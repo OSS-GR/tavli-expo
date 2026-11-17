@@ -44,6 +44,7 @@ function allProps(): Required<Omit<SettingsScreenProps, 'turnPushes' | 'visit'>>
     onTour: jest.fn(),
     onHistory: jest.fn(),
     onWhatsNew: jest.fn(),
+    onSupport: jest.fn(),
     onAccount: jest.fn(),
     account: { auth: auth!, usernames: usernames! },
     onBlocked: jest.fn(),
@@ -168,6 +169,21 @@ describe('<SettingsScreen /> index', () => {
     expect(screen.queryByRole('header', { name: 'Help' })).not.toBeOnTheScreen();
     expect(screen.queryByTestId('settings-learn-to-play')).not.toBeOnTheScreen();
     expect(screen.queryByTestId('settings-whats-new')).not.toBeOnTheScreen();
+  });
+
+  it('has Support Tavlaki last in Help, and it opens the Support screen (#590)', async () => {
+    const user = userEvent.setup();
+    const props = allProps();
+    await render(<SettingsScreen {...props} />);
+    const row = screen.getByRole('button', { name: 'Support Tavlaki' });
+    expect(screen.getByText('Buy me a coffee on Ko-fi')).toBeOnTheScreen();
+    await user.press(row);
+    expect(props.onSupport).toHaveBeenCalledTimes(1);
+    // Last in Help: no row of the group comes after it.
+    const ids = screen
+      .getAllByTestId(/^settings-(how-to-play|tour|whats-new|support)$/)
+      .map((node) => node.props.testID as string);
+    expect(ids.at(-1)).toBe('settings-support');
   });
 
   it("puts a gold dot on What's new while an update has news", async () => {

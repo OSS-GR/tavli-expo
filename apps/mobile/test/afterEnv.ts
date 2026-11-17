@@ -15,6 +15,7 @@ import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
 import { forgetRankedRulesForTest } from '../src/features/ranked/rankedRules';
 import { forgetRankedStartsForTest } from '../src/features/ranked/rankedStarts';
 import { resetRemindersForTest } from '../src/features/reminders/reminders';
+import { resetSupportAskForTest } from '../src/features/support/supportAsk';
 import { resetTourForTest } from '../src/features/tour/tourStore';
 import { resetUpdateCheckForTest } from '../src/features/update/updateCheck';
 import { markWhatsNewSeenForTest } from '../src/features/whats-new/seen';
@@ -61,4 +62,7 @@ beforeEach(() => {
   forgetLastModesForTest();
   // The app tour (#573): done, so Home never opens it. A test of it sets `new`.
   resetTourForTest('done');
+  // Support Tavlaki (#590): "Don't ask again", so no end screen shows the
+  // ask card. A test of it calls `resetSupportAskForTest('new')`.
+  resetSupportAskForTest('never');
 });

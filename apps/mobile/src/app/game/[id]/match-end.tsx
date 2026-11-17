@@ -22,6 +22,7 @@ import {
   rankedHref,
   RATINGS_HREF,
   reviewHref,
+  supportHref,
 } from '@/features/match/routes';
 import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchEnd } from '@/features/online/OnlineMatchEnd';
@@ -50,6 +51,7 @@ export default function MatchEndRoute() {
             onLeaderboards={() => router.push(RATINGS_HREF)}
             onNewPlayer={(game) => router.replace(rankedHref(game))}
             onPlayAgain={(playerId) => router.replace(friendInviteHref(playerId))}
+            onSupport={() => router.push(supportHref('ask'))}
           />
         )}
       </OnlineConnect>
@@ -79,6 +81,12 @@ function LocalMatchEnd({ id }: { id: string | null }) {
       match={match}
       // The result is read once per app run, not again on a remount (#216).
       announceKey={matchKey}
+      // Support Tavlaki (#590): the last game of the match counts here.
+      supportAsk={{
+        key: `${matchKey}:matchEnd`,
+        games: 1,
+        onSupport: () => router.push(supportHref('ask')),
+      }}
       onRematch={() => {
         // The last winner starts (engine `createRematch`); it is saved as a new match.
         session.store.getState().rematch();

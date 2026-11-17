@@ -192,6 +192,10 @@ describe('the homepage', () => {
     },
   );
 
+  it.each(pages)('the %s homepage links the Support page (#590)', (lang, file) => {
+    expect(read(file)).toContain(lang === 'el' ? 'href="/el/support/"' : 'href="/support/"');
+  });
+
   it('the invite page links the same TestFlight link in both languages', () => {
     const page = read('docs/legal/site/i/index.html');
     expect(page.split(`href="${TESTFLIGHT}"`)).toHaveLength(3);

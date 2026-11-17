@@ -38,7 +38,8 @@ export type WhatsNewEntryId =
   | 'gameLayout'
   | 'howToPlay'
   | 'appTour'
-  | 'lostDice';
+  | 'lostDice'
+  | 'support';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -54,6 +55,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-17',
+    entries: [{ id: 'support', icon: 'heart' }],
+  },
   {
     date: '2026-11-15',
     entries: [

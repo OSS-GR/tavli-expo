@@ -24,6 +24,7 @@ import { AccessibilityInfo } from 'react-native';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
+import { resetSupportAskForTest, supportAsk } from '@/features/support/supportAsk';
 
 import { createGameStore, type GameStore } from './gameStore';
 import { GameScreen, OPENING_RESULT_MS } from './GameScreen';
@@ -292,6 +293,28 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     expect(screen.getByTestId('game-content')).toHaveProp('importantForAccessibility', 'auto');
     expect(screen.getByTestId('menu-button')).toBeOnTheScreen();
     expect(screen.getByTestId('strip-bottom')).toBeOnTheScreen();
+  });
+
+  it('the support ask over the game-end sheet hides the sheet under it (#590)', async () => {
+    resetSupportAskForTest('new');
+    supportAsk.countGames(1, true);
+    const onSupport = jest.fn();
+    const store = newStore();
+    startAt(store, portes.initialState({ startingPlayer: 'white' }).board, 'portes');
+    await show(store, { supportAsk: { onSupport } });
+    focus.mockClear();
+    await act(async () => {
+      store.getState().dispatch({ type: 'resign', player: 'black' });
+    });
+    expect(screen.getByTestId('support-ask-card')).toBeOnTheScreen();
+    // The sheet is under the card: screen readers skip it.
+    expect(screen.queryByTestId('game-end-card')).toBeNull();
+    expect(screen.getByTestId('game-end-card', hidden)).toBeOnTheScreen();
+
+    await press('support-ask-support');
+    expect(onSupport).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(screen.getByTestId('game-end-card')).toBeOnTheScreen();
   });
 
   it('a menu or dialog on top (covered) hides the whole screen', async () => {

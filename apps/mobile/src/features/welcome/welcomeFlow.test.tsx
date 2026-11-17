@@ -94,6 +94,7 @@ const routes = {
   ratings: stub('leaderboards'),
   ranked: stub('play ranked'),
   'whats-new': stub("what's new"),
+  support: stub('support tavlaki'),
 };
 
 /** A URL for each app route (not the layout, not the welcome flow). */

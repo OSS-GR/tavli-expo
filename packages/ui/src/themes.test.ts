@@ -71,6 +71,7 @@ describe('themes', () => {
         ['onAccent', 'accentLight'], // the main button's gradient (#356)
         ['text', 'accentWash'], // the "Learn to play" banner on Home (#342)
         ['textDim', 'accentWash'],
+        ['textDim', 'surfaceRaised'], // Don't ask again on the support ask card (#590)
         // Error popups and lines (#462).
         ['problem', 'problemWash'],
         ['text', 'problemWash'],

@@ -37,6 +37,8 @@ import { isHumanWin } from '@/features/game/gameFeedback';
 import { winType, type WinType } from '@/features/game/turnNotices';
 import type { Seat } from '@/features/game/seats';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
+import { SupportAskCard, SupportAskCover } from '@/features/support/SupportAskCard';
+import { useSupportAsk } from '@/features/support/supportAsk';
 
 import { seatsFor } from './seats';
 import { HUMAN_SIDE, type MatchSetup } from './setup';
@@ -89,6 +91,14 @@ export type MatchEndScreenProps = (LocalMatchEnd | OnlineEnd) & {
    * it, every time the screen mounts.
    */
   announceKey?: string;
+  /**
+   * Support Tavlaki (#590): this match end counts `games` finished games
+   * once per `key` and app run, and the ask card may show over it when the
+   * player won. A local match counts only its last game here (the game-end
+   * sheet counted the others); a Play ranked match counts all its games.
+   * Online friend games pass none.
+   */
+  supportAsk?: { key: string; games: number; onSupport: () => void };
 };
 
 /**
@@ -117,6 +127,7 @@ export function MatchEndScreen({
   onChangeSettings,
   onHome,
   announceKey,
+  supportAsk,
 }: MatchEndScreenProps) {
   const { t } = useTranslation();
   const seats = online !== undefined ? online.seats : seatsFor(setup, t);
@@ -126,6 +137,10 @@ export function MatchEndScreen({
   const humans =
     online !== undefined ? [online.me] : setup.mode === 'bot' ? [HUMAN_SIDE] : undefined;
   const celebrate = isHumanWin(winner, humans);
+  const ask = useSupportAsk(supportAsk?.key ?? null, {
+    games: supportAsk?.games ?? 0,
+    won: isHumanWin(match.winner, humans),
+  });
 
   const title = seats[winner].you
     ? t('game.end.matchWinner_you')
@@ -205,155 +220,168 @@ export function MatchEndScreen({
 
   return (
     <Screen testID="match-end-screen">
-      <ScrollView contentContainerStyle={styles.content}>
-        <View testID="match-hero" style={styles.hero}>
-          {celebrate ? (
-            <Celebration
-              testID="match-celebration"
-              kind="match"
-              // A win by a person gets the trophy medallion (#361, #515).
-              icon={<EmptyMedallion testID="match-trophy" icon="trophy" size="small" />}
-            />
-          ) : null}
-          <View style={styles.titles}>
-            <Text style={styles.title} accessibilityRole="header">
-              {title}
-            </Text>
-            <Text style={styles.about}>{about}</Text>
-            {reason ? <Text style={styles.reason}>{reason}</Text> : null}
-          </View>
-          <View
-            testID="final-score"
-            style={styles.scoreRow}
-            accessible
-            accessibilityLabel={t('matchEnd.finalScore', { score: scoreLine })}>
-            {side('white')}
-            <Text style={styles.bigScore}>
-              {sideScore('white')}
-              <Text style={styles.dash}>{' – '}</Text>
-              {sideScore('black')}
-            </Text>
-            {side('black')}
-          </View>
-        </View>
-        {match.games.length > 0 ? (
-          <CardFrame testID="match-games">
-            {match.games.map((record, i) => {
-              // Each game names its variant (#109): "Game 2 · Plakoto".
-              const game = t('game.round', { number: i + 1, game: variantName(record.variant, t) });
-              const shortGame = oneGame ? t('matchEnd.game', { number: i + 1 }) : game;
-              // A game lost on time says so (#170): "Bot won on time".
-              const onTime = record.reason === 'timeout';
-              const result =
-                record.winner === null
-                  ? t('matchEnd.draw')
-                  : seats[record.winner].you
-                    ? t(onTime ? 'matchEnd.wonOnTime_you' : 'matchEnd.won_you')
-                    : t(onTime ? 'matchEnd.wonOnTime' : 'matchEnd.won', {
-                        name: name(record.winner),
-                      });
-              // Every game of an app match scores like the match rules (#241).
-              const type =
-                record.winner === null ? 'points' : winType(record, match.rules.scoring.method);
-              const chipKey = winChipKey(type);
-              const chip = chipKey === null ? null : t(chipKey);
-              const yours = record.winner !== null && seats[record.winner].you;
-              return (
-                <View key={i}>
-                  {i > 0 ? <RowDivider /> : null}
-                  <View
-                    testID={`match-game-${i + 1}`}
-                    style={styles.row}
-                    accessible
-                    accessibilityLabel={[
-                      game,
-                      result,
-                      chip,
-                      t('matchEnd.pointsLabel', { count: record.points }),
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}>
-                    <Text style={styles.rowGame}>{shortGame}</Text>
-                    {record.winner === null ? (
-                      <View style={styles.noChecker} />
-                    ) : (
-                      <CheckerAvatar
-                        wood={sideWood(record.winner)}
-                        size={ROW_CHECKER}
-                        name={null}
-                      />
-                    )}
-                    <Text style={styles.rowResult}>
-                      {result}
-                      {chip ? <Text style={styles.rowChip}>{` · ${chip}`}</Text> : null}
-                    </Text>
-                    <Text style={styles.rowPoints(yours)}>
-                      {t('matchEnd.points', { count: record.points })}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </CardFrame>
-        ) : null}
-        {online?.extra}
-        {/* Pushes the buttons down on a tall screen; with a large font all of it scrolls. */}
-        <View style={styles.spacer} />
-        <View style={styles.actions}>
-          {onRematch && rematchHint !== null ? (
-            <View style={styles.rematch}>
-              <ActionButton
-                testID="rematch-button"
-                label={rematchLabel}
-                icon="rotateCcw"
-                // The hint sits under the button; screen readers hear both.
-                accessibilityLabel={`${rematchLabel}, ${rematchHint}`}
-                onPress={onRematch}
+      <SupportAskCover covered={ask.open} fill="flex">
+        <ScrollView contentContainerStyle={styles.content}>
+          <View testID="match-hero" style={styles.hero}>
+            {celebrate ? (
+              <Celebration
+                testID="match-celebration"
+                kind="match"
+                // A win by a person gets the trophy medallion (#361, #515).
+                icon={<EmptyMedallion testID="match-trophy" icon="trophy" size="small" />}
               />
-              <Text
-                style={styles.rematchHint}
-                accessibilityElementsHidden
-                importantForAccessibility="no">
-                {rematchHint}
+            ) : null}
+            <View style={styles.titles}>
+              <Text style={styles.title} accessibilityRole="header">
+                {title}
               </Text>
+              <Text style={styles.about}>{about}</Text>
+              {reason ? <Text style={styles.reason}>{reason}</Text> : null}
             </View>
+            <View
+              testID="final-score"
+              style={styles.scoreRow}
+              accessible
+              accessibilityLabel={t('matchEnd.finalScore', { score: scoreLine })}>
+              {side('white')}
+              <Text style={styles.bigScore}>
+                {sideScore('white')}
+                <Text style={styles.dash}>{' – '}</Text>
+                {sideScore('black')}
+              </Text>
+              {side('black')}
+            </View>
+          </View>
+          {match.games.length > 0 ? (
+            <CardFrame testID="match-games">
+              {match.games.map((record, i) => {
+                // Each game names its variant (#109): "Game 2 · Plakoto".
+                const game = t('game.round', {
+                  number: i + 1,
+                  game: variantName(record.variant, t),
+                });
+                const shortGame = oneGame ? t('matchEnd.game', { number: i + 1 }) : game;
+                // A game lost on time says so (#170): "Bot won on time".
+                const onTime = record.reason === 'timeout';
+                const result =
+                  record.winner === null
+                    ? t('matchEnd.draw')
+                    : seats[record.winner].you
+                      ? t(onTime ? 'matchEnd.wonOnTime_you' : 'matchEnd.won_you')
+                      : t(onTime ? 'matchEnd.wonOnTime' : 'matchEnd.won', {
+                          name: name(record.winner),
+                        });
+                // Every game of an app match scores like the match rules (#241).
+                const type =
+                  record.winner === null ? 'points' : winType(record, match.rules.scoring.method);
+                const chipKey = winChipKey(type);
+                const chip = chipKey === null ? null : t(chipKey);
+                const yours = record.winner !== null && seats[record.winner].you;
+                return (
+                  <View key={i}>
+                    {i > 0 ? <RowDivider /> : null}
+                    <View
+                      testID={`match-game-${i + 1}`}
+                      style={styles.row}
+                      accessible
+                      accessibilityLabel={[
+                        game,
+                        result,
+                        chip,
+                        t('matchEnd.pointsLabel', { count: record.points }),
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}>
+                      <Text style={styles.rowGame}>{shortGame}</Text>
+                      {record.winner === null ? (
+                        <View style={styles.noChecker} />
+                      ) : (
+                        <CheckerAvatar
+                          wood={sideWood(record.winner)}
+                          size={ROW_CHECKER}
+                          name={null}
+                        />
+                      )}
+                      <Text style={styles.rowResult}>
+                        {result}
+                        {chip ? <Text style={styles.rowChip}>{` · ${chip}`}</Text> : null}
+                      </Text>
+                      <Text style={styles.rowPoints(yours)}>
+                        {t('matchEnd.points', { count: record.points })}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </CardFrame>
           ) : null}
-          {/* A ranked match's own buttons (#532), above Review and Home. */}
-          {online?.actions}
-          {onReview ? (
-            <View style={styles.pair}>
+          {online?.extra}
+          {/* Pushes the buttons down on a tall screen; with a large font all of it scrolls. */}
+          <View style={styles.spacer} />
+          <View style={styles.actions}>
+            {onRematch && rematchHint !== null ? (
+              <View style={styles.rematch}>
+                <ActionButton
+                  testID="rematch-button"
+                  label={rematchLabel}
+                  icon="rotateCcw"
+                  // The hint sits under the button; screen readers hear both.
+                  accessibilityLabel={`${rematchLabel}, ${rematchHint}`}
+                  onPress={onRematch}
+                />
+                <Text
+                  style={styles.rematchHint}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no">
+                  {rematchHint}
+                </Text>
+              </View>
+            ) : null}
+            {/* A ranked match's own buttons (#532), above Review and Home. */}
+            {online?.actions}
+            {onReview ? (
+              <View style={styles.pair}>
+                <ActionButton
+                  testID="review-button"
+                  label={t('game.end.review')}
+                  icon="chart"
+                  kind="secondary"
+                  grow
+                  onPress={onReview}
+                />
+                {home(true)}
+              </View>
+            ) : (
+              home(false)
+            )}
+            {onChangeSettings ? (
               <ActionButton
-                testID="review-button"
-                label={t('game.end.review')}
-                icon="chart"
-                kind="secondary"
-                grow
-                onPress={onReview}
+                testID="change-settings-button"
+                label={t('game.end.changeSettings')}
+                kind="text"
+                onPress={onChangeSettings}
               />
-              {home(true)}
-            </View>
-          ) : (
-            home(false)
-          )}
-          {onChangeSettings ? (
-            <ActionButton
-              testID="change-settings-button"
-              label={t('game.end.changeSettings')}
-              kind="text"
-              onPress={onChangeSettings}
-            />
-          ) : null}
-          {online?.onReportOrBlock ? (
-            <ActionButton
-              testID="end-report-block"
-              label={t('safety.action')}
-              accessibilityLabel={t('safety.actionLabel', { name: name(opponent(online.me)) })}
-              kind="text"
-              onPress={online.onReportOrBlock}
-            />
-          ) : null}
-        </View>
-      </ScrollView>
+            ) : null}
+            {online?.onReportOrBlock ? (
+              <ActionButton
+                testID="end-report-block"
+                label={t('safety.action')}
+                accessibilityLabel={t('safety.actionLabel', { name: name(opponent(online.me)) })}
+                kind="text"
+                onPress={online.onReportOrBlock}
+              />
+            ) : null}
+          </View>
+        </ScrollView>
+      </SupportAskCover>
+      {ask.open ? (
+        <SupportAskCard
+          onAnswer={(answer) => {
+            ask.answer(answer);
+            if (answer === 'support') supportAsk?.onSupport();
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

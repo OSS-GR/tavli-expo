@@ -15,6 +15,7 @@ import { AccessibilityInfo } from 'react-native';
 import * as Reanimated from 'react-native-reanimated';
 
 import { onlineSeats } from '@/features/online/seats';
+import { resetSupportAskForTest, supportAsk } from '@/features/support/supportAsk';
 import i18n from '@/i18n';
 
 import { MatchEndScreen } from './MatchEndScreen';
@@ -484,5 +485,87 @@ describe('<MatchEndScreen /> announcement after a remount (#216)', () => {
     await screen.unmount();
     await renderWithRoot(<MatchEndScreen setup={botSetup} match={match} {...props} />);
     expect(announce).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('<MatchEndScreen /> support ask (#590)', () => {
+  const won = () =>
+    playedMatch([
+      ['white', 1],
+      ['white', 2],
+    ]);
+  const lost = () =>
+    playedMatch([
+      ['black', 1],
+      ['black', 2],
+    ]);
+
+  function showAsk(match: Match, key = 'm1:matchEnd') {
+    const props = { onRematch: jest.fn(), onChangeSettings: jest.fn(), onHome: jest.fn() };
+    const onSupport = jest.fn();
+    const view = renderWithRoot(
+      <MatchEndScreen
+        setup={botSetup}
+        match={match}
+        {...props}
+        supportAsk={{ key, games: 1, onSupport }}
+      />,
+    );
+    return { onSupport, view };
+  }
+
+  beforeEach(() => {
+    resetSupportAskForTest('new');
+    // One finished game before: this end is the second.
+    supportAsk.countGames(1, true);
+  });
+
+  it('asks after the second won game, hides the screen under it, and Support opens the Support screen', async () => {
+    const user = userEvent.setup();
+    const { onSupport, view } = showAsk(won());
+    await view;
+    const card = within(screen.getByTestId('support-ask-card'));
+    expect(card.getByRole('header', { name: 'Enjoying Tavlaki?' })).toBeOnTheScreen();
+    // The end screen under the card is hidden from screen readers.
+    expect(screen.queryByTestId('match-games')).toBeNull();
+    expect(screen.getByTestId('match-games', hidden)).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: "Don't ask again" })).toBeOnTheScreen();
+
+    await user.press(screen.getByTestId('support-ask-support'));
+    expect(onSupport).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(screen.getByTestId('match-games')).toBeOnTheScreen();
+  });
+
+  it('never asks after a loss, and keeps the ask for the next win', async () => {
+    await showAsk(lost()).view;
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(supportAsk.state().asked).toBe(false);
+  });
+
+  it('counts the game once: a remount shows no card again', async () => {
+    const user = userEvent.setup();
+    await showAsk(won()).view;
+    await user.press(screen.getByTestId('support-ask-not-now'));
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(supportAsk.state().games).toBe(0);
+    await screen.unmount();
+    await showAsk(won()).view;
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(supportAsk.state().games).toBe(0);
+  });
+
+  it("Don't ask again stops the asks", async () => {
+    const user = userEvent.setup();
+    await showAsk(won()).view;
+    await user.press(screen.getByTestId('support-ask-never'));
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(supportAsk.state().stopped).toBe(true);
+  });
+
+  it('shows nothing without the prop (an online friend match, the tutorial)', async () => {
+    await show(botSetup, won()).view;
+    expect(screen.queryByTestId('support-ask-card')).toBeNull();
+    expect(supportAsk.state().games).toBe(1);
   });
 });

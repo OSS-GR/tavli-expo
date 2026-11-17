@@ -1,5 +1,5 @@
 /** Links and route params of the app shell (wireframes, "Route map"). Pure. */
-import type { RankedGame, TutorialGame, TutorialSource } from '@tavli/contracts';
+import type { RankedGame, SupportSource, TutorialGame, TutorialSource } from '@tavli/contracts';
 import type { PresetId } from '@tavli/engine';
 
 import {
@@ -68,6 +68,16 @@ export function tourHref(from: TourSource) {
 /** Reads the tour's `from`. Anything else is Home. */
 export function parseTourSource(value: string | undefined): TourSource {
   return value === 'rules' || value === 'settings' ? value : 'home';
+}
+
+/** Support Tavlaki (#590), from the Settings row or the ask card. */
+export function supportHref(from: SupportSource) {
+  return { pathname: '/support', params: { from } } as const;
+}
+
+/** Reads the Support screen's `from`. Anything else is Settings. */
+export function parseSupportSource(value: string | undefined): SupportSource {
+  return value === 'ask' ? 'ask' : 'settings';
 }
 
 /** A local match id (`local-…`). Any other id names an online game (#255). */

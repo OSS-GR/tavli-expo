@@ -41,6 +41,12 @@ export interface MatchScreenProps {
   onMatchOver: () => void;
   /** "Review" on the game-end sheet: the review of the game that just ended (#215). */
   onReview?: () => void;
+  /**
+   * Support Tavlaki (#590): opens the Support screen from the ask card,
+   * which may show over a game-end sheet. Without it the games here are
+   * not counted for the ask.
+   */
+  onSupport?: () => void;
   /** For tests: another runner, or bot timing on top of the Bot speed setting. */
   runner?: BotRunner;
   botTiming?: Partial<BotTiming>;
@@ -60,6 +66,7 @@ export function MatchScreen({
   onRules,
   onMatchOver,
   onReview,
+  onSupport,
   runner = botRunner,
   botTiming,
   fastForwardTiming,
@@ -235,6 +242,7 @@ export function MatchScreen({
         onHome={onExit}
         onMatchOver={onMatchOver}
         {...(onReview ? { onReview } : {})}
+        {...(onSupport ? { supportAsk: { onSupport } } : {})}
         gameLabel={gameLabel}
         {...(nextLabel ? { nextGameLabel: nextLabel } : {})}
         analyzer={analyzer}
