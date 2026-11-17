@@ -12,14 +12,15 @@ import type {
   InviteErrorCode,
   RecordingPushProvider,
 } from '@tavli/contracts';
+import { usernameKey } from '@tavli/online';
 
 import { api, components, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { GAME_RESIGN_PAGE, INVITE_DELETE_PAGE } from './account';
+import { GAME_RESIGN_PAGE, INVITE_DELETE_PAGE, OWNER_LOOKUP_LIMIT, guestNumberIn } from './account';
 import { MATCH_END_PUSH_TEXT } from './model/push';
 import { setPushProvider } from './push';
 import schema from './schema';
-import { modules } from './test.setup';
+import { authUsers, modules } from './test.setup';
 
 type Tester = ReturnType<typeof setup>;
 
@@ -577,5 +578,134 @@ describe('deleteSentInvites (#306)', () => {
       ),
     );
     expect(pending).toEqual([]);
+  });
+});
+
+describe("the owner's tools for a delete request by email (#447)", () => {
+  /** Gives `playerId` a name row, as `ensureGuestNumber` and `setMyUsername` do. */
+  async function nameRow(t: Tester, playerId: string, guestNumber: string, username?: string) {
+    await t.run(async (ctx) => {
+      await ctx.db.insert('playerNames', {
+        playerId,
+        guestNumber,
+        ...(username === undefined ? {} : { username, usernameKey: usernameKey(username) }),
+      });
+    });
+  }
+
+  it('deleteAccountForOwner runs the same delete as the app, with its later pages', async () => {
+    const t = setup();
+    const alice = await guest(t);
+    const bob = await guest(t);
+    const active = await createGame(t, alice, bob);
+    await createInvite(t, alice);
+    const cancelled = await createInvite(t, alice);
+    await as(t, alice).mutation(api.invites.cancelInvite, { code: cancelled });
+    const bobsInvite = await createInvite(t, bob);
+    await register(t, alice, 'ExponentPushToken[alice-phone]');
+    await flush(t);
+
+    await t.mutation(internal.account.deleteAccountForOwner, { userId: alice });
+
+    const resigned = await as(t, bob).query(api.games.getGame, { gameId: active });
+    expect(resigned?.status).toBe('finished');
+    expect(resigned?.match.resignedBy).toBe('white');
+    await flush(t);
+    expect(await inviteCodes(t)).toEqual([bobsInvite]);
+    const tokens = await t.run(async (ctx) => await ctx.db.query('pushTokens').collect());
+    expect(tokens).toEqual([]);
+    const names = await t.run(async (ctx) => await ctx.db.query('playerNames').collect());
+    expect(names.map((row) => row.playerId)).toEqual([bob]);
+    expect(await authRows(t, 'user', alice)).toEqual([]);
+    expect(await authRows(t, 'session', alice)).toEqual([]);
+    expect(await authRows(t, 'user', bob)).toHaveLength(1);
+    // The app's old token is refused, as after the app's own delete.
+    await rejectsWith(as(t, alice).mutation(api.account.deleteMyAccount, {}), 'NOT_SIGNED_IN');
+  });
+
+  it('deleteAccountForOwner resigns more games than one page, after the call', async () => {
+    const t = setup();
+    const [alice, bob] = (await authUsers(t, 2)) as [string, string];
+    const games: Id<'games'>[] = [];
+    for (let i = 0; i < GAME_RESIGN_PAGE + 2; i++) games.push(await createGame(t, alice, bob));
+    await t.mutation(internal.account.deleteAccountForOwner, { userId: alice });
+    await flush(t);
+    for (const gameId of games) expect((await rawGame(t, gameId))?.status).toBe('finished');
+  });
+
+  it('deleteAccountForOwner refuses an id with no account, and a second run', async () => {
+    const t = setup();
+    const [alice] = (await authUsers(t, 1)) as [string];
+    await expect(
+      t.mutation(internal.account.deleteAccountForOwner, { userId: 'nobody' }),
+    ).rejects.toThrow('no account has this user id');
+    await t.mutation(internal.account.deleteAccountForOwner, { userId: alice });
+    await expect(
+      t.mutation(internal.account.deleteAccountForOwner, { userId: alice }),
+    ).rejects.toThrow('no account has this user id');
+  });
+
+  it('findAccountForOwner finds a username by its key, and says the account is saved', async () => {
+    const t = setup();
+    const [saved, other] = (await authUsers(t, 2, true)) as [string, string];
+    await nameRow(t, saved, '4821', 'Orestis');
+    await nameRow(t, other, '1234', 'Marina');
+    expect(await t.query(internal.account.findAccountForOwner, { username: 'ORESTÍS' })).toEqual([
+      { userId: saved, saved: true },
+    ]);
+    expect(await t.query(internal.account.findAccountForOwner, { username: 'nobody' })).toEqual([]);
+  });
+
+  it('findAccountForOwner finds every account with a guest number, with only the id and saved', async () => {
+    const t = setup();
+    const [first, second, stranger] = (await authUsers(t, 3)) as [string, string, string];
+    const [saved] = (await authUsers(t, 1, true)) as [string];
+    await nameRow(t, first, '4821');
+    await nameRow(t, second, '4821');
+    await nameRow(t, saved, '4821', 'Orestis');
+    await nameRow(t, stranger, '1000');
+    for (const guestName of ['Guest 4821', 'Επισκέπτης 4821', '4821']) {
+      const found = await t.query(internal.account.findAccountForOwner, { guestName });
+      expect(found).toHaveLength(3);
+      expect(found).toEqual(
+        expect.arrayContaining([
+          { userId: first, saved: false },
+          { userId: second, saved: false },
+          { userId: saved, saved: true },
+        ]),
+      );
+      for (const row of found) expect(Object.keys(row).sort()).toEqual(['saved', 'userId']);
+    }
+  });
+
+  it('findAccountForOwner skips a name row whose account is gone, and caps a guest number', async () => {
+    const t = setup();
+    await nameRow(t, 'gone', '4821');
+    expect(await t.query(internal.account.findAccountForOwner, { guestName: '4821' })).toEqual([]);
+    const many = await authUsers(t, OWNER_LOOKUP_LIMIT + 1);
+    for (const id of many) await nameRow(t, id, '5555');
+    const found = await t.query(internal.account.findAccountForOwner, { guestName: 'Guest 5555' });
+    expect(found).toHaveLength(OWNER_LOOKUP_LIMIT);
+  });
+
+  it('findAccountForOwner takes exactly one of a username and a guest name', async () => {
+    const t = setup();
+    await expect(t.query(internal.account.findAccountForOwner, {})).rejects.toThrow('not both');
+    await expect(
+      t.query(internal.account.findAccountForOwner, { username: 'a', guestName: '4821' }),
+    ).rejects.toThrow('not both');
+    await expect(
+      t.query(internal.account.findAccountForOwner, { guestName: 'Guest' }),
+    ).rejects.toThrow('four digits');
+  });
+
+  it('guestNumberIn reads the four digits of a guest name', () => {
+    expect(guestNumberIn('Guest 4821')).toBe('4821');
+    expect(guestNumberIn('Επισκέπτης 4821')).toBe('4821');
+    expect(guestNumberIn(' 1000 ')).toBe('1000');
+    expect(guestNumberIn('Guest 0999')).toBeNull();
+    expect(guestNumberIn('48210')).toBeNull();
+    expect(guestNumberIn('4821 and 1234')).toBeNull();
+    expect(guestNumberIn('')).toBeNull();
   });
 });
