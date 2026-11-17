@@ -160,6 +160,8 @@ import { onlineStoreEvents } from '@/features/online/onlineFeedback';
 import { remoteRoll } from '@/features/online/remoteRoll';
 import { remoteSteps } from '@/features/online/remoteTurn';
 import { useSettings } from '@/features/settings/store';
+import { SupportAskCard, SupportAskCover } from '@/features/support/SupportAskCard';
+import { useSupportAsk } from '@/features/support/supportAsk';
 
 import {
   onlinePassLine,
@@ -383,6 +385,13 @@ export interface GameScreenProps {
   onHintShown?: () => void;
   /** An online game (#255): the server rolls, and the other player is remote. */
   online?: OnlineSide;
+  /**
+   * Support Tavlaki (#590): a local match (vs the bot or pass-and-play)
+   * counts each game that ends here, and the ask card may show over the
+   * game-end sheet. `onSupport` opens the Support screen. Online games and
+   * the tutorial pass none.
+   */
+  supportAsk?: { onSupport: () => void };
 }
 
 const other = (player: PlayerId): PlayerId => (player === 'white' ? 'black' : 'white');
@@ -404,6 +413,7 @@ export function GameScreen({
   analyzer,
   onHintShown,
   online,
+  supportAsk,
 }: GameScreenProps) {
   const { t } = useTranslation();
   const theme = useBoardTheme();
@@ -1526,6 +1536,13 @@ export function GameScreen({
               key: `${matchKey}:end:${gameKey}`,
             }
           : null;
+  // Support Tavlaki (#590): a local game that ended here counts once; the
+  // last game of a match counts on the match-end screen instead.
+  const localEnd = supportAsk !== undefined && ended === null && gameOver && game.result !== null;
+  const ask = useSupportAsk(localEnd ? `${matchKey}:end:${gameKey}` : null, {
+    games: 1,
+    won: localEnd && isHumanWin(game.result?.winner, humans),
+  });
   let endSheet = null;
   if (ending !== null) {
     const { result } = ending;
@@ -2389,7 +2406,19 @@ export function GameScreen({
         {landscape ? null : moveList}
         {trail}
       </View>
-      {endSheet}
+      {endSheet !== null ? (
+        <SupportAskCover covered={ask.open} fill="absolute">
+          {endSheet}
+        </SupportAskCover>
+      ) : null}
+      {endSheet !== null && ask.open ? (
+        <SupportAskCard
+          onAnswer={(answer) => {
+            ask.answer(answer);
+            if (answer === 'support') supportAsk?.onSupport();
+          }}
+        />
+      ) : null}
     </View>
   );
 }

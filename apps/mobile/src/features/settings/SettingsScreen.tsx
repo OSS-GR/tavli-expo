@@ -47,6 +47,8 @@ export interface SettingsScreenProps {
   onWhatsNew?: () => void;
   /** Opens the app tour (#573): a row in the Help group. */
   onTour?: () => void;
+  /** Opens Support Tavlaki (#590): the last row of the Help group. */
+  onSupport?: () => void;
   /**
    * Turn notifications (#285). Its row shows only with it: a build with no
    * online play has none.
@@ -83,6 +85,7 @@ export function SettingsScreen({
   onHistory,
   onWhatsNew,
   onTour,
+  onSupport,
   turnPushes,
   onAccount,
   account,
@@ -211,7 +214,7 @@ export function SettingsScreen({
         </SectionCard>
       ) : null}
 
-      {onHowToPlay || onWhatsNew || onTour ? (
+      {onHowToPlay || onWhatsNew || onTour || onSupport ? (
         <SectionCard title={t('settings.sections.help')}>
           {onHowToPlay ? (
             <SectionRow
@@ -247,6 +250,17 @@ export function SettingsScreen({
                 whatsNewDue ? <View testID="settings-whats-new-dot" style={styles.dot} /> : null
               }
               onPress={onWhatsNew}
+            />
+          ) : null}
+          {/* Last in Help (#590). It stays after "Don't ask again" on the ask card. */}
+          {onSupport ? (
+            <SectionRow
+              testID="settings-support"
+              icon="heart"
+              iconLook="bare"
+              label={t('settings.support.label')}
+              hint={t('settings.support.hint')}
+              onPress={onSupport}
             />
           ) : null}
         </SectionCard>

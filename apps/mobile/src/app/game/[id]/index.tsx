@@ -30,6 +30,7 @@ import {
   parseIdParam,
   reviewHref,
   rulesHref,
+  supportHref,
 } from '@/features/match/routes';
 import { useTurnPushOffering } from '@/features/notifications/appTurnPushes';
 import { stopDevGame } from '@/features/online/devGame';
@@ -107,6 +108,8 @@ export default function GameRoute() {
         onMatchOver={() => router.replace(matchEndHref(session.id))}
         // The review of the game that just ended (#215); Back returns to the sheet.
         onReview={() => router.push(reviewHref(session.id))}
+        // Support Tavlaki (#590): the ask card's button; Back returns to the sheet.
+        onSupport={() => router.push(supportHref('ask'))}
       />
     </View>
   );
