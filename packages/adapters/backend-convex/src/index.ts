@@ -5,7 +5,7 @@
  * adapters backed by Convex (ADR-0004).
  *
  * They call the functions in `apps/server/convex/games.ts`, `invites.ts`,
- * `push.ts`, `account.ts`, `appUpdate.ts`, `usernames.ts`, `safety.ts`,
+ * `push.ts`, `account.ts`, `myData.ts`, `appUpdate.ts`, `usernames.ts`, `safety.ts`,
  * `friends.ts`, `ratings.ts` and `matchmaking.ts`. The server reads the caller from the sign-in token
  * (`AuthProvider`). See README.md.
  */
@@ -33,6 +33,8 @@ export {
   INVITE_FUNCTIONS,
   MATCH_FUNCTION_NAMES,
   MATCH_FUNCTIONS,
+  MY_DATA_FUNCTION_NAMES,
+  MY_DATA_FUNCTIONS,
   PUSH_FUNCTION_NAMES,
   PUSH_FUNCTIONS,
   RATING_FUNCTION_NAMES,
@@ -48,6 +50,7 @@ export {
   type GameFunctions,
   type InviteFunctions,
   type MatchFunctions,
+  type MyDataFunctions,
   type NewInviteArgs,
   type PushFunctions,
   type RatingFunctions,
@@ -82,6 +85,7 @@ export {
 } from './invites';
 export {
   createConvexOnlineData,
+  type ConvexActionClient,
   type ConvexOnlineDataClient,
   type ConvexOnlineDataOptions,
 } from './onlineData';

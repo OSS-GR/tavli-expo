@@ -138,12 +138,45 @@ describe('<RankedScreen /> without a saved account', () => {
     await open();
     await user.press(await screen.findByTestId('ranked-apple'));
     await flush();
-    // A new account picks a username first; Not now skips it.
+    // A new account picks a username first: ranked needs one (#599), so no Not now.
     const step = await screen.findByTestId('ranked-username-step');
-    await user.press(within(step).getByText('Not now'));
-    await flush();
+    expect(within(step).queryByText('Not now')).toBeNull();
+    await pickUsername(user, 'Maria');
     expect(await screen.findByTestId('ranked-setup')).toBeOnTheScreen();
     expect(onlineFake.authStore.guests).toBe(0);
+  });
+});
+
+/** Fills the username step and saves it. */
+async function pickUsername(user: ReturnType<typeof setupUser>, name: string): Promise<void> {
+  await user.type(screen.getByTestId('username-input'), name);
+  await user.press(screen.getByTestId('username-terms'));
+  await user.press(screen.getByTestId('username-age'));
+  await user.press(screen.getByTestId('username-save'));
+  await flush();
+}
+
+describe('<RankedScreen /> with a saved account and no username (#599)', () => {
+  it('shows the username gate, never the setup; after the pick the setup shows', async () => {
+    const seek = jest.spyOn(onlineFake.matchmaking, 'seek');
+    const nonce = await auth!.keyNonce();
+    await auth!.signInWithKey({
+      provider: 'apple',
+      idToken: memoryAppleIdToken('apple-1', nonce),
+      nonce,
+    });
+    rememberOnlineAccount();
+    await open();
+    expect(await screen.findByTestId('ranked-username-gate')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        'In ranked games the other player sees your username, and the leaderboards show it. Pick one to play ranked.',
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByTestId('ranked-setup')).toBeNull();
+    await pickUsername(setupUser(), 'Maria');
+    expect(await screen.findByTestId('ranked-setup')).toBeOnTheScreen();
+    expect(seek).not.toHaveBeenCalled();
   });
 });
 

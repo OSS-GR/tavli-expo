@@ -43,6 +43,7 @@ describe('seekRange', () => {
 describe('isMatchmakingErrorData', () => {
   it('accepts only known codes with a message', () => {
     expect(isMatchmakingErrorData({ code: 'NOT_SAVED', message: 'save first' })).toBe(true);
+    expect(isMatchmakingErrorData({ code: 'USERNAME_NEEDED', message: 'pick one' })).toBe(true);
     expect(isMatchmakingErrorData({ code: 'NOPE', message: 'x' })).toBe(false);
     expect(isMatchmakingErrorData({ code: 'NOT_SAVED' })).toBe(false);
     expect(isMatchmakingErrorData(null)).toBe(false);

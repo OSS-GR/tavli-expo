@@ -39,6 +39,7 @@ export {
   candidatePairs,
   checkRankedChoice,
   checkSeekSaved,
+  checkSeekUsername,
   countLooking,
   inRange,
   isMatchedSeekDone,
@@ -151,6 +152,7 @@ export {
   NO_RECORD,
   checkFriendCaps,
   checkFriendTarget,
+  checkFriendUsername,
   checkFriends,
   checkOpenRequest,
   checkSaved,
@@ -191,6 +193,7 @@ export {
   type GuestGameMove,
 } from './guest-move';
 export { latestGames, newestFirst, summarizeGame } from './summaries';
+export { makeMyData, myDataAccount, myDataGame, myDataInvite, myDataRating } from './my-data';
 export type { SummaryInput } from './summaries';
 export { createMemoryGameServer } from './memory-server';
 export type {

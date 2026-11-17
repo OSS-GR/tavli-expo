@@ -30,6 +30,11 @@ export async function nameRowOf(ctx: QueryCtx, playerId: string) {
     .first();
 }
 
+/** `playerId` has picked a username (#405). Friends and Play ranked need one (#599). */
+export async function hasUsername(ctx: QueryCtx, playerId: string): Promise<boolean> {
+  return (await nameRowOf(ctx, playerId))?.username !== undefined;
+}
+
 /** Gives `playerId` a guest number, unless they have one. */
 export async function ensureGuestNumber(ctx: MutationCtx, playerId: string): Promise<void> {
   if ((await nameRowOf(ctx, playerId)) !== null) return;

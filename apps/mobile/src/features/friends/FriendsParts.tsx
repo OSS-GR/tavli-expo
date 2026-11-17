@@ -3,6 +3,7 @@
  * (loading, not signed in, a guest, a failed load), and the problem line.
  */
 import { useTranslation } from 'react-i18next';
+import type { Usernames } from '@tavli/contracts';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -11,6 +12,7 @@ import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
 
 import { AccountBenefits } from '@/features/online/AccountBenefits';
+import { UsernameGate } from '@/features/online/UsernameGate';
 
 import type { FriendsLoad, FriendsProblem } from './friendsData';
 
@@ -22,10 +24,23 @@ export interface NotReadyProps {
   testID: string;
   /** Whose texts to read: the friends screens' (default) or the leaderboards' (#407). */
   texts?: 'friends' | 'ratings';
+  /** For the username gate (#599): it saves the pick. */
+  usernames: Usernames;
 }
 
-/** The screen before its data: loading, not signed in, a guest, or a failed load. */
-export function NotReady({ state, onRetry, onAccount, testID, texts = 'friends' }: NotReadyProps) {
+/**
+ * The screen before its data: loading, not signed in, a guest, a saved
+ * account with no username (the gate, then `onRetry` loads the screen),
+ * or a failed load.
+ */
+export function NotReady({
+  state,
+  onRetry,
+  onAccount,
+  testID,
+  texts = 'friends',
+  usernames,
+}: NotReadyProps) {
   const { t } = useTranslation();
   switch (state.kind) {
     case 'loading':
@@ -62,6 +77,16 @@ export function NotReady({ state, onRetry, onAccount, testID, texts = 'friends' 
             onPress={onAccount}
           />
         </>
+      );
+    case 'username':
+      return (
+        <UsernameGate
+          testID={`${testID}-username-gate`}
+          usernames={usernames}
+          feature={texts}
+          mine={state.mine}
+          onDone={onRetry}
+        />
       );
     case 'failed':
       return (

@@ -37,6 +37,7 @@ import {
   type BoardRow,
   type MyRating,
   type Ratings,
+  type Usernames,
 } from '@tavli/contracts';
 import type { TFunction } from 'i18next';
 import { useCallback, useState } from 'react';
@@ -65,6 +66,8 @@ export interface RatingsScreenProps {
   /** Counts the times the screen shows (the route): each new one loads again. */
   visit?: number;
   auth: AuthProvider;
+  /** Saves a username at the username gate (#599). */
+  usernames: Usernames;
   ratings: Ratings;
   onBack: () => void;
   /** Opens Settings → Account (a guest saves the account there). */
@@ -101,6 +104,7 @@ const NO_RANK = '–';
 
 export function RatingsScreen({
   auth,
+  usernames,
   ratings,
   onBack,
   onAccount,
@@ -117,7 +121,7 @@ export function RatingsScreen({
     ]);
     return { mine, friends, everyone };
   }, [ratings]);
-  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit);
+  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit, usernames);
   const [board, setBoard] = useState<BoardKind>('friends');
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -154,6 +158,7 @@ export function RatingsScreen({
             state={state}
             onRetry={retry}
             onAccount={onAccount}
+            usernames={usernames}
             testID="ratings"
             texts="ratings"
           />

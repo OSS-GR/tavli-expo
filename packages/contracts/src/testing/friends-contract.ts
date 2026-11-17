@@ -8,7 +8,9 @@
  *
  * Make a new subject for each check: three players with saved accounts
  * (`alice`, `bob`, `carol`) and one guest, on one server, who have not
- * met. A check rejects with an `Error` when the adapter breaks the
+ * met and have no username. Each check picks the usernames it needs
+ * first (`USERNAMES`): the calls that reach another player need one
+ * (#599). A check rejects with an `Error` when the adapter breaks the
  * contract. The checks never wait on a real clock.
  *
  * The caps, the hourly search limit and the wait after a decline need
@@ -139,8 +141,76 @@ async function setUsername(
     .setMine({ name, acceptTerms: TERMS_VERSION, ageChecked: true });
 }
 
+/** The usernames a check gives the saved players before it runs (#599). */
+const USERNAMES: Readonly<Record<Exclude<FriendsContractPlayer, 'guest'>, string>> = {
+  alice: 'Alice_Plays',
+  bob: 'Bob_Plays',
+  carol: 'Carol_Plays',
+};
+
+type Named = Exclude<FriendsContractPlayer, 'guest'>;
+
+interface CheckSpec extends FriendsContractCheck {
+  /** The players who get their username first. Default: all three. */
+  readonly named?: readonly Named[];
+}
+
 export function friendsContract(): readonly FriendsContractCheck[] {
+  return checks().map(({ name, run, named = ['alice', 'bob', 'carol'] }) => ({
+    name,
+    run: async (subject: FriendsContractSubject) => {
+      for (const player of named) await setUsername(subject, player, USERNAMES[player]);
+      await run(subject);
+    },
+  }));
+}
+
+function checks(): readonly CheckSpec[] {
   return [
+    {
+      name: 'a saved player with no username may read and clean up, but not reach others',
+      named: ['bob', 'carol'],
+      run: async (subject) => {
+        const alice = subject.friendsFor('alice');
+        const bobId = subject.idOf('bob');
+        const what = 'with no username';
+        const token = await subject.friendsFor('bob').myFriendLink();
+        await failsWith(alice.findPlayer('Bob_Plays'), 'USERNAME_NEEDED', `findPlayer() ${what}`);
+        await failsWith(alice.myFriendLink(), 'USERNAME_NEEDED', `myFriendLink() ${what}`);
+        await failsWith(alice.resetFriendLink(), 'USERNAME_NEEDED', `resetFriendLink() ${what}`);
+        await failsWith(alice.requestByLink(token), 'USERNAME_NEEDED', `requestByLink() ${what}`);
+        await failsWith(
+          alice.requestByUsername('Bob_Plays'),
+          'USERNAME_NEEDED',
+          `requestByUsername() ${what}`,
+        );
+        await failsWith(alice.sendRequest(bobId), 'USERNAME_NEEDED', `sendRequest() ${what}`);
+        await failsWith(alice.acceptRequest(bobId), 'USERNAME_NEEDED', `acceptRequest() ${what}`);
+        await failsWith(
+          alice.inviteFriend(bobId, GAME),
+          'USERNAME_NEEDED',
+          `inviteFriend() ${what}`,
+        );
+        // The reads and the clean-up calls stay open.
+        same(await alice.listFriends(), [], `listFriends() ${what}`);
+        same(await alice.listFriendInvites(), [], `listFriendInvites() ${what}`);
+        same(await alice.recentPlayers(), [], `recentPlayers() ${what}`);
+        same((await alice.openFriendLink(token))?.status, 'none', `openFriendLink() ${what}`);
+        same(
+          await subject.friendsFor('carol').requestByUsername('Bob_Plays'),
+          'sent',
+          'carol asks bob',
+        );
+        same(await alice.listRequests(), { incoming: [], outgoing: [] }, `listRequests() ${what}`);
+        await alice.declineRequest(bobId);
+        await alice.cancelRequest(bobId);
+        await alice.removeFriend(bobId);
+
+        // After a pick, the same calls work.
+        await setUsername(subject, 'alice', USERNAMES.alice);
+        same(await alice.requestByLink(token), 'sent', 'alice asks bob after her pick');
+      },
+    },
     {
       name: 'refuses every call with nobody signed in',
       run: async (subject) => {
@@ -330,7 +400,6 @@ export function friendsContract(): readonly FriendsContractCheck[] {
     {
       name: 'a username search is exact, and a block hides the player',
       run: async (subject) => {
-        await setUsername(subject, 'alice', 'Alice_Plays');
         const bob = subject.friendsFor('bob');
         same(
           await bob.findPlayer('alice_plays'),

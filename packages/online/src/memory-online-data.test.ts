@@ -10,6 +10,7 @@ import type { OnlineDataContractSubject } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 
 import { createMemoryGameServer } from './memory-server';
+import { markNamed } from './testing';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -35,6 +36,8 @@ function contractSubject(): OnlineDataContractSubject {
             // The in-memory server has no sign-in: the app's fake gives
             // this answer with nobody signed in (`test/onlineFake.ts`).
             deleteMyData: () =>
+              Promise.reject({ code: 'NOT_SIGNED_IN', message: 'nobody is signed in' }),
+            exportMyData: () =>
               Promise.reject({ code: 'NOT_SIGNED_IN', message: 'nobody is signed in' }),
           }
         : server.onlineDataFor(ids[player]),
@@ -88,5 +91,38 @@ describe('onlineDataFor', () => {
       'this account does not exist',
     );
     await expect(server.onlineDataFor(BOB).deleteMyData()).resolves.toBeUndefined();
+  });
+});
+
+describe('onlineDataFor(…).exportMyData (#445)', () => {
+  it('holds the friends, the rating, the blocks and the reports, with names only', async () => {
+    const server = setup();
+    // Ids that no other text in the copy holds.
+    const [me, friend, other] = ['id-me-41f', 'id-friend-9c2', 'id-other-77d'] as const;
+    // Friends need a username (#599); names that hold no id.
+    await markNamed(server, me, 'Kafeneio');
+    await markNamed(server, friend, 'Portes');
+    server.markSaved(other);
+    const gameId = await server
+      .invitesFor(friend)
+      .acceptInvite(await server.invitesFor(me).createInvite(GAME));
+    await server.transportFor(friend).resign(gameId);
+    await server.invitesFor(other).acceptInvite(await server.invitesFor(me).createInvite(GAME));
+    await server.friendsFor(me).sendRequest(friend);
+    await server.friendsFor(friend).acceptRequest(me);
+    await server.safetyFor(me).report({ playerId: other, reason: 'name' });
+
+    const data = await server.onlineDataFor(me).exportMyData();
+    expect(data.account.kind).toBe('saved');
+    expect(data.rating).toMatchObject({ matches: 1, shownOnBoard: true });
+    expect(data.friends).toEqual([
+      { name: server.nameOf(friend), since: START, wins: 1, losses: 0 },
+    ]);
+    expect(data.blocks).toEqual([{ name: server.nameOf(other), blockedAt: START }]);
+    expect(data.reports).toEqual([{ reason: 'name', username: null, reportedAt: START }]);
+    expect(data.games.map((game) => game.status).sort()).toEqual(['active', 'finished']);
+    const text = JSON.stringify(data);
+    expect(text).not.toContain(friend);
+    expect(text).not.toContain(other);
   });
 });

@@ -188,6 +188,7 @@ One per saved account (#405, ADR-0008): a Better Auth user that is not anonymous
 - **Block list** (`isAllowedUsername`): reserved names (exact, on the key: `admin`, `support`, `tavlaki`, …), reserved starts, blocked parts (substrings, on `foldLetters` without the `rn`/`vv` merges, so "porn" does not block "pomegranate") and blocked names (exact), in English, Greek and Greeklish. A "bare" form (no `_` or digits) is checked too. Keep Scunthorpe words out of the parts list: put a short word in the exact list.
 - **`setMyUsername`** (`{ name, acceptTerms?, ageChecked? }`) runs `planUsername` (both servers): `NOT_SAVED`, `BAD_NAME`, `NOT_ALLOWED`, `TERMS_NEEDED` (no accepted `TERMS_VERSION` yet), `AGE_NEEDED` (no age check yet), the same text (no change, no 30 days), `TOO_SOON`; then the server adds `TAKEN`. A missing Better Auth user is `NOT_SIGNED_IN` (a token outlives its user). The errors are `ConvexError` data (`UsernameErrorData`).
 - **`getMyUsername`** gives `MyUsername`: `saved`, `name`, `nextChangeAt`, `ageChecked`, `termsVersion`.
+- **Needed for Friends and Play ranked** (owner, 2026-11-17, #599). A saved account with no username gets `USERNAME_NEEDED` from the calls that reach other players: `findPlayer`, `myFriendLink`, `resetFriendLink`, `requestByLink`, `requestByUsername`, `sendFriendRequest`, `acceptFriendRequest`, `inviteFriend` (`checkFriendUsername`) and `seek` (`checkSeekUsername`). Reads and clean-up stay open to it (the friend lists and requests, friend invites to you, decline, cancel, remove, `cancelSeek`, `mySeek`, `lookingCounts`, every ratings call), so Home's friend invites and tile news still load after the owner clears a name. The username step takes the terms and the age check, so these calls need them too. Both checks are pure (`@tavli/online`); `hasUsername` (`convex/playerNames.ts`) reads the row. Tests name players with `nameUsers(t, ids)` (`convex/test.setup.ts`) or `markNamed(server, id)` (`@tavli/online/testing`).
 - **`clearUsername`** (internal, the owner's tool from the dashboard): with no `name` it clears the username; with a `name` it renames after `checkUsername` and the uniqueness check (the block list is the owner's call). Either way the 30 days start over.
 - **The adapter** is `createConvexUsernames` (`USERNAME_FUNCTIONS` in `backend-convex`), checked against `api` and run through `usernamesContract()` in `convex/convexUsernames.test.ts`. The memory server has `usernamesFor(playerId, saved)`.
 - **Never** send a username to analytics or the logs.
@@ -296,6 +297,7 @@ Issue #406. A saved player (a Better Auth user that is not anonymous, ADR-0008) 
 - **The record** lives on the `friends` rows ([`friends`](#friends)), so the list reads no games.
 - **Invite a friend.** `inviteFriend` makes an invite with `to` set (`insertInvite` in `invites.ts`, so it counts toward `MAX_OPEN_INVITES`), and schedules `sendFriendInvitePush` (`push.ts`). The push holds only the invite code (`data.inviteCode`) and the fixed text `FRIEND_INVITE_PUSH_TEXT`. Only `to` may read it (`getInvite` through `inviteVisibleTo`), accept it or decline it (`checkAddressee`); `listFriendInvites` lists the open ones sent to the caller.
 - **Callers.** Every public function uses `signedInPlayer` or, when it saves the caller's id, `existingPlayer`.
+- **A username** (#599). The calls that reach another player need one (`namedCaller`: `USERNAME_NEEDED`, see [Usernames](#usernames)); reads, decline, cancel and remove do not. An app build from before #599 shows its plain "That did not work" problem for this code.
 - **The adapter** is `createConvexFriends` (`FRIEND_FUNCTIONS` in `backend-convex`), checked against `api` and run through `friendsContract()` in `convex/convexFriends.test.ts`.
 - **Never** send ids, names, tokens or search text to analytics or the logs.
 
@@ -318,7 +320,7 @@ Issue #407, ADR-0008 item 9. Saved players get one rating from their online matc
 Issue #531, ADR-0009. A saved player asks for a ranked match of one game; the server matches two players with close ratings and starts a ranked game between them. The rules are in `packages/online/src/matchmaking.ts`; the in-memory server runs them too (`matchmakingFor(id)`, `runMatching()`). Never copy them into `convex/matchmaking.ts`. The port is `Matchmaking` (`packages/contracts/src/matchmaking.ts`), the contract checks `matchmakingContract()`. The app screens come in #532.
 
 - **The port.** `seek({ game })`, `cancel()`, `mySeek()`, `watchMySeek(onUpdate, onError)` and `lookingCounts()`. `MySeek` is `{ kind: 'none' }`, `{ kind: 'waiting', game, since, rating }` or `{ kind: 'matched', game, gameId, me, opponent }` (each a `SeekPlayer`: `name` and the shown `rating`). The waiting seek gives `since`, not the range: the app works the range out with `seekRange(since, now)`, so a cached query never shows an old range. "Nobody yet" is `NOBODY_YET_MS` after `since`. `lookingCounts` gives, per game, how many other players wait: never who.
-- **Who.** Saved accounts only (`NOT_SAVED` for a guest, `NOT_SIGNED_IN` with no session or a gone user). Only `RANKED_GAMES` (`BAD_REQUEST` for any other game, Asodio too).
+- **Who.** Saved accounts only (`NOT_SAVED` for a guest, `NOT_SIGNED_IN` with no session or a gone user), with a username (`USERNAME_NEEDED` from `seek`, #599; checked after `NOT_SAVED`). Only `RANKED_GAMES` (`BAD_REQUEST` for any other game, Asodio too).
 - **One seek per player.** A waiting seek of the same game stays as it is (`planSeek` → `keep`, the same `since`). Another game, or a matched seek, is replaced. `cancelSeek` deletes a waiting row only: a matched one stays, so a cancel that lands just after a match still shows the match on the phone (#532).
 - **The range.** A seek takes partners within `seekRange(createdAt, now)`: `SEEK_RANGE_START` (±50) growing in a straight line to `SEEK_RANGE_MAX` (±400) over `SEEK_RANGE_GROW_MS` (60 s). Two seeks fit when the rating gap is within **both** ranges (`inRange`), so a new seek never gets a far partner just because the other waited long.
 - **The pairs.** `candidatePairs` sorts the fitting pairs by the rating gap, then the older seek first. `pickPairs` takes them greedily, each seek once, and asks `mayPair` for each: no block either way (`blocks`) and the pair under `RATED_MATCHES_PER_PAIR_PER_DAY` that UTC day (`planRatedMatch` on the `ratedPairs` row). So every matched game is rated. There is never a fake player.
@@ -830,6 +832,32 @@ Both delete routes are **off**, so no client can delete a user without steps 2�
 
 - No sign-in, or no Better Auth user for the token: `NOT_SIGNED_IN`.
 - After the delete, the old token is valid for up to 15 more minutes. The calls that save the caller's id (`createInvite`, `acceptInvite`, `declineInvite`, `registerPushToken`) check the user (`existingPlayer`) and get `NOT_SIGNED_IN` (#306), so no row is saved under the deleted id. The other calls still pass `signedInPlayer`, but save nothing: once the game pages ran, the caller has no active game and no invite that is still open (see [Games after the call](#games-after-the-call)). See [Who calls](#who-calls).
+
+## Download my data
+
+Issue #445 (GDPR access and portability). The public action `exportMyData` in `convex/myData.ts` gives the signed-in caller a copy of what this server keeps about them, as plain JSON (`MyData`, `packages/contracts/src/my-data.ts`, `format: 'tavlaki-my-data'`, `version: 1`). It takes no arguments: the caller comes from `signedInPlayer(ctx)`, and a token whose Better Auth user is gone gets `NOT_SIGNED_IN`. The app shares it from Settings → Account → **Download my data** ([App shell](app-shell.md#settings--account-402)).
+
+### What it holds
+
+- **account:** `guest` or `saved`, when it was made, the guest number, the username and when it last changed, the sign-in keys (the kind and when it was added; an email key also has its address, which Account shows the caller too), the terms version and when it was accepted, when the age check was answered.
+- **rating** (the `ratings` row, or `null`), **rankedSearch** (the `seeks` row, or `null`).
+- **friends:** each friend's name as the caller sees it, since when, and the wins and losses between the two.
+- **games:** every game of the caller, active and finished: id, status, game choice, preset, target, turn time, ranked, the caller's side, the score, the winner, when it started and last changed, and the other player's name as the caller sees it (`playerNamesSeenBy`, so a blocked player is `null`). No moves: the log of a long match is large, and the game id leads to it if a player asks us.
+- **invites** the caller sent: code, choice, target, turn time, status (`inviteStatus`), whether it went to a friend, the times and the game id.
+- **blocks** and **reports** the caller made: the name as the caller sees it (a report: the username at that time and the reason) and the time.
+- **pushTokens:** only the platform and the time. Never the token.
+
+Never another player's id, a token, a code, a hash or a secret. Every list is newest first, and every missing value is `null`. Left out on purpose: friend requests, the friend link token and the friend search times (working data of the Friends screens, not a record about the player), the Apple tokens, the email code rows and the sessions.
+
+### How it reads
+
+An action, so it can read the tables with no cap in pages: the capped parts (account, keys, name row, rating, friends, blocks, push tokens, seek) are one internal query, `exportHead`; games (`exportGamesPage`, `MY_DATA_GAMES_PAGE` = 50 per page, `by_white` then `by_black`), invites (`exportInvitesPage`) and reports (`exportReportsPage`, both `MY_DATA_ROWS_PAGE` = 200) are paged internal queries. The pages run one after another, so a game that changes during the copy may show either state. The shape and the order come from `makeMyData` and its helpers in `@tavli/online` (`my-data.ts`), which the in-memory server's `onlineDataFor(id).exportMyData()` runs too.
+
+**A new table or field that holds a player's data goes in the copy too**, next to `deleteAccountOf` and the guest move.
+
+### The port
+
+`OnlineData.exportMyData()` (contracts). On Convex: `createConvexOnlineData` calls the action named in `MY_DATA_FUNCTIONS` (`backend-convex/src/functions.ts`); `convex/convexOnlineData.test.ts` checks the name and types against `api` and runs `onlineDataContract` through the adapter. Server tests: `convex/myData.test.ts` (the contents with no other ids, an expired invite, paging past one page, `NOT_SIGNED_IN`).
 
 ## Update needed
 

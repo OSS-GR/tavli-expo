@@ -13,6 +13,7 @@ import {
   candidatePairs,
   checkRankedChoice,
   checkSeekSaved,
+  checkSeekUsername,
   countLooking,
   inRange,
   isMatchedSeekDone,
@@ -46,6 +47,11 @@ describe('the checks of a seek', () => {
   it('needs a saved account', () => {
     expect(codeOf(() => checkSeekSaved(false))).toBe('NOT_SAVED');
     expect(codeOf(() => checkSeekSaved(true))).toBeUndefined();
+  });
+
+  it('needs a username (#599)', () => {
+    expect(codeOf(() => checkSeekUsername(false))).toBe('USERNAME_NEEDED');
+    expect(codeOf(() => checkSeekUsername(true))).toBeUndefined();
   });
 
   it('takes only a ranked game', () => {

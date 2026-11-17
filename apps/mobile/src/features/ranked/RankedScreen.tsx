@@ -9,6 +9,10 @@
  *   (the `EmailCodeForm` step) and Not now. They never see the search.
  *   The save works as on Account: the move offer, the problems and the
  *   username step are the same parts. After the save the setup shows.
+ * - A saved account with no username sees the username gate (#599,
+ *   `UsernameGate`) in place of the setup: ranked needs a username. The
+ *   step after a save has no Not now here, since the gate would follow.
+ *   After the pick the setup shows.
  * - Setup: the table with an empty chair, the game (Portes, Plakoto,
  *   Fevga, Tavli), the clock card, your rating, **Find a player**. The
  *   first Find a player shows the rules sheet once (`rankedRules.ts`);
@@ -71,6 +75,7 @@ import { useAnnouncement } from '@/features/game/useAnnouncement';
 import { EmailCodeForm } from '@/features/online/EmailCodeForm';
 import { playerNameText } from '@/features/online/playerName';
 import { UsernameForm } from '@/features/online/UsernameForm';
+import { UsernameGate } from '@/features/online/UsernameGate';
 import { termsUrl } from '@/features/online/usernameStep';
 import { ReportOrBlock, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
@@ -125,7 +130,11 @@ export function RankedScreen(props: RankedScreenProps) {
   const account = useAccount(props.account, props.visit ?? 0);
   const [emailStep, setEmailStep] = useState(false);
   const { state } = account;
-  const savedNow = state.kind === 'saved' && account.usernameStep === null && !emailStep;
+  const savedNow =
+    state.kind === 'saved' &&
+    state.username !== null &&
+    account.usernameStep === null &&
+    !emailStep;
   // Once saved, a reload (the app comes back, `visit`) that loads or fails
   // keeps the search on screen: unmounting it would cancel a live search.
   const [kept, setKept] = useState<{ readonly username: string | null } | null>(null);
@@ -167,7 +176,6 @@ export function RankedScreen(props: RankedScreenProps) {
                     mine={account.usernameStep}
                     title={t('username.title')}
                     onDone={account.finishUsernameStep}
-                    onNotNow={() => account.finishUsernameStep()}
                   />
                 </SectionCard>
               ) : emailStep ? (
@@ -196,6 +204,14 @@ export function RankedScreen(props: RankedScreenProps) {
                     onPress={account.reload}
                   />
                 </>
+              ) : state.kind === 'saved' ? (
+                <UsernameGate
+                  testID="ranked-username-gate"
+                  usernames={props.account.usernames}
+                  feature="ranked"
+                  mine={null}
+                  onDone={account.finishUsernameStep}
+                />
               ) : (
                 <RankedGate
                   account={account}

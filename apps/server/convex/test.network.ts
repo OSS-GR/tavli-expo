@@ -9,7 +9,7 @@
 import type { convexTest } from 'convex-test';
 import type { FunctionReference } from 'convex/server';
 
-import type { ConvexInvitesClient } from '@tavli/backend-convex';
+import type { ConvexActionClient, ConvexInvitesClient } from '@tavli/backend-convex';
 
 /** A convex-test backend. */
 export type Tester = ReturnType<typeof convexTest>;
@@ -18,6 +18,7 @@ export type Tester = ReturnType<typeof convexTest>;
 // clients take any reference, so they pass it on untyped.
 type AnyQuery = FunctionReference<'query'>;
 type AnyMutation = FunctionReference<'mutation'>;
+type AnyAction = FunctionReference<'action'>;
 
 /** A query the fake client watches. */
 interface Watched {
@@ -47,7 +48,7 @@ export function convexTestNetwork(t: Tester) {
   }
 
   /** A client of `subject`, or of nobody (no sign-in) when it is `null`. */
-  function clientFor(subject: string | null): ConvexInvitesClient {
+  function clientFor(subject: string | null): ConvexInvitesClient & ConvexActionClient {
     const user = subject === null ? t : t.withIdentity({ subject });
     return {
       onUpdate(query, args, onResult, onError) {
@@ -91,6 +92,14 @@ export function convexTestNetwork(t: Tester) {
           return await user.mutation(fn as AnyMutation, args);
         } finally {
           // The real client has the new query results before the mutation resolves.
+          await refreshAll();
+        }
+      },
+      // An action may run mutations; the copy (#445) runs only queries.
+      async action(fn, args) {
+        try {
+          return await user.action(fn as AnyAction, args);
+        } finally {
           await refreshAll();
         }
       },

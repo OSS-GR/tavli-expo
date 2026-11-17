@@ -319,6 +319,25 @@
     "loading": "Loading your account…",
     "failed": "Could not load your account. Check the connection and try again.",
     "retry": "Try again",
+    "download": {
+      "label": "Download my data",
+      "hint": "A copy of what our server keeps about you",
+      "busy": "Getting your data…",
+      "problem": {
+        "network": {
+          "title": "No connection",
+          "text": "Our server did not answer. Check the connection and try again."
+        },
+        "signedOut": {
+          "title": "This account is gone",
+          "text": "Our server no longer has this account, so it keeps no data of yours."
+        },
+        "other": {
+          "title": "Your data did not download",
+          "text": "Try again in a moment."
+        }
+      }
+    },
     "offline": {
       "intro": "You are not signed in. You play on this phone only.",
       "kept": "Kept on this phone: your games against the bot, your history and your settings.",
@@ -777,6 +796,7 @@
     "problem": {
       "signedOut": "You are not signed in any more. Open Account to sign in.",
       "notSaved": "Friends need a saved account.",
+      "usernameNeeded": "Pick a username first, in Settings → Account.",
       "notFound": "That player cannot be found.",
       "blocked": "You blocked this player. Unblock them in Settings → Blocked players first.",
       "notFriends": "You are not friends any more.",
@@ -1023,6 +1043,10 @@
         "title": "Save your account first",
         "text": "Ranked games need a saved account. Save it in Settings › Account."
       },
+      "usernameNeeded": {
+        "title": "Pick a username first",
+        "text": "Ranked games need a username. Pick one in Settings › Account."
+      },
       "notSignedIn": {
         "title": "You are signed out",
         "text": "Sign in again in Settings › Account, then come back."
@@ -1166,6 +1190,11 @@
         "title": "A tour of the app",
         "body": "A short tour: how to roll, how to move your checkers and where everything is. You try rolling and moving on the real board.",
         "where": "Home › How to play › App tour, or Settings › Help"
+      },
+      "downloadData": {
+        "title": "Download my data",
+        "body": "Get a copy of what our server keeps about your online account: your name, games, invites, friends and more. Save it or send it on from the share sheet.",
+        "where": "Settings › Account"
       },
       "support": {
         "title": "Support Tavlaki",
@@ -2088,6 +2117,12 @@
     },
     "guestOnly": "A username needs a saved account. Save yours in Settings → Account. Guests play as “Guest” and a number.",
     "loading": "Loading…"
+  },
+  "usernameGate": {
+    "title": "Pick a username first",
+    "friends": "Friends find you by your username and see it in each game. Pick one to add friends and invite them.",
+    "ranked": "In ranked games the other player sees your username, and the leaderboards show it. Pick one to play ranked.",
+    "ratings": "The leaderboards show each player by username. Pick one to open them."
   },
   "safety": {
     "action": "Report or block",

@@ -25,6 +25,7 @@ import type {
   FriendStatus,
   Friends,
   RecentPlayer,
+  Usernames,
 } from '@tavli/contracts';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +67,8 @@ export interface AddFriendScreenProps {
   /** Counts the times the screen shows (the route): each new one loads again. */
   visit?: number;
   auth: AuthProvider;
+  /** Saves a username at the username gate (#599). */
+  usernames: Usernames;
   friends: Friends;
   onBack: () => void;
   /** Opens the screen of a pasted friend link. */
@@ -96,6 +99,7 @@ export function smsUrl(body: string): string {
 
 export function AddFriendScreen({
   auth,
+  usernames,
   friends,
   onBack,
   onLink,
@@ -109,7 +113,12 @@ export function AddFriendScreen({
     const [token, recent] = await Promise.all([friends.myFriendLink(), friends.recentPlayers()]);
     return { token, recent };
   }, [friends]);
-  const { state, current, reload, retry, replace, sessionLost } = useFriendsData(auth, load, visit);
+  const { state, current, reload, retry, replace, sessionLost } = useFriendsData(
+    auth,
+    load,
+    visit,
+    usernames,
+  );
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
   const [sent, setSent] = useState<{ name: string; status: FriendStatus; n: number } | null>(null);
@@ -213,6 +222,7 @@ export function AddFriendScreen({
             state={state.kind === 'ready' ? { kind: 'loading' } : state}
             onRetry={retry}
             onAccount={onAccount}
+            usernames={usernames}
             testID="add-friend"
           />
         ) : (

@@ -50,7 +50,7 @@ import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
 import { signedInPlayer } from './caller';
-import { nameRowOf } from './playerNames';
+import { hasUsername, nameRowOf } from './playerNames';
 
 /**
  * How many rows of the board index the global board reads at most: the
@@ -134,10 +134,6 @@ export async function ratingRow(ctx: QueryCtx, playerId: string): Promise<Doc<'r
 function recordOf(row: Doc<'ratings'> | null): RatingRecord & { readonly shown: boolean } {
   if (row === null) return { ...NEW_RATING, shown: true };
   return { rating: row.rating, experience: row.experience, matches: row.matches, shown: row.shown };
-}
-
-async function hasUsername(ctx: QueryCtx, playerId: string): Promise<boolean> {
-  return (await nameRowOf(ctx, playerId))?.username !== undefined;
 }
 
 /** Saves `record` for `playerId` (`row`: their row, if any). */

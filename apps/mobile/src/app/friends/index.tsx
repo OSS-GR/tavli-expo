@@ -13,15 +13,17 @@ import {
   inviteHref,
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
-import { auth, friends, ratings, safety } from '@/services';
+import { auth, friends, ratings, safety, usernames } from '@/services';
 
 export default function FriendsRoute() {
   // Counts the times the screen shows, so it loads again on the way back.
   const visit = useVisit();
-  if (auth === undefined || friends === undefined) return <Redirect href="/settings" />;
+  if (auth === undefined || friends === undefined || usernames === undefined)
+    return <Redirect href="/settings" />;
   return (
     <FriendsScreen
       auth={auth}
+      usernames={usernames}
       visit={visit}
       friends={friends}
       {...(safety === undefined ? {} : { safety })}

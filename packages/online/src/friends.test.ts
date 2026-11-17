@@ -14,6 +14,8 @@ import {
 import { SERVER_ACTOR } from './calls';
 import {
   checkFriendTarget,
+  checkFriendUsername,
+  checkSaved,
   friendStatusOf,
   planRequest,
   recentOpponents,
@@ -42,6 +44,17 @@ const BASE: PlanRequestInput = {
 };
 
 const OPEN = { status: 'open', createdAt: NOW - 1, declinedAt: null } as const;
+
+describe('who may call', () => {
+  it('needs a saved account, and a username for the calls that reach others (#599)', () => {
+    expect(() => checkSaved(false)).toThrow(expect.objectContaining({ code: 'NOT_SAVED' }));
+    expect(() => checkSaved(true)).not.toThrow();
+    expect(() => checkFriendUsername(false)).toThrow(
+      expect.objectContaining({ code: 'USERNAME_NEEDED' }),
+    );
+    expect(() => checkFriendUsername(true)).not.toThrow();
+  });
+});
 
 function codeOf(input: Partial<PlanRequestInput>): string {
   try {

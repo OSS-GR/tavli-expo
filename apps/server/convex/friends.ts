@@ -8,6 +8,11 @@
  *   username (`FRIEND_SEARCHES_PER_HOUR` searches an hour), or from the
  *   players they met (`recentPlayers`, `sendFriendRequest`). A guest gets
  *   `NOT_SAVED`; only `openFriendLink` is open to guests.
+ * - The calls that reach another player (search, the link, a request,
+ *   accept, a friend invite) need a username too (`namedCaller`,
+ *   `USERNAME_NEEDED`, #599). The lists, decline, cancel and remove need
+ *   only a saved account, so a player with no username still sees friend
+ *   invites on Home and can clean up.
  * - A request must be accepted. The caps, the wait after a decline and
  *   the order of the checks are `planRequest` in `@tavli/online`, which
  *   the in-memory server runs too: never copy a check here. This file
@@ -52,6 +57,7 @@ import type {
 import {
   FriendsError,
   checkFriendTarget,
+  checkFriendUsername,
   checkFriends,
   checkOpenRequest,
   checkSaved,
@@ -77,7 +83,7 @@ import { signedInPlayer } from './caller';
 import { endFriendship, friendRow, isFriend, requestRecord, requestRow } from './friendEdges';
 import { insertInvite, toInviteRecord } from './invites';
 import { createCryptoRng } from './model/cryptoRng';
-import { nameOf } from './playerNames';
+import { hasUsername, nameOf } from './playerNames';
 import { scheduleFriendInvitePush } from './push';
 import { blocks, met } from './safety';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
@@ -137,6 +143,17 @@ async function currentUser(ctx: QueryCtx): Promise<{ playerId: string; saved: bo
 async function savedCaller(ctx: QueryCtx): Promise<string> {
   const { playerId, saved } = await currentUser(ctx);
   await guarded(() => checkSaved(saved));
+  return playerId;
+}
+
+/**
+ * The caller, who must have a saved account and a username
+ * (`USERNAME_NEEDED`, #599): for the calls that reach another player.
+ */
+async function namedCaller(ctx: QueryCtx): Promise<string> {
+  const playerId = await savedCaller(ctx);
+  const named = await hasUsername(ctx, playerId);
+  await guarded(() => checkFriendUsername(named));
   return playerId;
 }
 
@@ -486,7 +503,7 @@ export const recentPlayers = query({
 export const findPlayer = mutation({
   args: { username: v.string() },
   handler: async (ctx, { username }): Promise<FoundPlayer | null> => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     await countSearch(ctx, playerId);
     return await found(ctx, playerId, await holderOfUsername(ctx, username));
   },
@@ -497,7 +514,7 @@ export const myFriendLink = mutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     const link = await linkOf(ctx, playerId);
     return link?.token ?? (await newLink(ctx, playerId));
   },
@@ -508,7 +525,7 @@ export const resetFriendLink = mutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     const link = await linkOf(ctx, playerId);
     if (link !== null) await ctx.db.delete(link._id);
     return await newLink(ctx, playerId);
@@ -529,7 +546,7 @@ export const requestByLink = mutation({
   args: { token: v.string() },
   returns: friendStatus,
   handler: async (ctx, { token }) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     const owner = await ownerOfToken(ctx, token);
     return await guarded(async () => {
       if (owner !== null && owner !== playerId && (await blockedEither(ctx, playerId, owner))) {
@@ -553,7 +570,7 @@ export const requestByUsername = mutation({
     v.object({ ok: v.literal(false), code: v.string(), message: v.string() }),
   ),
   handler: async (ctx, { username }) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     await countSearch(ctx, playerId);
     try {
       const status = await askFriend(
@@ -577,7 +594,7 @@ export const sendFriendRequest = mutation({
   args: { playerId: v.string() },
   returns: friendStatus,
   handler: async (ctx, { playerId: other }) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     return await guarded(async () => {
       checkFriendTarget(playerId, other);
       return await askFriend(ctx, playerId, other, 'met');
@@ -590,7 +607,7 @@ export const acceptFriendRequest = mutation({
   args: { playerId: v.string() },
   returns: v.null(),
   handler: async (ctx, { playerId: other }) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     const theirs = await requestRow(ctx, other, playerId);
     await guarded(async () => {
       checkOpenRequest(requestRecord(theirs));
@@ -679,7 +696,7 @@ export const inviteFriend = mutation({
   },
   returns: v.string(),
   handler: async (ctx, { playerId: other, choice, targetPoints, turnTimeMinutes }) => {
-    const playerId = await savedCaller(ctx);
+    const playerId = await namedCaller(ctx);
     const friends = await isFriend(ctx, playerId, other);
     await guarded(() => checkFriends(friends));
     const game = { choice, targetPoints, turnTimeMinutes };

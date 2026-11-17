@@ -605,7 +605,7 @@ export const checkTimeout = internalMutation({
 });
 
 /** The view input of a stored game, without its flow (`toView`, `summarizeGame`). */
-function gameInput(game: Doc<'games'>) {
+export function gameInput(game: Doc<'games'>) {
   return {
     gameId: game._id,
     version: game.version,

@@ -65,7 +65,7 @@ export type RankedSearchState =
     };
 
 /** Why the last call failed. */
-export type RankedProblem = 'notSaved' | 'notSignedIn' | 'badRequest' | 'failed';
+export type RankedProblem = 'notSaved' | 'usernameNeeded' | 'notSignedIn' | 'badRequest' | 'failed';
 
 export interface RankedSearch {
   readonly state: RankedSearchState;
@@ -94,6 +94,7 @@ export interface RankedSearchDeps {
 function problemOf(error: unknown): RankedProblem {
   if (isMatchmakingErrorData(error)) {
     if (error.code === 'NOT_SAVED') return 'notSaved';
+    if (error.code === 'USERNAME_NEEDED') return 'usernameNeeded';
     if (error.code === 'NOT_SIGNED_IN') return 'notSignedIn';
     if (error.code === 'BAD_REQUEST') return 'badRequest';
   }

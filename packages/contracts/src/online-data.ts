@@ -1,7 +1,10 @@
+import type { MyData } from './my-data';
+
 /**
  * Delete my account (#315; Settings → Account since #402). App stores ask
  * for this in the app. This port deletes what the server keeps under the
- * player's id (a guest or a saved account). On
+ * player's id (a guest or a saved account), and gives a copy of it first
+ * if the player asks (`exportMyData`, #445). On
  * Convex it is `deleteMyAccount` (`apps/server/convex/account.ts`, #302):
  *
  * - every match still in progress is resigned: the other player wins;
@@ -26,4 +29,13 @@ export interface OnlineData {
    * again: `NOT_SIGNED_IN` then means the data is gone.
    */
   deleteMyData(): Promise<void>;
+
+  /**
+   * A copy of the signed-in user's data on the server (#445, `MyData`):
+   * plain JSON, with no other player's id. Rejects with
+   * `GameTransportErrorData`: `NOT_SIGNED_IN` with nobody signed in, and
+   * once the data is deleted. On Convex it is `exportMyData`
+   * (`apps/server/convex/myData.ts`).
+   */
+  exportMyData(): Promise<MyData>;
 }

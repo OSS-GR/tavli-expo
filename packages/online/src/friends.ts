@@ -43,6 +43,17 @@ export function checkSaved(saved: boolean): void {
   if (!saved) fail('NOT_SAVED', 'save your account to add friends');
 }
 
+/**
+ * The friend calls that reach another player need a username too (owner,
+ * 2026-11-17, #599): `findPlayer`, `myFriendLink`, `resetFriendLink`,
+ * `requestByLink`, `requestByUsername`, `sendRequest`, `acceptRequest`
+ * and `inviteFriend`. The lists, Decline, Cancel and Remove stay open to
+ * any saved account. Check `checkSaved` first: a guest is `NOT_SAVED`.
+ */
+export function checkFriendUsername(hasUsername: boolean): void {
+  if (!hasUsername) fail('USERNAME_NEEDED', 'pick a username to add friends');
+}
+
 /** The other player of a call: not empty, not the server. The caller's own id is `BAD_REQUEST`. */
 export function checkFriendTarget(callerId: string, playerId: string): void {
   if (playerId.trim() === '' || playerId === SERVER_ACTOR) fail('NOT_FOUND', 'no such player');
