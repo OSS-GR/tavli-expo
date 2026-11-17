@@ -204,7 +204,13 @@ describe('the homepage', () => {
 });
 
 describe('the delete account pages (#447)', () => {
-  type Strings = { account: { saved: { delete: string }; guest: { delete: string } } };
+  type Strings = {
+    account: {
+      saved: { delete: string };
+      guest: { delete: string };
+      deleteDialog: { confirm: string };
+    };
+  };
   const strings = (lang: string) =>
     JSON.parse(read(`apps/mobile/src/i18n/${lang}.json`)) as Strings;
   const pages = [
@@ -218,6 +224,8 @@ describe('the delete account pages (#447)', () => {
     const { account } = strings(lang);
     expect(page).toContain(`<strong>${account.saved.delete}</strong>`);
     expect(page).toContain(`<strong>${account.guest.delete}</strong>`);
+    // The confirm button of the delete dialog.
+    expect(page).toContain(`<strong>${account.deleteDialog.confirm}</strong>`);
     expect(page).toContain('href="mailto:support@tavlaki.com');
   });
 
