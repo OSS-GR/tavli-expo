@@ -57,11 +57,12 @@ export interface WhatsNewRelease {
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
+    date: '2026-11-18',
+    entries: [{ id: 'signOutEverywhere', icon: 'logOut' }],
+  },
+  {
     date: '2026-11-17',
-    entries: [
-      { id: 'support', icon: 'heart' },
-      { id: 'signOutEverywhere', icon: 'logOut' },
-    ],
+    entries: [{ id: 'support', icon: 'heart' }],
   },
   {
     date: '2026-11-15',
