@@ -3,6 +3,7 @@ import {
   createBoard,
   createGameFlow,
   createSeededRng,
+  legalNextMoves,
   portes,
   type BoardState,
   type PerPlayer,
@@ -236,19 +237,55 @@ describe('<GameScreen /> a die you cannot play (#579)', () => {
     expect(storage.getString(CONFIRM_HINT_KEY)).toBeUndefined();
   });
 
-  it('says when no checker can move a die', async () => {
+  it('shows no note for a blocked die (#596): the slashed die says it, then "All dice used"', async () => {
     await rolled(blockedSix, [6, 5]);
-    expect(note()).toHaveTextContent("The 6 can't be played\nNo checker can move 6 now.");
+    expect(note()).toBeNull();
+    expect(
+      screen.getByLabelText(
+        "Dice 6-5, 1 left to play. The 6 can't be played. No checker can move 6 now.",
+      ),
+    ).toBeOnTheScreen();
+    await touch(PAN, [top(13, 15), point(8)]);
+    expect(button('Confirm')).toBeEnabled();
+    expect(note()).toBeNull();
+    expect(screen.getByTestId('confirm-hint')).toHaveTextContent('All dice used. Confirm or undo.');
+    expect(storage.getString(CONFIRM_HINT_KEY)).toBe('1');
   });
 
-  it('counts each reason on its own, and stops after the limit', async () => {
+  it('stops after the limit', async () => {
     storage.setString(turnNoteKey('lost.higherDie'), String(CONFIRM_HINT_TURNS));
     reloadConfirmHintForTest();
     await rolled(higherDie, [6, 5]);
     expect(note()).toBeNull();
     // The dice still say it, with the reason.
     expect(screen.getByLabelText(/The 5 can't be played\. Only one die moves/)).toBeOnTheScreen();
-    expect(storage.getString(turnNoteKey('lost.blocked'))).toBeUndefined();
+  });
+
+  it('loses no dice on the turn that ends the game (#596, tavli-match.md #39)', async () => {
+    // White's last two checkers are on the 6: a 6-6 bears both off.
+    const lastTwo = createBoard(
+      { white: { points: { 6: 2 }, off: 13 }, black: { points: { 24: 15 } } },
+      'contrary',
+    );
+    const store = newStore();
+    setPosition(store, lastTwo);
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
+    });
+    const play = async () => {
+      const move = legalNextMoves(store.getState().flow.game)[0]!.moves[0]!;
+      await act(async () => {
+        store.getState().dispatch({ type: 'move', player: 'white', move });
+      });
+    };
+    await play();
+    await play();
+    expect(phase(store)).toBe('awaiting-confirm');
+    expect(note()).toBeNull();
+    expect(screen.queryByLabelText(/can't be played/)).toBeNull();
+    expect(screen.getByLabelText('Dice 6-6-6-6, 0 left to play')).toBeOnTheScreen();
+    expect(storage.getString(turnNoteKey('lost.higherDie'))).toBeUndefined();
   });
 });
 
