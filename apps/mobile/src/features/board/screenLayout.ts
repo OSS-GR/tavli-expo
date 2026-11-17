@@ -47,18 +47,20 @@ export function boardModeOf(layout: ScreenLayout): BoardLayoutMode {
  *
  * The rails are as slim as the longest one-word label of the language
  * allows (owner pick, 2026-11-17: a bigger board on its side): a word never
- * breaks in the middle. English: "Opponent" at 13 pt, about 63 pt. Greek:
+ * breaks in the middle, with a few points to spare for another font
+ * (Android's Roboto, a new iOS). English: "Opponent" at 13 pt, about
+ * 63 pt; 66 pt still leaves the iPhone 17 Pro board its full height. Greek:
  * "Υπολογιστής" (the bot) at 13 pt, about 82 pt, on the left, and
  * "Επιβεβαίωση" (Confirm) at 12 pt, about 78 pt, on the right. A new
  * language, or a longer one-word label in a rail, needs its width here.
  */
 export const RAIL_WIDTHS: Readonly<Record<AppLanguage, Rails>> = {
-  en: { left: 64, right: 64 },
+  en: { left: 66, right: 66 },
   el: { left: 84, right: 80 },
 };
-/** The English rails: the slimmest. */
-export const LEFT_RAIL = RAIL_WIDTHS.en.left;
-export const RIGHT_RAIL = RAIL_WIDTHS.en.right;
+/** The English rails (the slimmest). Greek ones are in `RAIL_WIDTHS.el`. */
+export const EN_LEFT_RAIL = RAIL_WIDTHS.en.left;
+export const EN_RIGHT_RAIL = RAIL_WIDTHS.en.right;
 /** With a large font the rails grow up to this factor; the board gets smaller. */
 const MAX_RAIL_GROWTH = 1.35;
 
@@ -93,9 +95,13 @@ export function spaceKeyFor(
   return `${layout}:${window.width}x${window.height}@${window.fontScale ?? 1}`;
 }
 
-/** The app language as a rail table key: English for anything else. */
-function railLanguage(code: string | undefined): AppLanguage {
-  return isAppLanguage(code) ? code : FALLBACK_LANGUAGE;
+/**
+ * The app language as a rail table key: a regional code such as `el-GR`
+ * counts as its language, anything else as English.
+ */
+export function railLanguage(code: string | undefined): AppLanguage {
+  const base = code?.split('-')[0]?.toLowerCase();
+  return isAppLanguage(base) ? base : FALLBACK_LANGUAGE;
 }
 
 /** The layout of the game screen now. It changes when the phone turns. */
@@ -103,7 +109,7 @@ export function useScreenLayout(): ScreenLayoutInfo {
   const window = useWindowDimensions();
   const mode = useSettings((s) => s.boardLayout);
   const { i18n } = useTranslation();
-  const language = railLanguage(i18n.language);
+  const language = railLanguage(i18n.resolvedLanguage ?? i18n.language);
   const layout = screenLayoutFor(window, mode);
   return {
     layout,

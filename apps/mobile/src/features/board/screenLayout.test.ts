@@ -2,9 +2,10 @@ import el from '@/i18n/el.json';
 import en from '@/i18n/en.json';
 
 import {
-  LEFT_RAIL,
+  EN_LEFT_RAIL,
   RAIL_WIDTHS,
-  RIGHT_RAIL,
+  railLanguage,
+  EN_RIGHT_RAIL,
   boardModeOf,
   isLandscapeWindow,
   railWidths,
@@ -41,22 +42,32 @@ describe('screenLayoutFor (#185)', () => {
   });
 });
 
+describe('railLanguage', () => {
+  it('reads a regional code as its language, and anything else as English', () => {
+    expect(railLanguage('el')).toBe('el');
+    expect(railLanguage('el-GR')).toBe('el');
+    expect(railLanguage('en-US')).toBe('en');
+    expect(railLanguage('fr')).toBe('en');
+    expect(railLanguage(undefined)).toBe('en');
+  });
+});
+
 describe('railWidths (#185)', () => {
-  it('is LEFT_RAIL and RIGHT_RAIL at the normal font size, and never narrower', () => {
-    expect(railWidths(1)).toEqual({ left: LEFT_RAIL, right: RIGHT_RAIL });
-    expect(railWidths(0.85)).toEqual({ left: LEFT_RAIL, right: RIGHT_RAIL });
+  it('is EN_LEFT_RAIL and EN_RIGHT_RAIL at the normal font size, and never narrower', () => {
+    expect(railWidths(1)).toEqual({ left: EN_LEFT_RAIL, right: EN_RIGHT_RAIL });
+    expect(railWidths(0.85)).toEqual({ left: EN_LEFT_RAIL, right: EN_RIGHT_RAIL });
   });
 
   it('grows with a large font, up to a limit', () => {
-    expect(railWidths(1.2).right).toBeGreaterThan(RIGHT_RAIL);
-    expect(railWidths(1.2).left).toBeGreaterThan(LEFT_RAIL);
+    expect(railWidths(1.2).right).toBeGreaterThan(EN_RIGHT_RAIL);
+    expect(railWidths(1.2).left).toBeGreaterThan(EN_LEFT_RAIL);
     expect(railWidths(3)).toEqual(railWidths(1.35));
-    expect(railWidths(3).right).toBeLessThan(RIGHT_RAIL * 1.5);
+    expect(railWidths(3).right).toBeLessThan(EN_RIGHT_RAIL * 1.5);
   });
 
   it('leaves the board most of an iPhone 17 Pro on its side', () => {
     // 874 pt wide, 62 pt safe edges on each side: the board keeps the rest.
-    expect(874 - 2 * 62 - LEFT_RAIL - RIGHT_RAIL).toBeGreaterThanOrEqual(620);
+    expect(874 - 2 * 62 - EN_LEFT_RAIL - EN_RIGHT_RAIL).toBeGreaterThanOrEqual(618);
     const greek = RAIL_WIDTHS.el;
     expect(874 - 2 * 62 - greek.left - greek.right).toBeGreaterThanOrEqual(580);
   });
