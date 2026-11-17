@@ -24,7 +24,7 @@ import { boardLayout } from '@/features/board/BoardCanvas';
 import { boardDiceBox } from '@/features/board/boardDice';
 import { DOUBLE_SPLIT_AT_MS, USED_OPACITY, doublePlaces } from '@/features/board/diceMotion';
 import { boxRatioWithShadow, fitBoardWithShadow } from '@/features/board/geometry';
-import { LEFT_RAIL, RIGHT_RAIL } from '@/features/board/screenLayout';
+import { EN_LEFT_RAIL, EN_RIGHT_RAIL } from '@/features/board/screenLayout';
 import { DOUBLE_LABEL_MS } from '@/features/board/useDoubleReveal';
 import { BOT_TIMING } from '@/features/bot/botSpeed';
 import { DEFAULT_SETTINGS, type BoardLayoutMode } from '@/features/settings/settings';
@@ -49,7 +49,7 @@ const SPACE: Readonly<Record<BoardLayoutMode, { width: number; height: number }>
 };
 const SIZE = SPACE.tall;
 /** The board's space in landscape on an iPhone SE: between the two side columns. */
-const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - LEFT_RAIL - RIGHT_RAIL - 2 * 2, height: 360 };
+const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - EN_LEFT_RAIL - EN_RIGHT_RAIL - 2 * 2, height: 360 };
 
 /** Rolls 4 on every die: each roll is 4-4. */
 const fours: Rng = { nextUint32: () => 3 };

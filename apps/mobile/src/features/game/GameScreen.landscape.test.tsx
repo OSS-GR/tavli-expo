@@ -26,7 +26,7 @@ import {
   stackPosition,
   type BoardGeometry,
 } from '@/features/board/geometry';
-import { LEFT_RAIL, RIGHT_RAIL, railWidths } from '@/features/board/screenLayout';
+import { EN_LEFT_RAIL, EN_RIGHT_RAIL, railWidths } from '@/features/board/screenLayout';
 import { DEFAULT_SETTINGS, type HomeBoardSide } from '@/features/settings/settings';
 import { settingsStore } from '@/features/settings/store';
 
@@ -42,7 +42,7 @@ import { LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test
 
 const theme = getTheme('walnut-kafeneio');
 /** The board's space in landscape on an iPhone SE: between the two rails (and their 2 pt gaps). */
-const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - LEFT_RAIL - RIGHT_RAIL - 2 * 2, height: 360 };
+const LANDSCAPE_SPACE = { width: 667 - 2 * 4 - EN_LEFT_RAIL - EN_RIGHT_RAIL - 2 * 2, height: 360 };
 /** The tall board's space in portrait. */
 const TALL_SPACE = { width: 375, height: 500 };
 const PAN = 'game-board-pan';
