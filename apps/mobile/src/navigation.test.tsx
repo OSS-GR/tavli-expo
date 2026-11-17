@@ -11,6 +11,7 @@ import {
 } from '@tavli/contracts';
 import { createGameFlow, portes } from '@tavli/engine';
 import { MAX_OPEN_INVITES } from '@tavli/online';
+import { openMemoryGame } from '@tavli/online/testing';
 import { fireEvent, within } from '@testing-library/react-native';
 import { router as appRouter } from 'expo-router';
 import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library';
@@ -265,8 +266,8 @@ describe('app navigation', () => {
 
     const reviews = recorded.sent.filter((e) => e.type === 'track' && e.event === 'review_opened');
     expect(reviews).toEqual([
-      { type: 'track', event: 'review_opened', props: { game: 'portes' } },
-      { type: 'track', event: 'review_opened', props: { game: 'portes' } },
+      { type: 'track', event: 'review_opened', props: { game: 'portes', online: false } },
+      { type: 'track', event: 'review_opened', props: { game: 'portes', online: false } },
     ]);
   });
 
@@ -935,6 +936,53 @@ describe('online games (#255)', () => {
     await user.press(screen.getByTestId('safety-close'));
     await user.press(screen.getByRole('button', { name: 'Home' }));
     expect(router.getPathname()).toBe('/');
+  });
+
+  it('reviews a finished online game from match end, from the server’s record (#604)', async () => {
+    const user = setupUser();
+    // Usage data allowed: the review sends `review_opened`.
+    await act(async () => consentStore.setState({ status: 'granted' }));
+    recorded.sent.length = 0;
+    const router = await renderRouter('./src/app', { initialUrl: '/dev/online' });
+    await user.press(screen.getByRole('radio', { name: '1' }));
+    await user.press(screen.getByRole('button', { name: 'Start game' }));
+    const board = router.getPathname();
+    const gameId = board.split('/').at(-1)!;
+    await act(async () => {
+      await openMemoryGame(onlineServer(), gameId);
+    });
+
+    // A game in play has no record: the review says so, and OK goes back.
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    await act(async () => appRouter.push(`${board}/review?game=1`));
+    expect(await screen.findByText('The review did not load')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'OK' }));
+    expect(router.getPathname()).toBe(board);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    // No game number: the review cannot be opened.
+    await act(async () => appRouter.push(`${board}/review`));
+    expect(screen.getByText('This game could not be opened.')).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(board);
+
+    // You resign the match after the opening: game 1 is scored, the match is over.
+    await act(async () => {
+      await onlineServer().transportFor(onlinePlayerId).resign(gameId);
+    });
+    await expectMatchEndAfterDelay(router, `${board}/match-end`);
+    await user.press(screen.getByRole('button', { name: 'Review' }));
+    expect(router.getPathname()).toBe(`${board}/review`);
+    expect(await screen.findByRole('header', { name: 'Game 1 · Portes' })).toBeOnTheScreen();
+    // Nobody finished a turn in that game.
+    expect(await screen.findByText('No moves to review in this game.')).toBeOnTheScreen();
+    await act(async () => appRouter.back());
+    expect(router.getPathname()).toBe(`${board}/match-end`);
+
+    const reviews = recorded.sent.filter((e) => e.type === 'track' && e.event === 'review_opened');
+    expect(reviews).toEqual([
+      { type: 'track', event: 'review_opened', props: { game: 'portes', online: true } },
+    ]);
   });
 });
 

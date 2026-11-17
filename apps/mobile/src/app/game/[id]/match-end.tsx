@@ -52,6 +52,7 @@ export default function MatchEndRoute() {
             onNewPlayer={(game) => router.replace(rankedHref(game))}
             onPlayAgain={(playerId) => router.replace(friendInviteHref(playerId))}
             onSupport={() => router.push(supportHref('ask'))}
+            onReview={(game) => router.push(reviewHref(id, game))}
           />
         )}
       </OnlineConnect>

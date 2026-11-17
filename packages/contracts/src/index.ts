@@ -57,6 +57,8 @@ export {
   turnDeadlineMs,
 } from './game-transport';
 export type {
+  GameRecord,
+  GameRecordRequest,
   GameTransport,
   GameTransportErrorCode,
   GameTransportErrorData,

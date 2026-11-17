@@ -31,6 +31,7 @@ import type {
   Friend,
   FriendRequests,
   FriendStatus,
+  GameRecord,
   GameSummary,
   GameTransportErrorData,
   InviteView,
@@ -90,6 +91,13 @@ export interface GameFunctions {
     WriteResult
   >;
   readonly resign: FunctionReference<'mutation', 'public', { gameId: string }, number>;
+  /** One game's record for the review (#604). A server from before #604 has no such function. */
+  readonly gameRecord: FunctionReference<
+    'query',
+    'public',
+    { gameId: string; gameNumber: number },
+    GameRecord
+  >;
   readonly listMyGames: FunctionReference<
     'query',
     'public',
@@ -106,6 +114,7 @@ export const GAME_FUNCTION_NAMES = {
   setDraft: 'games:setDraft',
   answer: 'games:answer',
   resign: 'games:resign',
+  gameRecord: 'games:gameRecord',
   listMyGames: 'games:listMyGames',
 } as const satisfies { readonly [K in keyof GameFunctions]: string };
 
@@ -116,6 +125,7 @@ export const GAME_FUNCTIONS: GameFunctions = {
   setDraft: makeFunctionReference(GAME_FUNCTION_NAMES.setDraft),
   answer: makeFunctionReference(GAME_FUNCTION_NAMES.answer),
   resign: makeFunctionReference(GAME_FUNCTION_NAMES.resign),
+  gameRecord: makeFunctionReference(GAME_FUNCTION_NAMES.gameRecord),
   listMyGames: makeFunctionReference(GAME_FUNCTION_NAMES.listMyGames),
 };
 

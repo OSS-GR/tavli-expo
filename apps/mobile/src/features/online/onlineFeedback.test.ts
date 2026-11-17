@@ -437,6 +437,7 @@ describe('online feedback (#271)', () => {
       setDraft: () => Promise.reject(new Error('network request failed')),
       sendAnswer: () => Promise.reject(new Error('network request failed')),
       resign: () => Promise.reject(new Error('network request failed')),
+      gameRecord: () => Promise.reject(new Error('network request failed')),
       listMyGames: () => Promise.reject(new Error('network request failed')),
       watchMyGames: (request, onList, onError) => inner.watchMyGames(request, onList, onError),
     };

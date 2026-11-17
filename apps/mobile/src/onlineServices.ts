@@ -131,6 +131,7 @@ export function lazyGameTransport(get: () => GameTransport): GameTransport {
     setDraft: (request) => get().setDraft(request),
     sendAnswer: (request) => get().sendAnswer(request),
     resign: (gameId) => get().resign(gameId),
+    gameRecord: (request) => get().gameRecord(request),
     listMyGames: (request) => get().listMyGames(request),
     watchMyGames: (request, onList, onError) => get().watchMyGames(request, onList, onError),
   };

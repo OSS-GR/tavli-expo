@@ -277,14 +277,16 @@ describe('the review text', () => {
 });
 
 describe('sendReviewOpened', () => {
-  it('sends the game only, after opt-in', () => {
+  it('sends the game and whether it was online only, after opt-in', () => {
     const analytics = createRecordingAnalytics();
-    sendReviewOpened('tavli', analytics);
+    sendReviewOpened('tavli', false, analytics);
     expect(analytics.sent).toEqual([]);
     analytics.optIn();
-    sendReviewOpened('tavli', analytics);
+    sendReviewOpened('tavli', false, analytics);
+    sendReviewOpened('portes', true, analytics);
     expect(analytics.sent).toEqual([
-      { type: 'track', event: 'review_opened', props: { game: 'tavli' } },
+      { type: 'track', event: 'review_opened', props: { game: 'tavli', online: false } },
+      { type: 'track', event: 'review_opened', props: { game: 'portes', online: true } },
     ]);
   });
 
@@ -295,7 +297,7 @@ describe('sendReviewOpened', () => {
         throw new Error('down');
       },
     } as unknown as Analytics;
-    expect(() => sendReviewOpened('portes', broken)).not.toThrow();
+    expect(() => sendReviewOpened('portes', false, broken)).not.toThrow();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

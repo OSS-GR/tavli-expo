@@ -9,7 +9,7 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | Path | What it holds |
 |---|---|
 | `apps/server/convex/schema.ts` | The tables: `games`, `moves`, `drafts`, `invites`, `pushTokens`, `authKeys`, `usedKeyNonces`, `appleTokens`, `appleRevokes`, `playerNames`, `blocks`, `reports`, `friends`, `friendRequests`, `friendLinks`, `friendSearches`, `ratings`, `ratedPairs` and `seeks` |
-| `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
+| `apps/server/convex/games.ts` | The Convex functions: the public `makeMove`, `answer`, `resign`, `getGame`, `gameRecord` and `listMyGames`, the internal `createGame` and `checkTimeout`, and `insertGame` (the one way to start a game). They keep only the database and scheduler parts. |
 | `apps/server/convex/playerNames.ts` | [Guest names and usernames](#playernames) (#400, #405): `ensureGuestNumber`, `nameRowOf`, `nameOf`, `namesOfPlayers`, `deletePlayerNameOf` |
 | `packages/online/src/names.ts` | The pure part of guest names: `pickGuestNumber(rng)` (fair, 1000–9999), `nameFrom` (the username first), `namesOf`, `NO_NAMES` |
 | `apps/server/convex/usernames.ts` | [Usernames](#usernames) (#405): `getMyUsername`, `setMyUsername`, and the owner's `clearUsername` (internal) |
@@ -393,6 +393,7 @@ A game between two people starts only from an accepted invite ([Invites](#invite
 | `resign(gameId)` | either player, any time | no | Resigns the **match**; the opponent wins. No version, so a resign never fails only because the opponent just moved. It ignores the turn timer. Returns the new version. |
 | `setDraft(gameId, expectedVersion, moves)` | the player to move, in `moving` | yes | Saves the caller's turn so far ([Live moves](#live-moves)). Returns `null`. |
 | `getGame(gameId)` | the two players | – | `OnlineGameView`, or `null` when there is no such game. Anyone else gets `NOT_A_PLAYER`. |
+| `gameRecord(gameId, gameNumber)` | the two players | – | The record of one game of the match that is over (#604, for the game review): `{ choice, side, log }`. `log` is the match log from the `moves` rows up to the end of game `gameNumber` (from 1; the event before its `nextGame`), or the whole log for the last game of a finished match. The `start` event names the sides (`white`, `black`), never the player ids. `side` is the caller's. A game in play or not played yet: `ILLEGAL_ACTION`; a bad number: `BAD_REQUEST`; a stranger: `NOT_A_PLAYER`; no game: `NOT_FOUND`. The pure part is `gameRecordLog` and `checkGameNumber` (`@tavli/online`, `game-record.ts`), which the in-memory server runs too. |
 | `listMyGames(status)` | anyone signed in | – | The caller's games with `status` (`active` or `finished`) as `GameSummary`, newest change first, at most `MAX_LISTED_GAMES` (50). See [My games](#my-games). |
 | `checkTimeout(gameId, version)` | internal (the scheduler) | yes | Runs at a turn deadline. Applies the time out if the game is still at `version`; else it does nothing. |
 
@@ -459,7 +460,7 @@ The app plays a game through the online store (`apps/mobile/src/features/online/
 
 ## The port
 
-`GameTransport` in `packages/contracts`: `subscribe(gameId, onView, onError)`, `sendTurn({ gameId, expectedVersion, moves })`, `sendAnswer({ gameId, expectedVersion, choice })`, `resign(gameId)`, `listMyGames({ status })` ([My games](#my-games), #296) and `watchMyGames({ status }, onList, onError)` (#297). `listMyGames` is on this port, not a new one: it is a call of the same signed-in player on the same server and client, and every place that has a transport (the online screens, the services, the fakes) gets it with no new wiring. The calls carry no player id. The server reads the caller from the sign-in token, which the backend client gets from the `AuthProvider` port ([Sign-in](#sign-in)). `subscribe` is for the two players only: a stranger's `onError` gets `NOT_A_PLAYER`.
+`GameTransport` in `packages/contracts`: `subscribe(gameId, onView, onError)`, `sendTurn({ gameId, expectedVersion, moves })`, `sendAnswer({ gameId, expectedVersion, choice })`, `resign(gameId)`, `gameRecord({ gameId, gameNumber })` (#604), `listMyGames({ status })` ([My games](#my-games), #296) and `watchMyGames({ status }, onList, onError)` (#297). `listMyGames` is on this port, not a new one: it is a call of the same signed-in player on the same server and client, and every place that has a transport (the online screens, the services, the fakes) gets it with no new wiring. The calls carry no player id. The server reads the caller from the sign-in token, which the backend client gets from the `AuthProvider` port ([Sign-in](#sign-in)). `subscribe` is for the two players only: a stranger's `onError` gets `NOT_A_PLAYER`.
 
 ### The Convex adapter
 

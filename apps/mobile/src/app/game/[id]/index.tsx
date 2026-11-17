@@ -79,6 +79,7 @@ export default function GameRoute() {
               onSettings={() => router.push('/settings')}
               onRules={(variant, preset) => router.push(rulesHref(variant, preset))}
               onMatchOver={() => router.replace(matchEndHref(id))}
+              onReview={(game) => router.push(reviewHref(id, game))}
             />
           )}
         </OnlineConnect>

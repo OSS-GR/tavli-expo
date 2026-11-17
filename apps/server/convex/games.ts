@@ -47,13 +47,14 @@ import type { Infer } from 'convex/values';
 
 import { MAX_LISTED_GAMES } from '@tavli/contracts';
 import type {
+  GameRecord,
   GameSummary,
   GameTransportErrorData,
   OnlineGameView,
   PlayerName,
 } from '@tavli/contracts';
 import { serializeRules } from '@tavli/engine';
-import type { MatchFlow, MoveInput, PerPlayer, PlayerId } from '@tavli/engine';
+import type { FlowEvent, MatchFlow, MoveInput, PerPlayer, PlayerId } from '@tavli/engine';
 import {
   OnlineGameError,
   SERVER_ACTOR,
@@ -61,12 +62,14 @@ import {
   answerPrompt,
   callTimedOut,
   checkCall,
+  checkGameNumber,
   checkNewGame,
   checkRankedGame,
   checkTurnTimeMinutes,
   checkViewer,
   createOnlineMatch,
   eventActor,
+  gameRecordLog,
   latestGames,
   NO_NAMES,
   loadFlow,
@@ -80,6 +83,7 @@ import {
   rollDeadline,
   rollDice as rollMatchDice,
   scheduledCheck,
+  sideOf,
   storeFlow,
   storeStep,
   summarizeGame,
@@ -110,6 +114,11 @@ function reject(error: OnlineGameError): never {
     message: error.message,
   };
   throw new ConvexError(data);
+}
+
+/** The caller is not one of the two players. */
+function notAPlayer(): OnlineGameError {
+  return new OnlineGameError('NOT_A_PLAYER', 'only the players may read this game');
 }
 
 /** Runs `step`; an `OnlineGameError` becomes a `ConvexError`. */
@@ -627,6 +636,41 @@ export const getGame = query({
     // A side the caller blocks shows no name (#320).
     const names = await playerNamesSeenBy(ctx, callerId, game.players);
     return toView({ ...gameInput(game), flow, previousGame, timeoutsInARow, draft, names });
+  },
+});
+
+/**
+ * The record of one game of the match (#604), for the game review: the
+ * log from `start` to the end of that game. Only the two players may read
+ * it, and only for a game that is over (`gameRecordOf` in `@tavli/online`
+ * holds the checks;
+ * the in-memory server runs them too). It reads the
+ * `moves` rows in order and stops at the end of that game. The record
+ * carries no player id.
+ */
+export const gameRecord = query({
+  args: { gameId: v.id('games'), gameNumber: v.number() },
+  handler: async (ctx, { gameId, gameNumber }): Promise<GameRecord> => {
+    const callerId = await signedInPlayer(ctx);
+    guarded(() => checkGameNumber(gameNumber));
+    const loaded = await ctx.db.get(gameId);
+    const game = guarded(() => checkViewer(loaded, callerId));
+    if (game === null) reject(new OnlineGameError('NOT_FOUND', 'no game with this id'));
+    const events: FlowEvent[] = [];
+    // The `nextGame` events read so far: game `gameNumber` ended at the
+    // last one of them, so the rest of the log is not needed.
+    let started = 0;
+    const rows = ctx.db.query('moves').withIndex('by_game', (q) => q.eq('gameId', game._id));
+    for await (const row of rows) {
+      const event = JSON.parse(row.event) as FlowEvent;
+      events.push(event);
+      if (event.type === 'nextGame') started += 1;
+      if (started >= gameNumber) break;
+    }
+    const log = guarded(() => gameRecordLog(events, gameNumber, game.status === 'finished'));
+    // `checkViewer` let only a player through.
+    const side = sideOf(game.players, callerId) ?? reject(notAPlayer());
+    return { choice: game.choice, side, log };
   },
 });
 

@@ -3,7 +3,8 @@
  * (`online-game.ts`), the checks around each call (`calls.ts`), the invite
  * checks and codes (`invites.ts`), the block and report checks
  * (`safety.ts`), the friends checks (`friends.ts`), the rating math (`ratings.ts`), Play ranked
- * matching (`matchmaking.ts`), the "my games" summaries
+ * matching (`matchmaking.ts`), the record of a game for the review
+ * (`game-record.ts`), the "my games" summaries
  * (`summaries.ts`), moving a guest into an account (`guest-move.ts`),
  * and an in-memory server that gives a
  * `GameTransport` and an `Invites` per player (`memory-server.ts`).
@@ -53,6 +54,7 @@ export {
   type SeekRecord,
   type SeekState,
 } from './matchmaking';
+export { checkGameNumber, gameRecordLog } from './game-record';
 export { NO_NAMES, nameFrom, namesOf, pickGuestNumber, type NameRecord } from './names';
 export {
   checkUsername,

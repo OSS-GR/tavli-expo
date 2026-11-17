@@ -57,6 +57,8 @@ export interface OnlineMatchEndProps {
    * which may show at the end of a Play ranked match (never a friend game).
    */
   onSupport?: () => void;
+  /** Review of a game of the match (#604), by its number (from 1). */
+  onReview?: (gameNumber: number) => void;
 }
 
 export function OnlineMatchEnd(props: OnlineMatchEndProps) {
@@ -90,6 +92,7 @@ function OnlineMatchEndView({
   onNewPlayer,
   onPlayAgain,
   onSupport,
+  onReview,
 }: OnlineMatchEndProps & { store: OnlineStore }) {
   const { t } = useTranslation();
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
@@ -143,6 +146,10 @@ function OnlineMatchEndView({
         // The result is read once per app run (#216).
         announceKey={`online:${gameId}`}
         onHome={onHome}
+        // The review of the last game (#604), as after a local match.
+        {...(onReview && view.match.games.length >= 1
+          ? { onReview: () => onReview(view.match.games.length) }
+          : {})}
         // Support Tavlaki (#590): a ranked match counts all its games.
         {...(ranked && onSupport
           ? {

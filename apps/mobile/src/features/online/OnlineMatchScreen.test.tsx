@@ -88,6 +88,8 @@ interface Game {
   readonly server: MemoryGameServer;
   readonly gameId: string;
   readonly onMatchOver: jest.Mock;
+  /** Review of a game that ended (#604), with its number. */
+  readonly onReview: jest.Mock;
 }
 
 /** A game of `me` (White) vs the bot (Black) on its own in-memory server, on the screen. */
@@ -126,6 +128,7 @@ async function openGame(
     timing: { thinkMs: () => botThinkMs },
   });
   const onMatchOver = jest.fn();
+  const onReview = jest.fn();
   await renderWithRoot(
     <OnlineMatchScreen
       gameId={gameId}
@@ -135,6 +138,7 @@ async function openGame(
       onSettings={jest.fn()}
       onRules={jest.fn()}
       onMatchOver={onMatchOver}
+      onReview={onReview}
       {...(safetyOf ? { safety: safetyOf(server) } : {})}
     />,
   );
@@ -142,7 +146,7 @@ async function openGame(
   await act(async () => {
     fireEvent(board, 'layout', { nativeEvent: { layout: { x: 0, y: 0, ...SIZE } } });
   });
-  const game = { server, gameId, onMatchOver };
+  const game = { server, gameId, onMatchOver, onReview };
   if (playOpening) await untilOpened(game);
   return game;
 }
@@ -364,6 +368,14 @@ describe('<OnlineMatchScreen /> (#255)', () => {
 
     const gameLabel = () => screen.getByTestId('game-label', { includeHiddenElements: true });
 
+    it('offers the review of the game that ended, by its number (#604)', async () => {
+      const user = setupUser();
+      const game = await winGameOne(user);
+      // The server started game 2 already; the review is of game 1.
+      await user.press(screen.getByTestId('end-review-button'));
+      expect(game.onReview).toHaveBeenCalledWith(1);
+    });
+
     it('holds the next game’s dice and sounds until the sheet closes, then plays its roll once', async () => {
       const announce = jest
         .spyOn(AccessibilityInfo, 'announceForAccessibility')
@@ -520,6 +532,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
           setDraft: (request) => real.setDraft(request),
           sendAnswer: (request) => real.sendAnswer(request),
           resign: (id) => real.resign(id),
+          gameRecord: (request) => real.gameRecord(request),
           listMyGames: (request) => real.listMyGames(request),
           watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
         };
@@ -717,6 +730,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
             setDraft: (request) => real.setDraft(request),
             sendAnswer: (request) => real.sendAnswer(request),
             resign: (id) => real.resign(id),
+            gameRecord: (request) => real.gameRecord(request),
             listMyGames: (request) => real.listMyGames(request),
             watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
           };
@@ -1028,6 +1042,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         setDraft: (request) => real.setDraft(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
+        gameRecord: (request) => real.gameRecord(request),
         listMyGames: (request) => real.listMyGames(request),
         watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       };
@@ -1073,6 +1088,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
         setDraft: (request) => real.setDraft(request),
         sendAnswer: (request) => real.sendAnswer(request),
         resign: (id) => real.resign(id),
+        gameRecord: (request) => real.gameRecord(request),
         listMyGames: (request) => real.listMyGames(request),
         watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
       };
