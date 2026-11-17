@@ -43,6 +43,7 @@ The app saves these things on your phone only. They never leave it.
 - **Your privacy answer** (allow or don't allow).
 - **Your answer** (**Turn on** or **Not now**) to turn notifications, so the app does not ask again by itself and sends the push token only after **Turn on**.
 - **When the app last asked** you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after **Don't ask again** or a sign-in with Apple or an email code.
+- **When the app last asked you to support Tavlaki** (the time, a count of finished games, and whether you tapped **Don't ask again**), so it asks after your second game, then every 10 games at most once a week, and never after **Don't ask again**.
 - **An install id:** a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap **Allow usage data**.
 
 Deleting the app deletes all of this from your phone. If you install the app again, you get a new install id. (On Android, your phone's own backup may keep a copy of app data and bring it back when you reinstall.)
@@ -106,6 +107,10 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Invite made | You made an invite to play a friend online. Includes the game, the points to win and the time limit only, never the invite code or any id |
 | Turn notifications answered | You answered your phone's question about turn notifications. Includes the answer only (allowed or not allowed), never the push token or any id |
 | Signed in for online play | You signed in to play online. Includes how only (Apple, email or guest), never the email, the Apple id or any id |
+| Support screen opened | You opened the Support Tavlaki screen. Includes where from only (Settings or the ask after a game) |
+| Support link opened | You tapped **Support on Ko-fi** on the Support screen. Includes nothing else. We never learn whether you gave anything |
+| Support ask shown | The app asked you to support Tavlaki after a game. Includes nothing else |
+| Support ask answered | You answered that ask. Includes the answer only (Support Tavlaki, Not now, or Don't ask again) |
 | Screen viewed | You opened a screen. Includes the screen's name (for example "settings"), never personal data |
 
 Each event also carries technical facts: the phone maker and model (for example "iPhone 15", never the name you gave your phone), the system and its version, screen size, the app name and version, language and time zone. It carries the install id, and random ids that PostHog keeps on your phone.
@@ -247,9 +252,15 @@ These features are planned. They are **not** in the app today. We will update th
 - **Sign-in with Google** and **Sign in with Apple on Android**. These will store your account on our server (Convex), with sign-in through Better Auth. (Guest accounts, Sign in with Apple on iPhone, the email code, usernames, friends and online games with a friend are live now: see above.)
 - **App updates over the air** (EAS Update by Expo). The app will ask Expo's servers at launch if a newer version exists. This request carries technical facts only.
 
+## Supporting Tavlaki (Ko-fi)
+
+Tavlaki is free. If you want to support it, **Settings → Help → Support Tavlaki** opens our page `tavlaki.com/support` in your browser, and that page links to Ko-fi. Ko-fi (Ko-fi Labs Limited, UK) is a third-party service with its own terms and privacy policy. It is not one of the services above: we do not send it any data, and the app never opens it by itself.
+
+If you give something, the payment happens on Ko-fi, through Stripe or PayPal. We never see your card or bank details. We get your details from Ko-fi (such as your name or a message) only if you choose to share them with us there. Supporting gives nothing extra in the app, and it is not linked to your account or your install id. <!-- OWNER: check in Ko-fi's settings what Ko-fi shows the creator about a supporter (name, email, message), and change this line if it shows more than the supporter chooses. -->
+
 ## This website
 
-This page is a plain web page. It sets no cookies, runs no scripts and loads nothing from other sites. The web host may keep standard server logs (such as IP addresses) for security.
+This page is a plain web page. It sets no cookies, runs no scripts and loads nothing from other sites. The Support page links to Ko-fi; Ko-fi's button there is an image on our own site. The web host may keep standard server logs (such as IP addresses) for security.
 
 ## The app stores
 

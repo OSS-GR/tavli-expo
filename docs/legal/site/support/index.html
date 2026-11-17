@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Tavlaki</title>
+<meta name="description" content="Tavlaki is free, with no ads, and made by one person. If you enjoy it, you can buy me a coffee on Ko-fi.">
+<meta name="theme-color" content="#3B2A1D">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Support Tavlaki">
+<meta property="og:description" content="Tavlaki is free, with no ads, and made by one person. If you enjoy it, you can buy me a coffee on Ko-fi.">
+<meta property="og:image" content="https://tavlaki.com/img/board-1280.webp">
+<meta property="og:url" content="https://tavlaki.com/support/">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" hreflang="en" href="https://tavlaki.com/support/">
+<link rel="alternate" hreflang="el" href="https://tavlaki.com/el/support/">
+<style>
+/* Support Tavlaki (#590). The app's Support screen opens this page; the
+   Ko-fi button is a plain link, so the Ko-fi page can change without a new
+   build. The style is the homepage's (../index.html). No JavaScript, no
+   fonts or images from other sites, no cookies: keep it that way. Copy any
+   change to the Greek page (../el/support/index.html). */
+:root {
+  --walnut: #3B2A1D; --walnut-deep: #2E1F15; --line: #6A4E35;
+  --ivory: #F1E6CF; --ivory-dim: #BFA987;
+  --brass: #C89B45; --brass-light: #E0B867; --on-brass: #22160C;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--walnut); color: var(--ivory); font: 17px/1.6 var(--sans); }
+a { color: var(--brass-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--ivory); }
+a:focus-visible, .get:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 3px; border-radius: 4px; }
+h1 { font-family: var(--serif); font-weight: 600; color: var(--ivory); text-wrap: balance; }
+p { margin: 0 0 1rem; text-wrap: pretty; }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+@media (min-width: 40rem) { .wrap { padding: 0 2rem; } }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
+.brand { display: flex; align-items: center; gap: 0.75rem; color: var(--ivory); text-decoration: none; font: 600 1.35rem/1 var(--serif); }
+.brand img { width: 44px; height: 44px; border-radius: 10px; }
+.brand:hover { color: var(--ivory); }
+.points { display: block; width: 100%; height: 40px; }
+
+/* The card: one text and one button. */
+main { padding: clamp(2.5rem, 7vw, 5rem) 0; }
+.card { max-width: 34rem; margin: 0 auto; padding: 2rem 1.5rem; border: 1px solid var(--line); border-radius: 20px; background: var(--walnut-deep); text-align: center; }
+@media (min-width: 40rem) { .card { padding: 2.5rem; } }
+.cup { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin: 0 auto 1.25rem; border: 2px solid var(--brass); border-radius: 50%; color: var(--brass-light); }
+.card h1 { font-size: clamp(2rem, 6vw, 2.8rem); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 1.25rem; }
+.card .lead { font-size: 1.15rem; }
+.get { display: inline-block; margin: 0.75rem 0 1.5rem; padding: 0.9rem 1.9rem; border-radius: 999px; background: linear-gradient(var(--brass-light), var(--brass)); color: var(--on-brass); font-weight: 700; font-size: 1.05rem; text-decoration: none; box-shadow: 0 2px 0 #83632F, 0 8px 24px rgba(0, 0, 0, 0.35); }
+.get:hover { background: var(--brass-light); color: var(--on-brass); }
+.top .get { margin: 0; padding: 0.55rem 1.2rem; font-size: 0.95rem; }
+/* Ko-fi's button image (English page) and our own button with Ko-fi's cup (Greek page). */
+.kofi { display: inline-block; margin: 0.75rem 0 1.5rem; border-radius: 8px; }
+.kofi:focus-visible { outline: 3px solid var(--brass-light); outline-offset: 4px; }
+.kofi img { display: block; width: 245px; max-width: 100%; height: auto; }
+.get .cup-icon { display: inline-block; width: 20px; height: auto; margin-right: 0.5rem; vertical-align: -0.2em; }
+.note { color: var(--ivory-dim); font-size: 0.95rem; }
+.note:last-child { margin-bottom: 0; }
+
+footer { background: var(--walnut-deep); }
+footer .wrap { padding-top: 1.75rem; padding-bottom: 2.5rem; color: var(--ivory-dim); font-size: 0.95rem; }
+footer nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="/"><img src="/img/icon-192.webp" alt="" width="44" height="44">Tavlaki</a>
+  <a class="get" href="https://testflight.apple.com/join/RTCQhMCc" rel="noreferrer">Get Tavlaki</a>
+</header>
+
+<svg class="points" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="points-down" width="64" height="40" patternUnits="userSpaceOnUse">
+      <rect width="64" height="40" fill="#8A6038"/>
+      <polygon points="0,0 16,40 32,0" fill="#CFB98E"/>
+      <polygon points="32,0 48,40 64,0" fill="#2B1F19"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="40" fill="url(#points-down)"/>
+</svg>
+
+<main class="wrap">
+  <div class="card">
+    <div class="cup" aria-hidden="true">
+      <!-- Lucide "coffee" (ISC), like the app's icon. -->
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+        <path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/>
+        <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/>
+      </svg>
+    </div>
+    <h1>Support Tavlaki</h1>
+    <p class="lead">Tavlaki is free, with no ads, and made by one person.</p>
+    <p>If you enjoy it, you can buy me a coffee on Ko-fi. It keeps Tavlaki going and growing.</p>
+    <!-- Ko-fi's own button (img/kofi/, Ko-fi's brand assets as Ko-fi gives
+         them: never recolor or crop). The dark one on a light page. -->
+    <a class="kofi" href="https://ko-fi.com/orestisstefanis" rel="noreferrer"><picture>
+      <source media="(prefers-color-scheme: light)" srcset="/img/kofi/support_me_on_kofi_dark.png">
+      <img src="/img/kofi/support_me_on_kofi_beige.png" alt="Support me on Ko-fi" width="245" height="50">
+    </picture></a>
+    <p class="note">You get nothing extra in the app. Everyone plays the same game.</p>
+    <p class="note">The payment happens on Ko-fi, through Stripe or PayPal. We never see your card details. Ko-fi has its own privacy policy; ours is <a href="/privacy/">here</a>.</p>
+  </div>
+</main>
+
+<footer>
+  <svg class="points" aria-hidden="true" focusable="false">
+    <defs>
+      <pattern id="points-up" width="64" height="40" patternUnits="userSpaceOnUse">
+        <rect width="64" height="40" fill="#8A6038"/>
+        <polygon points="0,40 16,0 32,40" fill="#2B1F19"/>
+        <polygon points="32,40 48,0 64,40" fill="#CFB98E"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="40" fill="url(#points-up)"/>
+  </svg>
+  <div class="wrap">
+    <nav aria-label="Pages">
+      <a href="/">Tavlaki</a>
+      <a href="/privacy/">Privacy policy</a>
+      <a href="/terms/">Terms of use</a>
+      <a href="mailto:support@tavlaki.com">support@tavlaki.com</a>
+      <a href="/el/support/" lang="el" hreflang="el">Ελληνικά</a>
+    </nav>
+    <p>This site sets no cookies, runs no scripts and loads nothing from other sites.</p>
+  </div>
+</footer>
+</body>
+</html>
