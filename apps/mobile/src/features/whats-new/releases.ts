@@ -47,7 +47,8 @@ export type WhatsNewEntryId =
   | 'widerBoard'
   | 'passInlay'
   | 'swipeRoll'
-  | 'takeBack';
+  | 'takeBack'
+  | 'betterPushes';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -63,6 +64,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-21',
+    entries: [{ id: 'betterPushes', icon: 'bell' }],
+  },
   {
     date: '2026-11-20',
     entries: [

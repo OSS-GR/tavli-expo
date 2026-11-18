@@ -5,9 +5,11 @@
  * Rules for every adapter:
  * - `send` never throws. A broken push service must not break the caller.
  *   Each message gets its own result, in the order of the messages.
- * - A message holds no names and no emails: only a fixed text and the
- *   game id (`data.gameId`), so the app can open the game on a tap, or
- *   the code of a friend invite (`data.inviteCode`, #406).
+ * - A message holds no emails. Since #631 its text may name the other
+ *   player (a username or a guest name, as the receiver sees them). The
+ *   data holds only the game id (`data.gameId`), so the app can open the
+ *   game on a tap, the code of a friend invite (`data.inviteCode`, #406),
+ *   or the screen to open (`data.screen`, #631: `friends`).
  *
  * The Expo Push adapter is `@tavli/push-expo`. The recording provider
  * below is for tests. The contract checks are `pushProviderContract` in
@@ -15,10 +17,16 @@
  * `docs/architecture/online-game-service.md`.
  */
 
-/** What a push opens: a game, or a friend invite (#406). */
+/** The screens a push may open by name (#631): Friends, for a friend request. */
+export const PUSH_SCREENS = ['friends'] as const;
+
+export type PushScreen = (typeof PUSH_SCREENS)[number];
+
+/** What a push opens: a game, a friend invite (#406), or a screen (#631). */
 export type PushData =
-  | { readonly gameId: string; readonly inviteCode?: never }
-  | { readonly inviteCode: string; readonly gameId?: never };
+  | { readonly gameId: string; readonly inviteCode?: never; readonly screen?: never }
+  | { readonly inviteCode: string; readonly gameId?: never; readonly screen?: never }
+  | { readonly screen: PushScreen; readonly gameId?: never; readonly inviteCode?: never };
 
 /** One push to one device. Plain JSON. */
 export interface PushMessage {
@@ -26,7 +34,7 @@ export interface PushMessage {
   readonly to: string;
   readonly title: string;
   readonly body: string;
-  /** What the app reads when the player taps the push: a game, or a friend invite (#406). */
+  /** What the app reads when the player taps the push: a game, a friend invite (#406) or a screen (#631). */
   readonly data: PushData;
   /** `high` asks the phone to show it at once. Left out: the service's default. */
   readonly priority?: 'normal' | 'high';

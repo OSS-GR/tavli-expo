@@ -27,11 +27,22 @@ export function screenBackground(colors: UiColors) {
 export interface ScreenProps {
   children: ReactNode;
   testID?: string;
+  /**
+   * Something covers the screen (the turn notifications offer, #285):
+   * screen readers skip it. `collapsable={false}` keeps its native view
+   * when this changes (#173).
+   */
+  hidden?: boolean;
 }
 
-export function Screen({ children, testID }: ScreenProps) {
+export function Screen({ children, testID, hidden = false }: ScreenProps) {
   return (
-    <View testID={testID} style={styles.screen}>
+    <View
+      testID={testID}
+      style={styles.screen}
+      collapsable={false}
+      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
+      accessibilityElementsHidden={hidden}>
       {children}
     </View>
   );

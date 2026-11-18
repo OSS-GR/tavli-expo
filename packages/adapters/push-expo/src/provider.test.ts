@@ -106,6 +106,16 @@ describe('createExpoPushProvider', () => {
     expect(expo.requests[0]?.body[0]).toMatchObject({ data: { inviteCode: 'ABC234' } });
   });
 
+  it('sends the screen of a friend request push, and only that (#631)', async () => {
+    const expo = fakeExpo();
+    const push = createExpoPushProvider({ fetch: expo.fetch });
+    await push.send([
+      { to: 'ExponentPushToken[a]', title: 'T', body: 'B', data: { screen: 'friends' } },
+    ]);
+    expect(expo.requests[0]?.body[0]).toMatchObject({ data: { screen: 'friends' } });
+    expect(Object.keys((expo.requests[0]?.body[0] as { data: object }).data)).toEqual(['screen']);
+  });
+
   it('sends priority and ttl only when the message has them', async () => {
     const expo = fakeExpo();
     const push = createExpoPushProvider({ fetch: expo.fetch });

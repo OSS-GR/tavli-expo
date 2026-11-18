@@ -43,6 +43,7 @@ import type {
   NewInvite,
   OnlineGameStatus,
   OnlineGameView,
+  PushLocale,
   PushPlatform,
   RecentPlayer,
   SendTurnRequest,
@@ -172,7 +173,8 @@ export interface PushFunctions {
   readonly registerPushToken: FunctionReference<
     'mutation',
     'public',
-    { token: string; platform: PushPlatform },
+    // `locale` (#631) is optional on the server: older builds send none.
+    { token: string; platform: PushPlatform; locale?: PushLocale },
     null
   >;
   readonly removePushToken: FunctionReference<'mutation', 'public', { token: string }, null>;

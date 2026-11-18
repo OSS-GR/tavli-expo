@@ -7,6 +7,7 @@ import {
   gameIdOfPush,
   inviteCodeOfPush,
   isPushPermission,
+  screenOfPush,
 } from './push-notifications';
 import { pushNotificationsContract, pushTokensContract } from './testing';
 import type { PushNotificationsContractSubject, PushTokensContractSubject } from './testing';
@@ -39,9 +40,9 @@ function tokensSubject(): PushTokensContractSubject {
   const ids = { me: 'alice', other: 'bob' } as const;
   return {
     tokensFor: (player) => ({
-      register: (token, platform) => {
+      register: (token, platform, locale) => {
         user = player === null ? null : ids[player];
-        return tokens.register(token, platform);
+        return tokens.register(token, platform, locale);
       },
       remove: (token) => {
         user = player === null ? null : ids[player];
@@ -88,20 +89,42 @@ describe('createMemoryPushTokens', () => {
   it('records every call with the user signed in then', async () => {
     let user: string | null = 'alice';
     const tokens = createMemoryPushTokens(() => user);
-    await tokens.register('ExponentPushToken[a]', 'ios');
+    await tokens.register('ExponentPushToken[a]', 'ios', 'el');
     user = null;
     await expect(tokens.remove('ExponentPushToken[a]')).rejects.toMatchObject({
       code: 'NOT_SIGNED_IN',
     });
     expect(tokens.calls).toEqual([
-      { kind: 'register', playerId: 'alice', token: 'ExponentPushToken[a]', platform: 'ios' },
+      {
+        kind: 'register',
+        playerId: 'alice',
+        token: 'ExponentPushToken[a]',
+        platform: 'ios',
+        locale: 'el',
+      },
       { kind: 'remove', playerId: null, token: 'ExponentPushToken[a]' },
     ]);
     expect(tokens.saved).toEqual([
-      { playerId: 'alice', token: 'ExponentPushToken[a]', platform: 'ios' },
+      { playerId: 'alice', token: 'ExponentPushToken[a]', platform: 'ios', locale: 'el' },
     ]);
     tokens.reset();
     expect({ saved: tokens.saved, calls: tokens.calls }).toEqual({ saved: [], calls: [] });
+  });
+});
+
+describe('screenOfPush (#631)', () => {
+  it('reads a known screen, else null', () => {
+    expect(screenOfPush({ screen: 'friends' })).toBe('friends');
+    for (const data of [
+      null,
+      'friends',
+      {},
+      { screen: '' },
+      { screen: 'settings' },
+      { screen: 1 },
+    ]) {
+      expect(screenOfPush(data)).toBeNull();
+    }
   });
 });
 

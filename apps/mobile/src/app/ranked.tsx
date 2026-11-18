@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useVisit } from '@/features/friends/useVisit';
 import { lastModes } from '@/features/home/lastModes';
 import { gameHref, newGameHref } from '@/features/match/routes';
-import { turnPushes } from '@/features/notifications/appTurnPushes';
+import { turnPushes, useTurnPushOffering } from '@/features/notifications/appTurnPushes';
 import { hasOnlineAccount } from '@/features/online/accountHint';
 import { RankedScreen } from '@/features/ranked/RankedScreen';
 import { useAppUpdateCheck } from '@/features/update/updateCheck';
@@ -35,6 +35,7 @@ export default function RankedRoute() {
   // Counts the times the screen shows, so the account loads again on the way back.
   const visit = useVisit();
   const { game } = useLocalSearchParams<{ game?: string }>();
+  const covered = useTurnPushOffering();
   if (
     auth === undefined ||
     usernames === undefined ||
@@ -61,6 +62,9 @@ export default function RankedRoute() {
         router.replace(gameHref(gameId));
       }}
       onBot={() => router.replace(newGameHref('bot'))}
+      // A ranked game can wait for the other player: offer turn notifications (#631).
+      onSearchStarted={() => void turnPushes()?.offer()}
+      covered={covered}
     />
   );
 }

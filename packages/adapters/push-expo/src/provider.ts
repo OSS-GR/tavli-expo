@@ -16,7 +16,13 @@
  * Expo also gives "push receipts" later (a second call, by ticket id).
  * This adapter reads only the tickets. See the README.
  */
-import type { PushErrorCode, PushMessage, PushProvider, PushResult } from '@tavli/contracts';
+import type {
+  PushData,
+  PushErrorCode,
+  PushMessage,
+  PushProvider,
+  PushResult,
+} from '@tavli/contracts';
 
 export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
@@ -85,16 +91,20 @@ function ticketResult(ticket: unknown): PushResult {
  * push sound. `priority` and `ttl` (seconds) go out only when the message
  * has them.
  */
+function expoData(data: PushData) {
+  if (data.gameId !== undefined) return { gameId: data.gameId };
+  if (data.inviteCode !== undefined) return { inviteCode: data.inviteCode };
+  return { screen: data.screen };
+}
+
 function toExpo(message: PushMessage) {
   return {
     to: message.to,
     title: message.title,
     body: message.body,
-    // Only the known keys go out: a game id or an invite code (#406).
-    data:
-      message.data.gameId === undefined
-        ? { inviteCode: message.data.inviteCode }
-        : { gameId: message.data.gameId },
+    // Only the known keys go out: a game id, an invite code (#406) or a
+    // screen (#631).
+    data: expoData(message.data),
     sound: 'default',
     ...(message.priority === undefined ? {} : { priority: message.priority }),
     ...(message.ttlSeconds === undefined ? {} : { ttl: message.ttlSeconds }),

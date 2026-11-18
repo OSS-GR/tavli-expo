@@ -74,11 +74,12 @@ export interface RankedSearch {
   readonly problem: RankedProblem | null;
   /** The last search ended on the server with nobody found (five minutes). */
   readonly expired: boolean;
-  readonly find: (game: RankedGame) => Promise<void>;
+  /** Starts a search. Resolves to true when the server took it. */
+  readonly find: (game: RankedGame) => Promise<boolean>;
   /** Ends the search; `how` is for analytics (Cancel, Back, the bot). `false` when it failed. */
   readonly cancel: (how: Extract<RankedSearchEnd, 'cancelled' | 'bot'>) => Promise<boolean>;
   /** Looks for `game` instead of the game of the search. */
-  readonly switchGame: (game: RankedGame) => Promise<void>;
+  readonly switchGame: (game: RankedGame) => Promise<boolean>;
   readonly dismissProblem: () => void;
   /** How many look for each game: for "Try another game". */
   readonly lookingCounts: () => Promise<LookingCounts | null>;
@@ -259,6 +260,7 @@ export function useRankedSearch({
       // `apply` ends the old search as `otherGame`.
       const done = await run(() => matchmaking.seek({ game }));
       if (!done) asked.current = null;
+      return done;
     },
     [matchmaking, now, run],
   );

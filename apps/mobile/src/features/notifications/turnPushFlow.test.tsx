@@ -79,7 +79,7 @@ const routes = {
 /** The real waiting screen and game route, for the tests that need them. */
 const realRoutes = { ...routes, 'friend/[code]': InviteWaitRoute, 'game/[id]/index': GameRoute };
 
-const OFFER = { name: 'Turn notifications?' } as const;
+const OFFER = { name: 'Turn on notifications?' } as const;
 
 /** The player tapped "Turn on" in an earlier app run. */
 function savedTurnedOn(): void {
@@ -166,7 +166,7 @@ describe('the offer', () => {
     expect(screen.queryByRole('header', OFFER)).toBeNull();
     expect(onlineFake.notifications.prompts).toBe(1);
     expect(onlineFake.pushTokens.saved).toEqual([
-      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios' },
+      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios', locale: 'en' },
     ]);
     // The answer only: never the token or the user id.
     expect(recorded.sent).toContainEqual({
@@ -219,7 +219,7 @@ describe('the offer', () => {
       recorded.sent.some((s) => s.type === 'track' && s.event === 'push_permission_answered'),
     ).toBe(false);
     expect(onlineFake.pushTokens.saved).toEqual([
-      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios' },
+      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios', locale: 'en' },
     ]);
   });
 
@@ -290,7 +290,7 @@ describe('an online game route', () => {
     await renderRouter(realRoutes, { initialUrl: '/game/k57abc' });
     await flush();
     expect(onlineFake.pushTokens.saved).toEqual([
-      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios' },
+      { playerId: 'guest-1', token: onlineFake.notifications.token, platform: 'ios', locale: 'en' },
     ]);
   });
 });
@@ -316,6 +316,21 @@ describe('a tap on a push', () => {
     await flush();
     await tapPush({ inviteCode: 'abcd2345' });
     expect(screen).toHavePathname('/invite/ABCD2345');
+  });
+
+  it('of a friend request or a new friend opens Friends (#631)', async () => {
+    await renderRouter(routes, { initialUrl: '/' });
+    await flush();
+    await tapPush({ screen: 'friends' });
+    expect(screen).toHavePathname('/friends');
+  });
+
+  it('with a screen that is not one opens nothing (#631)', async () => {
+    await renderRouter(routes, { initialUrl: '/' });
+    await flush();
+    await tapPush({ screen: 'settings' });
+    await tapPush({ screen: '../friends' });
+    expect(screen).toHavePathname('/');
   });
 
   it('with a code that is not an invite code opens nothing (#406)', async () => {
@@ -446,7 +461,7 @@ describe('a tap on a push, when the router does not take the navigation (#325)',
   });
 
   it('opens the tap that opened the app once, when the listener gets it too', async () => {
-    const opening: PushTap = { id: 'push-1', gameId: 'k57abc', inviteCode: null };
+    const opening: PushTap = { id: 'push-1', gameId: 'k57abc', inviteCode: null, screen: null };
     let listener: ((tap: PushTap) => void) | null = null;
     const replaced = jest.replaceProperty(services, 'notifications', {
       ...onlineFake.notifications,
@@ -469,7 +484,9 @@ describe('a tap on a push, when the router does not take the navigation (#325)',
     await waitForRetry();
     expect(screen).toHavePathname('/');
     // A new tap on a push of the same game opens it again.
-    await act(async () => listener?.({ id: 'push-2', gameId: 'k57abc', inviteCode: null }));
+    await act(async () =>
+      listener?.({ id: 'push-2', gameId: 'k57abc', inviteCode: null, screen: null }),
+    );
     await flush();
     expect(screen).toHavePathname('/game/k57abc');
   });
@@ -509,10 +526,10 @@ describe('Settings', () => {
     await flush();
     expect(screen.getByRole('header', { name: 'Online' })).toBeOnTheScreen();
     // The row on the index shows the state; its page turns them on (#501).
-    await user.press(screen.getByRole('button', { name: 'Turn notifications, Off' }));
+    await user.press(screen.getByRole('button', { name: 'Notifications, Off' }));
     await flush();
     expect(screen).toHavePathname('/settings/notifications');
-    expect(screen.getByRole('header', { name: 'Turn notifications' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Notifications' })).toBeOnTheScreen();
     expect(screen.getByText(/^Off\. Turn them on/)).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Turn on' }));
     await flush();
@@ -523,7 +540,7 @@ describe('Settings', () => {
     await user.press(screen.getByTestId('settings-notifications-back'));
     await flush();
     expect(screen).toHavePathname('/settings');
-    expect(screen.getByRole('button', { name: 'Turn notifications, On' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Notifications, On' })).toBeOnTheScreen();
     // This phone never used an online account: no server call at all.
     expect(ready).not.toHaveBeenCalled();
     expect(onlineFake.pushTokens.calls).toEqual([]);
@@ -575,7 +592,7 @@ describe('a phone without online play', () => {
       router.push('/settings');
     });
     await flush();
-    expect(screen.queryByText('Turn notifications')).toBeNull();
+    expect(screen.queryByText('Notifications')).toBeNull();
     await tapPush({ gameId: 'k57abc' });
     expect(screen).toHavePathname('/settings');
     expect(onlineFake.notifications.prompts).toBe(0);

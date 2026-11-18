@@ -117,6 +117,10 @@ export interface RankedScreenProps {
   onGame: (gameId: string) => void;
   /** Play the bot instead. */
   onBot: () => void;
+  /** The search started: the route offers turn notifications (#631). */
+  onSearchStarted?: () => void;
+  /** The turn notifications offer covers the screen: screen readers skip it. */
+  covered?: boolean;
   /** The phone clock. Default: `Date.now`. */
   now?: () => number;
 }
@@ -150,7 +154,7 @@ export function RankedScreen(props: RankedScreenProps) {
   };
 
   return (
-    <Screen testID="ranked-screen">
+    <Screen testID="ranked-screen" hidden={props.covered ?? false}>
       {saved ? (
         <RankedSaved {...props} titleRef={titleRef} username={username} />
       ) : (
@@ -391,6 +395,7 @@ function RankedSaved({
   onBack,
   onGame,
   onBot,
+  onSearchStarted,
   now = defaultNow,
   titleRef,
   username,
@@ -488,7 +493,9 @@ function RankedSaved({
       setDialog('rules');
       return;
     }
-    void search.find(game);
+    void search.find(game).then((started) => {
+      if (started) onSearchStarted?.();
+    });
   };
 
   // Leave only when the search is gone: a failed cancel shows its problem.
@@ -635,7 +642,9 @@ function RankedSaved({
             onAgree={() => {
               agreeRankedRules();
               setDialog(null);
-              void search.find(game);
+              void search.find(game).then((started) => {
+                if (started) onSearchStarted?.();
+              });
             }}
             onTerms={() => void Linking.openURL(termsUrl(i18n.language))}
           />

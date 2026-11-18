@@ -6,7 +6,7 @@ This is not legal advice. The owner should have a lawyer or a GDPR expert check 
 
 # Tavlaki privacy policy
 
-**Last updated:** 17 November 2026
+**Last updated:** 18 November 2026
 
 Ελληνικά: [tavlaki.com/el/privacy](https://tavlaki.com/el/privacy)
 
@@ -23,7 +23,7 @@ Tavlaki is a Greek backgammon (tavli) app for iPhone and Android. This policy sa
 - You can **block** or **report** a player you met online. We keep a report until we have read it and deleted it.
 - You can **delete your account** and its online data in the app at any time: **Settings → Account → Delete my account**.
 - You can **download a copy of your online data** in the app at any time: **Settings → Account → Download my data**. It is a copy in JSON format with your account, games, invites, friends, rating, blocks and reports (with the other players' names as the app shows them to you), which you save or send on from the share sheet.
-- **Turn notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game. If you turn them on, our server keeps your phone's push token, to tell you when it is your turn or your game is over.
+- **Notifications** are off until you turn them on. The app offers them only after you make or accept an invite for an async game, or start a Play ranked search. If you turn them on, our server keeps your phone's push token and the language of your notifications, to tell you when it is your turn, a game starts or is over, a friend invites you, or a player sends or accepts a friend request.
 - On the first launch, the app asks if it may send **anonymous usage data**. You choose **Allow usage data** or **Don't allow**. You can change your answer any time in **Settings → Privacy**.
 - Until you answer, the app sends only anonymous **crash reports**. **Don't allow** turns off usage data **and** crash reports.
 - We never collect your name, email, phone number, contacts or location.
@@ -42,7 +42,7 @@ The app saves these things on your phone only. They never leave it.
 - **Your settings:** sound, haptics, language, board theme, board turn, auto-confirm.
 - **Your games:** the match you are playing, so you can go back to it, and your last choices on the New game screen. In pass-and-play, this includes the player names you type. Names are never sent anywhere.
 - **Your privacy answer** (allow or don't allow).
-- **Your answer** (**Turn on** or **Not now**) to turn notifications, so the app does not ask again by itself and sends the push token only after **Turn on**.
+- **Your answer** (**Turn on** or **Not now**) to notifications, so the app does not ask again by itself and sends the push token only after **Turn on**.
 - **When the app last asked** you to save your guest account or to play online (the times and how many asks), so it asks four times at most and stops after **Don't ask again** or a sign-in with Apple or an email code.
 - **When the app last asked you to support Tavlaki** (the time, a count of finished games, and whether you tapped **Don't ask again**), so it asks after your second game, then every 10 games at most once a week, and never after **Don't ask again**.
 - **An install id:** a random code, made on your phone. It is not your name, email, phone number or a device id. It does not come from your phone's hardware. The app makes it only after you tap **Allow usage data**.
@@ -51,7 +51,7 @@ Deleting the app deletes all of this from your phone. If you install the app aga
 
 ## What leaves your phone
 
-Crash reports and usage data. Both follow **one switch**. If you play a friend online, the app also talks to our game server (see "Online games with a friend" below). If you turn on turn notifications, the server keeps your phone's push token (see "Turn notifications" below). These do not depend on the switch, because an online game and its notifications cannot work without them.
+Crash reports and usage data. Both follow **one switch**. If you play a friend online, the app also talks to our game server (see "Online games with a friend" below). If you turn on notifications, the server keeps your phone's push token (see "Notifications" below). These do not depend on the switch, because an online game and its notifications cannot work without them.
 
 | Your answer | Usage data | Crash reports |
 |-------------|------------|---------------|
@@ -106,7 +106,7 @@ Only if you tap **Allow usage data**. Then the app sends short messages ("events
 | Hint shown | You tapped Hint in a game. Includes the game only, never the position, the dice or the moves |
 | Review opened | You opened the review of a game. Includes the game only, never the position, the dice, the moves or the mistakes |
 | Invite made | You made an invite to play a friend online. Includes the game, the points to win and the time limit only, never the invite code or any id |
-| Turn notifications answered | You answered your phone's question about turn notifications. Includes the answer only (allowed or not allowed), never the push token or any id |
+| Notifications answered | You answered your phone's question about notifications. Includes the answer only (allowed or not allowed), never the push token or any id |
 | Signed in for online play | You signed in to play online. Includes how only (Apple, email or guest), never the email, the Apple id or any id |
 | Support screen opened | You opened the Support Tavlaki screen. Includes where from only (Settings or the ask after a game) |
 | Support link opened | You tapped **Support on Ko-fi** on the Support screen. Includes nothing else. We never learn whether you gave anything |
@@ -127,7 +127,7 @@ Go to **Settings → Privacy** and turn off **Share anonymous usage data**. This
 
 A few events made just before you turned it off may still upload. Nothing new is collected.
 
-The switch does not cover online games with a friend and their turn notifications: they need the game server (see the next sections).
+The switch does not cover online games with a friend and their notifications: they need the game server (see the next sections).
 
 ### Online games with a friend (Convex)
 
@@ -159,7 +159,7 @@ In the app, go to **Settings → Account** and tap **Delete my account** (for a 
 
 - resigns your online games in progress, so you lose them and your friend wins;
 - deletes the invites you made, so nobody can accept them;
-- deletes your push tokens, so turn notifications stop;
+- deletes your push tokens, so notifications stop;
 - deletes your guest name and your username (another player may then pick it), and the record of your terms and age answers;
 - deletes your blocks and the blocks of you by other players, and the reports you sent and the reports about you;
 - deletes your friendships (also from your friends' lists), the friend requests you sent and got, your friend link, your search times, and the friend invites sent to you;
@@ -174,17 +174,28 @@ What stays: finished online games (with their moves) stay for the other player. 
 
 Without the app (for example after you deleted it), write to **support@tavlaki.com** with your username or guest name. The page [tavlaki.com/delete](https://tavlaki.com/delete/) says what to send and how long it takes.
 
-### Turn notifications (Expo)
+### Notifications (Expo)
 
-Only if you turn them on. After you make or accept an invite for an online game, the app asks once if it may tell you when it is your turn or your game is over. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Turn notifications**, and off in your phone's settings.
+Only if you turn them on. After you make or accept an invite for an online game, or start a Play ranked search, the app asks once if it may send you notifications. It never asks on the first launch. **Not now** is kept: the app does not ask again by itself. You can turn them on later in **Settings → Notifications**, and off in your phone's settings.
 
 If you allow them:
 
 - Your phone gets a **push token** from Expo's push service (Expo, through Apple's or Google's push service). It is a random address for this app on this phone. It is not your name, email or phone number.
-- The app sends the push token and the phone system (iOS or Android) to our game server, under your guest account's user id. The server keeps, for each of your phones: the push token, the phone system and when the phone last sent it. At most 5 phones per account.
-- When it is your turn in an async game, or an async game is over, the server gives Expo the push token, a fixed text ("Your turn: an online game is waiting for your move", or "Your game is over. See the result.") and the game's id, so a tap opens that game. When a friend invites you, it gives Expo the text "A friend invites you to a game." and the invite code instead. No names, no emails and no moves. Expo passes the push to Apple or Google, which show it on your phone.
+- The app sends the push token, the phone system (iOS or Android) and the language of your notifications (English or Greek: the app's language) to our game server, under your guest account's user id. It sends the language again when you change the app's language. The server keeps, for each of your phones: the push token, the phone system, the language and when the phone last sent it. At most 5 phones per account.
+- To send a notification, the server gives Expo the push token, a short text in your language (see the list below) and what a tap opens. The text names the other player: their username, or their guest name (such as "Guest 4821"). The server reads the name when it sends the notification. A player you blocked is never named: that notification has the text with no name (for example "An online game is waiting for your move."). No emails, no moves and no ids in the text. Expo passes the notification to Apple or Google, which show it on your phone.
 - The server deletes a push token when Expo says it is no longer valid (for example after you delete the app), when you add a sixth phone (the oldest goes), when another account signs in on that phone (the token moves to that account), and when you sign out or delete your online data. Turning notifications off in your phone's settings stops them from showing on your phone; the token stays on the server until one of these happens.
 - The push token **never goes to analytics** (PostHog) and never goes into crash reports (Sentry). Usage data gets only your answer (allowed or not allowed), and only if you allowed usage data.
+
+The notifications (the title, then the text; *Name* is the other player's name):
+
+- Your turn in an async game: **Your turn**, "*Name* is waiting for your move." A tap opens the game (the server sends the game's id).
+- A new match starts: **New game**, "Your game with *Name* has started. Your roll." For Play ranked: **Match found**, "Your ranked game with *Name* has started. Your roll." This is the first notification of the match. A tap opens the game.
+- An async game is over: **Game over**, "Your game with *Name* is over. See the result." A tap opens the game.
+- A friend invites you: **Game invite**, "*Name* invites you to a game." A tap opens the invite (the server sends the invite code).
+- A player asks to be your friend: **Friend request**, "*Name* wants to be your friend."
+- A player accepts your friend request: **New friend**, "*Name* accepted your friend request."
+
+The two friend notifications carry only a marker that opens the Friends screen: no id and no code. Expo keeps a friend notification for at most one day. If the app's language is Greek, the texts are in Greek.
 
 ## What we never do
 
@@ -201,8 +212,8 @@ We use five services. They process the data for us, under their data processing 
 |---------|----------|--------------------------|----------|
 | **Sentry** (Functional Software, Inc., USA) | Crash reports | The EU (Frankfurt, Germany) <!-- OWNER: confirm the Sentry organization uses the EU data region. Sentry sets it when the organization is made. --> | Sentry's default. Sentry's docs say 30 days on the free (Developer) plan, 90 days on paid plans. |
 | **PostHog** (PostHog, Inc., USA) | Usage data | PostHog EU cloud, Frankfurt, Germany | PostHog's default. PostHog's docs say 1 year on the free plan, 7 years on paid plans. |
-| **Convex** (Convex, Inc., USA) | The game server for online games with a friend: the account (with Apple: the Apple id, the email and Apple's tokens; with the email code: the email address), the sign-in session, invites, online games, friends and friend requests, ratings, Play ranked requests, blocks, reports and push tokens | The EU (`eu-west-1`, Ireland) <!-- OWNER: confirm both Convex deployments are in eu-west-1. --> | Until you delete them in the app (**Settings → Account → Delete my account**) or ask us to. Finished games then stay, under an id that leads to nobody (see "Delete your account"). The app does not delete old invites and games by itself yet. A report stays until we have read it and deleted it. A declined friend request stays 30 days. A Play ranked request goes when you cancel it, after 5 minutes with no match, or 10 minutes after the match. A sign-in session runs out one year after it was last renewed. The server renews it at most once a day, when the app uses it. A push token: see "Turn notifications" above. A hashed email code runs out after 5 minutes, and the hashed log of sent codes after one day. |
-| **Expo** (650 Industries, Inc., USA) | Carries turn notifications to Apple's and Google's push services | The USA <!-- OWNER: check where Expo's push service processes the data, and Expo's data processing terms. --> | Expo's push service keeps a push only until it is delivered or runs out (at most the turn's time limit). Expo's docs say delivery receipts are kept for a day. |
+| **Convex** (Convex, Inc., USA) | The game server for online games with a friend: the account (with Apple: the Apple id, the email and Apple's tokens; with the email code: the email address), the sign-in session, invites, online games, friends and friend requests, ratings, Play ranked requests, blocks, reports and push tokens (with their language) | The EU (`eu-west-1`, Ireland) <!-- OWNER: confirm both Convex deployments are in eu-west-1. --> | Until you delete them in the app (**Settings → Account → Delete my account**) or ask us to. Finished games then stay, under an id that leads to nobody (see "Delete your account"). The app does not delete old invites and games by itself yet. A report stays until we have read it and deleted it. A declined friend request stays 30 days. A Play ranked request goes when you cancel it, after 5 minutes with no match, or 10 minutes after the match. A sign-in session runs out one year after it was last renewed. The server renews it at most once a day, when the app uses it. A push token: see "Notifications" above. A hashed email code runs out after 5 minutes, and the hashed log of sent codes after one day. |
+| **Expo** (650 Industries, Inc., USA) | Carries notifications (your turn, new and finished games, game invites, friend requests) to Apple's and Google's push services | The USA <!-- OWNER: check where Expo's push service processes the data, and Expo's data processing terms. --> | Expo's push service keeps a push only until it is delivered or runs out (at most the turn's time limit; a friend notification at most one day). Expo's docs say delivery receipts are kept for a day. |
 | **AhaSend** (AhaSend B.V., the Netherlands) | Sends the email with your sign-in code, if you pick the email code | The EU <!-- OWNER: confirm AhaSend's data region in its DPA. --> | We set AhaSend to keep the delivery record (the address and the time) for one day and no copy of the email's text. |
 
 Sentry, PostHog, Convex and Expo are based in the USA. Their staff or sub-processors may reach the data from outside the EU. Their data processing terms set safeguards for such transfers, such as the EU Standard Contractual Clauses. AhaSend is based in the Netherlands and keeps the data in the EU. <!-- OWNER: accept the five vendors' data processing terms (DPA) and check this line. -->
@@ -219,7 +230,7 @@ We, the developer, work from the USA. When we look at the data to run online pla
 - **Blocks and reports:** a block is part of the online game you asked for (GDPR Article 6(1)(b)). A report about you, and the username it keeps, rely on our legitimate interest in keeping online play safe and in acting on the terms of use (GDPR Article 6(1)(f)).
 - **Terms and age answers:** we keep when you accepted the terms and confirmed your age, to show that we asked (our legitimate interest, GDPR Article 6(1)(f), and our duty to check consent for children, GDPR Article 8).
 <!-- OWNER: a lawyer checks this legal basis and the age rule. -->
-- **Turn notifications:** you asked for them when you tapped **Turn on** in the app, so the push token is needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.
+- **Notifications:** you asked for them when you tapped **Turn on** in the app, so the push token and its language are needed to give you that service (GDPR Article 6(1)(b)). Turn them off in your phone's settings at any time.
 
 ## Your rights
 

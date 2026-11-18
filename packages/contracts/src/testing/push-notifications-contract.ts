@@ -273,9 +273,9 @@ export function pushTokensContract(): PushTokensContractCheck[] {
       name: 'register saves the token once, also when called again',
       run: async ({ tokensFor, token, savedFor }) => {
         const me = tokensFor('me');
-        await me.register(token(1), 'ios');
-        await me.register(token(1), 'ios');
-        await me.register(token(2), 'android');
+        await me.register(token(1), 'ios', 'en');
+        await me.register(token(1), 'ios', 'en');
+        await me.register(token(2), 'android', 'en');
         same(sorted(await savedFor('me')), sorted([token(1), token(2)]), 'saved');
       },
     },
@@ -283,7 +283,7 @@ export function pushTokensContract(): PushTokensContractCheck[] {
       name: 'remove takes the token away; an unknown token is fine',
       run: async ({ tokensFor, token, savedFor }) => {
         const me = tokensFor('me');
-        await me.register(token(1), 'ios');
+        await me.register(token(1), 'ios', 'en');
         await me.remove(token(1));
         await me.remove(token(2));
         same(await savedFor('me'), [], 'saved');
@@ -292,10 +292,10 @@ export function pushTokensContract(): PushTokensContractCheck[] {
     {
       name: 'a token of another player stays when I remove it, and moves to me when I register it',
       run: async ({ tokensFor, token, savedFor }) => {
-        await tokensFor('other').register(token(1), 'android');
+        await tokensFor('other').register(token(1), 'android', 'en');
         await tokensFor('me').remove(token(1));
         same(await savedFor('other'), [token(1)], 'the other player after my remove');
-        await tokensFor('me').register(token(1), 'android');
+        await tokensFor('me').register(token(1), 'android', 'en');
         same(await savedFor('me'), [token(1)], 'mine after my register');
         same(await savedFor('other'), [], 'the other player after my register');
       },
@@ -304,7 +304,7 @@ export function pushTokensContract(): PushTokensContractCheck[] {
       name: 'with nobody signed in, both calls fail NOT_SIGNED_IN as plain data',
       run: async ({ tokensFor, token }) => {
         const nobody = tokensFor(null);
-        await failsWith(nobody.register(token(1), 'ios'), 'NOT_SIGNED_IN', 'register');
+        await failsWith(nobody.register(token(1), 'ios', 'en'), 'NOT_SIGNED_IN', 'register');
         await failsWith(nobody.remove(token(1)), 'NOT_SIGNED_IN', 'remove');
       },
     },
@@ -312,11 +312,11 @@ export function pushTokensContract(): PushTokensContractCheck[] {
       name: 'a token that is not an Expo push token fails BAD_REQUEST',
       run: async ({ tokensFor, savedFor }) => {
         const me = tokensFor('me');
-        await failsWith(me.register('not-a-token', 'ios'), 'BAD_REQUEST', 'register');
+        await failsWith(me.register('not-a-token', 'ios', 'en'), 'BAD_REQUEST', 'register');
         await failsWith(me.remove('not-a-token'), 'BAD_REQUEST', 'remove');
         // The right shape, but longer than the 200 characters the server keeps.
         const long = `ExponentPushToken[${'x'.repeat(200)}]`;
-        await failsWith(me.register(long, 'ios'), 'BAD_REQUEST', 'register a long token');
+        await failsWith(me.register(long, 'ios', 'en'), 'BAD_REQUEST', 'register a long token');
         same(await savedFor('me'), [], 'saved');
       },
     },

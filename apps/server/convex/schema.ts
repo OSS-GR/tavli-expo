@@ -33,6 +33,9 @@ export const gameStatus = v.union(v.literal('active'), v.literal('finished'));
 /** The phone system of a push token. */
 export const pushPlatform = v.union(v.literal('ios'), v.literal('android'));
 
+/** The language of a phone's pushes (#631, `PUSH_LOCALES` in contracts). */
+export const pushLocale = v.union(v.literal('en'), v.literal('el'));
+
 const inviteStatus = v.union(...INVITE_STATUSES.map((status) => v.literal(status)));
 
 /** Why a player reported another (#320). */
@@ -167,6 +170,8 @@ export default defineSchema({
     /** `ExponentPushToken[…]` or `ExpoPushToken[…]` (`isExpoPushToken`). */
     token: v.string(),
     platform: pushPlatform,
+    /** The language of the pushes (#631). Missing on rows from before it: English. */
+    locale: v.optional(pushLocale),
     /** When the phone last registered the token, epoch ms (server clock). */
     updatedAt: v.number(),
   })

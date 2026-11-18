@@ -6,6 +6,7 @@ import {
   createMemoryPushNotifications,
   createMemoryPushTokens,
   createMemoryStorage,
+  type PushLocale,
   type Storage,
 } from '@tavli/contracts';
 
@@ -14,7 +15,11 @@ import { hasOnlineAccount, rememberOnlineAccount } from '@/features/online/accou
 
 import { TURN_PUSHES_STORAGE_KEY, createTurnPushes } from './turnPushes';
 
-function setup(storage: Storage = createMemoryStorage(), hasAccount = () => true) {
+function setup(
+  storage: Storage = createMemoryStorage(),
+  hasAccount = () => true,
+  locale: () => PushLocale = () => 'en',
+) {
   const authStore = createMemoryAuthStore();
   const auth = createMemoryAuthProvider(authStore);
   const notifications = createMemoryPushNotifications('android');
@@ -27,6 +32,7 @@ function setup(storage: Storage = createMemoryStorage(), hasAccount = () => true
     auth,
     onAnswer: (answer) => answers.push(answer),
     hasAccount,
+    locale,
   });
   return { storage, auth, authStore, notifications, pushTokens, answers, pushes };
 }
@@ -77,7 +83,7 @@ describe('offer', () => {
     expect(answers).toEqual([]);
     expect(pushes.store.getState()).toMatchObject({ offering: false, turnedOn: true });
     expect(pushTokens.saved).toEqual([
-      { playerId: 'guest-1', token: notifications.token, platform: 'android' },
+      { playerId: 'guest-1', token: notifications.token, platform: 'android', locale: 'en' },
     ]);
   });
 
@@ -227,7 +233,7 @@ describe('the token on the server', () => {
     await settle();
     const first = notifications.token;
     expect(pushTokens.calls).toEqual([
-      { kind: 'register', playerId: 'guest-1', token: first, platform: 'android' },
+      { kind: 'register', playerId: 'guest-1', token: first, platform: 'android', locale: 'en' },
     ]);
     // Again in the same app run (an online game opens): nothing new, and
     // no new call to Expo for the token.
@@ -240,10 +246,12 @@ describe('the token on the server', () => {
     const second = notifications.rollToken();
     await settle();
     expect(pushTokens.calls.slice(1)).toEqual([
-      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android' },
+      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android', locale: 'en' },
       { kind: 'remove', playerId: 'guest-1', token: first },
     ]);
-    expect(pushTokens.saved).toEqual([{ playerId: 'guest-1', token: second, platform: 'android' }]);
+    expect(pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: second, platform: 'android', locale: 'en' },
+    ]);
   });
 
   it('a new token that cannot be had now is asked for again on the next sync', async () => {
@@ -259,7 +267,7 @@ describe('the token on the server', () => {
     expect(pushTokens.calls).toHaveLength(1);
     await pushes.sync();
     expect(pushTokens.calls.slice(1)).toEqual([
-      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android' },
+      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android', locale: 'en' },
       { kind: 'remove', playerId: 'guest-1', token: first },
     ]);
   });
@@ -277,7 +285,7 @@ describe('the token on the server', () => {
     expect(pushTokens.calls).toHaveLength(1);
     await pushes.sync();
     expect(pushTokens.calls.slice(1)).toEqual([
-      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android' },
+      { kind: 'register', playerId: 'guest-1', token: second, platform: 'android', locale: 'en' },
       { kind: 'remove', playerId: 'guest-1', token: first },
     ]);
   });
@@ -324,7 +332,7 @@ describe('the token on the server', () => {
     authStore.session = { id: 'guest-2', isGuest: true };
     await pushes.sync();
     expect(pushTokens.saved).toEqual([
-      { playerId: 'guest-2', token: notifications.token, platform: 'android' },
+      { playerId: 'guest-2', token: notifications.token, platform: 'android', locale: 'en' },
     ]);
   });
 
@@ -424,7 +432,7 @@ describe('the token on the server', () => {
     expect(hasOnlineAccount()).toBe(true);
     await pushes.sync();
     expect(pushTokens.saved).toEqual([
-      { playerId: 'guest-1', token: notifications.token, platform: 'android' },
+      { playerId: 'guest-1', token: notifications.token, platform: 'android', locale: 'en' },
     ]);
   });
 
@@ -441,5 +449,40 @@ describe('the token on the server', () => {
     rememberOnlineAccount();
     await signOutOfOnline(auth, undefined);
     expect(hasOnlineAccount()).toBe(false);
+  });
+});
+
+describe('the push language (#631)', () => {
+  it('registers the token with the app language, and again when it changes', async () => {
+    let language: PushLocale = 'el';
+    const { pushes, notifications, pushTokens, auth } = setup(
+      optedIn(),
+      () => true,
+      () => language,
+    );
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.sync();
+    expect(pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: notifications.token, platform: 'android', locale: 'el' },
+    ]);
+    // The same language: nothing new.
+    await pushes.sync();
+    expect(pushTokens.calls).toHaveLength(1);
+    // The player picks English: the same token, the new language, no remove.
+    language = 'en';
+    await pushes.sync();
+    expect(pushTokens.calls.slice(1)).toEqual([
+      {
+        kind: 'register',
+        playerId: 'guest-1',
+        token: notifications.token,
+        platform: 'android',
+        locale: 'en',
+      },
+    ]);
+    expect(pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: notifications.token, platform: 'android', locale: 'en' },
+    ]);
   });
 });

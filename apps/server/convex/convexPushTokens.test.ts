@@ -59,16 +59,24 @@ describe('PushTokens contract (Convex adapter on the real functions)', () => {
 });
 
 describe('the adapter on the real functions', () => {
-  it('saves the platform the app sends', async () => {
+  it('saves the platform and the language the app sends (#631)', async () => {
     const t = await setup();
     const network = convexTestNetwork(t);
-    await createConvexPushTokens({ client: network.clientFor(ALICE) }).register(
-      'ExponentPushToken[a]',
-      'android',
-    );
-    const rows = await t.run((ctx) => ctx.db.query('pushTokens').collect());
-    expect(rows.map(({ playerId, token, platform }) => ({ playerId, token, platform }))).toEqual([
-      { playerId: ALICE, token: 'ExponentPushToken[a]', platform: 'android' },
+    const tokens = createConvexPushTokens({ client: network.clientFor(ALICE) });
+    await tokens.register('ExponentPushToken[a]', 'android', 'el');
+    const rows = () =>
+      t.run(async (ctx) =>
+        (await ctx.db.query('pushTokens').collect()).map(
+          ({ playerId, token, platform, locale }) => ({ playerId, token, platform, locale }),
+        ),
+      );
+    expect(await rows()).toEqual([
+      { playerId: ALICE, token: 'ExponentPushToken[a]', platform: 'android', locale: 'el' },
+    ]);
+    // The phone language changed: the same token, the new language.
+    await tokens.register('ExponentPushToken[a]', 'android', 'en');
+    expect(await rows()).toEqual([
+      { playerId: ALICE, token: 'ExponentPushToken[a]', platform: 'android', locale: 'en' },
     ]);
   });
 
@@ -76,7 +84,7 @@ describe('the adapter on the real functions', () => {
     const t = await setup();
     const network = convexTestNetwork(t);
     const reason = await createConvexPushTokens({ client: network.clientFor('nobody') })
-      .register('ExponentPushToken[a]', 'ios')
+      .register('ExponentPushToken[a]', 'ios', 'en')
       .then(
         () => null,
         (error: unknown) => error,
@@ -88,7 +96,7 @@ describe('the adapter on the real functions', () => {
   it('a platform that is not one fails argument validation: a plain error, not port data', async () => {
     const network = convexTestNetwork(await setup());
     const tokens = createConvexPushTokens({ client: network.clientFor(ALICE) });
-    const reason = await tokens.register('ExponentPushToken[a]', 'web' as never).then(
+    const reason = await tokens.register('ExponentPushToken[a]', 'web' as never, 'en').then(
       () => null,
       (error: unknown) => error,
     );

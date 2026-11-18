@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PushResult } from '@tavli/contracts';
+import { PUSH_LOCALES } from '@tavli/contracts';
+import type { PlayerName, PushResult } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import type { PlayerId } from '@tavli/engine';
 import { createOnlineMatch, resign, rollDice, timeOut, waitingFor } from '@tavli/online';
@@ -8,19 +9,24 @@ import { openFlow } from '@tavli/online/testing';
 
 import {
   FRIEND_INVITE_PUSH_TEXT,
+  FRIEND_PUSH_TTL_SECONDS,
   friendInviteMessages,
+  friendMessages,
   MATCH_END_PUSH_TEXT,
   MATCH_END_PUSH_TTL_SECONDS,
   MAX_PUSH_TOKENS_PER_PLAYER,
   MAX_PUSH_RETRIES,
   NEW_MATCH_WAIT,
   PUSH_RETRY_MS,
+  PUSH_TEXTS,
   TURN_PUSH_TEXT,
   deadTokens,
   matchEndMessages,
   matchEndPushSides,
   pushMessages,
+  pushNameText,
   pushStillDue,
+  pushText,
   retryTokens,
   tokensOverCap,
   turnMessages,
@@ -28,7 +34,7 @@ import {
   turnPushTtl,
   turnWait,
 } from './push';
-import type { TurnWait } from './push';
+import type { PushTarget, TurnWait } from './push';
 
 const at = (side: PlayerId | null, game = 0): TurnWait => ({ side, game, over: false });
 /** The match is over after `game` games: nobody is waited for. */
@@ -153,8 +159,52 @@ describe('turnWait', () => {
   });
 });
 
+const en = (...tokens: string[]): PushTarget[] => tokens.map((token) => ({ token, locale: 'en' }));
+const guest: PlayerName = { kind: 'guest', number: '4821' };
+const named: PlayerName = { kind: 'username', name: 'nikos' };
+
+describe('push texts (#631)', () => {
+  it('has every kind in English and Greek, short', () => {
+    for (const locale of PUSH_LOCALES) {
+      for (const forms of Object.values(PUSH_TEXTS[locale])) {
+        expect(forms.title.length).toBeLessThanOrEqual(30);
+        expect(forms.unnamed.length).toBeLessThanOrEqual(80);
+        // A 20 letter username still fits.
+        expect(forms.named('x'.repeat(20)).length).toBeLessThanOrEqual(90);
+      }
+    }
+    expect(Object.keys(PUSH_TEXTS.el).sort()).toEqual(Object.keys(PUSH_TEXTS.en).sort());
+  });
+
+  it('names a username, or a guest in the phone language', () => {
+    expect(pushNameText(named, 'en')).toBe('nikos');
+    expect(pushNameText(named, 'el')).toBe('nikos');
+    expect(pushNameText(guest, 'en')).toBe('Guest 4821');
+    expect(pushNameText(guest, 'el')).toBe('Επισκέπτης 4821');
+  });
+
+  it('puts the name first in Greek, with no article', () => {
+    expect(pushText('turn', 'el', named)).toEqual({
+      title: 'Σειρά σου',
+      body: 'nikos περιμένει την κίνησή σου.',
+    });
+    expect(pushText('friendRequest', 'en', guest)).toEqual({
+      title: 'Friend request',
+      body: 'Guest 4821 wants to be your friend.',
+    });
+  });
+
+  it('names no one without a name', () => {
+    for (const locale of PUSH_LOCALES) {
+      for (const kind of Object.keys(PUSH_TEXTS[locale]) as (keyof typeof PUSH_TEXTS.en)[]) {
+        expect(pushText(kind, locale, null).body).not.toMatch(/Guest|Επισκέπτης|@/);
+      }
+    }
+  });
+});
+
 describe('turnMessages', () => {
-  it('makes one high priority message per token with the fixed text, the game id and the ttl', () => {
+  it('makes one high priority message per token with the text, the game id and the ttl', () => {
     const message = (to: string) => ({
       to,
       title: TURN_PUSH_TEXT.title,
@@ -163,14 +213,18 @@ describe('turnMessages', () => {
       priority: 'high',
       ttlSeconds: 600,
     });
-    expect(turnMessages(['a', 'b'], 'g1', 600)).toEqual([message('a'), message('b')]);
+    expect(turnMessages(en('a', 'b'), 'g1', 600)).toEqual([message('a'), message('b')]);
   });
 
-  it('keeps the text short', () => {
-    for (const text of [TURN_PUSH_TEXT, MATCH_END_PUSH_TEXT]) {
-      expect(text.title.length).toBeLessThanOrEqual(30);
-      expect(text.body.length).toBeLessThanOrEqual(80);
-    }
+  it('writes each phone in its own language, with the name', () => {
+    const targets: PushTarget[] = [
+      { token: 'a', locale: 'en' },
+      { token: 'b', locale: 'el' },
+    ];
+    expect(turnMessages(targets, 'g1', 60, named).map((m) => m.body)).toEqual([
+      'nikos is waiting for your move.',
+      'nikos περιμένει την κίνησή σου.',
+    ]);
   });
 });
 
@@ -185,19 +239,43 @@ describe('matchEndMessages', () => {
       ttlSeconds: 24 * 60 * 60,
     });
     expect(MATCH_END_PUSH_TTL_SECONDS).toBe(86_400);
-    expect(matchEndMessages(['a', 'b'], 'g1')).toEqual([message('a'), message('b')]);
+    expect(matchEndMessages(en('a', 'b'), 'g1')).toEqual([message('a'), message('b')]);
   });
 });
 
 describe('pushMessages', () => {
   it('a turn push lives until the turn deadline; none with no time left', () => {
-    expect(pushMessages('turn', ['a'], 'g1', 60_000, 0)).toEqual(turnMessages(['a'], 'g1', 60));
-    expect(pushMessages('turn', ['a'], 'g1', 500, 0)).toEqual([]);
-    expect(pushMessages('turn', ['a'], 'g1', null, 0)).toEqual([]);
+    expect(pushMessages('turn', en('a'), 'g1', 60_000, 0)).toEqual(turnMessages(en('a'), 'g1', 60));
+    expect(pushMessages('turn', en('a'), 'g1', 500, 0)).toEqual([]);
+    expect(pushMessages('turn', en('a'), 'g1', null, 0)).toEqual([]);
   });
 
   it('a "game over" push needs no deadline', () => {
-    expect(pushMessages('matchEnd', ['a'], 'g1', null, 0)).toEqual(matchEndMessages(['a'], 'g1'));
+    expect(pushMessages('matchEnd', en('a'), 'g1', null, 0)).toEqual(
+      matchEndMessages(en('a'), 'g1'),
+    );
+  });
+
+  it('a new match says the game started; a ranked one says a match was found (#631)', () => {
+    const [friend] = pushMessages('matchStart', en('a'), 'g1', 60_000, 0, {
+      name: named,
+      ranked: false,
+    });
+    expect(friend).toMatchObject({
+      title: 'New game',
+      body: 'Your game with nikos has started. Your roll.',
+      data: { gameId: 'g1' },
+      priority: 'high',
+      ttlSeconds: 60,
+    });
+    const [ranked] = pushMessages('matchStart', en('a'), 'g1', 60_000, 0, {
+      name: named,
+      ranked: true,
+    });
+    expect(ranked).toMatchObject({ title: 'Match found' });
+    // A later turn of a ranked game is a plain turn push.
+    const [turn] = pushMessages('turn', en('a'), 'g1', 60_000, 0, { name: named, ranked: true });
+    expect(turn?.title).toBe('Your turn');
   });
 });
 
@@ -211,6 +289,11 @@ describe('pushStillDue', () => {
     expect(pushStillDue('turn', null, 3)).toBe(false);
   });
 
+  it('a match start push is like a turn push (#631)', () => {
+    expect(pushStillDue('matchStart', game(3, 'active'), 3)).toBe(true);
+    expect(pushStillDue('matchStart', game(3, 'finished'), 3)).toBe(false);
+  });
+
   it('a "game over" push: the match at the version is over', () => {
     expect(pushStillDue('matchEnd', game(3, 'finished'), 3)).toBe(true);
     expect(pushStillDue('matchEnd', game(3, 'active'), 3)).toBe(false);
@@ -221,7 +304,7 @@ describe('pushStillDue', () => {
 
 describe('deadTokens', () => {
   it('picks only the DeviceNotRegistered tokens', () => {
-    const messages = turnMessages(['a', 'b', 'c', 'd'], 'g1', 60);
+    const messages = turnMessages(en('a', 'b', 'c', 'd'), 'g1', 60);
     const results: PushResult[] = [
       { ok: true },
       { ok: false, error: 'DeviceNotRegistered', message: 'gone' },
@@ -233,7 +316,7 @@ describe('deadTokens', () => {
 
 describe('retryTokens', () => {
   it('picks the Failed and MessageRateExceeded tokens, no others', () => {
-    const messages = turnMessages(['a', 'b', 'c', 'd', 'e', 'f'], 'g1', 60);
+    const messages = turnMessages(en('a', 'b', 'c', 'd', 'e', 'f'), 'g1', 60);
     const results: PushResult[] = [
       { ok: true },
       { ok: false, error: 'DeviceNotRegistered', message: 'gone' },
@@ -289,7 +372,7 @@ describe('friendInviteMessages (#406)', () => {
   const NOW = Date.UTC(2026, 10, 9, 12, 0, 0);
 
   it('sends only the invite code, high, until the invite ends', () => {
-    expect(friendInviteMessages(['t1', 't2'], 'ABCD2345', NOW + 90_500, NOW)).toEqual([
+    expect(friendInviteMessages(en('t1', 't2'), 'ABCD2345', NOW + 90_500, NOW)).toEqual([
       {
         to: 't1',
         ...FRIEND_INVITE_PUSH_TEXT,
@@ -308,12 +391,36 @@ describe('friendInviteMessages (#406)', () => {
   });
 
   it('sends nothing with less than a second left', () => {
-    expect(friendInviteMessages(['t1'], 'ABCD2345', NOW + 999, NOW)).toEqual([]);
+    expect(friendInviteMessages(en('t1'), 'ABCD2345', NOW + 999, NOW)).toEqual([]);
   });
 
-  it('names no one', () => {
-    expect(`${FRIEND_INVITE_PUSH_TEXT.title} ${FRIEND_INVITE_PUSH_TEXT.body}`).not.toMatch(
-      /Guest|@/,
+  it('names the inviter (#631)', () => {
+    const [message] = friendInviteMessages(
+      [{ token: 't1', locale: 'el' }],
+      'ABCD2345',
+      NOW + 60_000,
+      NOW,
+      named,
+    );
+    expect(message?.body).toBe('nikos σε προσκαλεί σε παιχνίδι.');
+  });
+});
+
+describe('friendMessages (#631)', () => {
+  it('opens Friends, normal priority, for one day', () => {
+    expect(FRIEND_PUSH_TTL_SECONDS).toBe(86_400);
+    expect(friendMessages('friendRequest', en('t1'), named)).toEqual([
+      {
+        to: 't1',
+        title: 'Friend request',
+        body: 'nikos wants to be your friend.',
+        data: { screen: 'friends' },
+        priority: 'normal',
+        ttlSeconds: 86_400,
+      },
+    ]);
+    expect(friendMessages('friendAccepted', en('t1'), null)[0]?.body).toBe(
+      'A player accepted your friend request.',
     );
   });
 });

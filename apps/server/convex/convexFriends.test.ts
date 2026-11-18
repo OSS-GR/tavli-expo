@@ -39,8 +39,9 @@ import type { FriendsContractPlayer, FriendsContractSubject } from '@tavli/contr
 
 import { api, internal } from './_generated/api';
 import { FRIEND_DELETE_PAGE } from './friends';
-import { FRIEND_INVITE_PUSH_TEXT } from './model/push';
+import { FRIEND_PUSH_TTL_SECONDS, pushText } from './model/push';
 import { setPushProvider } from './push';
+import { nameSeenBy } from './safety';
 import schema from './schema';
 import { convexTestNetwork } from './test.network';
 import type { Tester } from './test.network';
@@ -120,6 +121,11 @@ describe('Friends contract (Convex adapter on the real functions)', () => {
 
 function as(t: Tester, playerId: string) {
   return t.withIdentity({ subject: playerId });
+}
+
+/** The name `viewer` sees for `player`, as a push writes it (#631). */
+async function nameFor(t: SchemaTester, viewer: string, player: string) {
+  return await t.run((ctx) => nameSeenBy(ctx, viewer, player));
 }
 
 /** `from` asks `to` by `to`'s friend link. */
@@ -239,7 +245,8 @@ describe('friends on the Convex server', () => {
     expect(push.sent).toEqual([
       {
         to: 'ExponentPushToken[bob]',
-        ...FRIEND_INVITE_PUSH_TEXT,
+        // It names the inviter as Bob sees them (#631).
+        ...pushText('friendInvite', 'en', await nameFor(t, BOB, ALICE)),
         data: { inviteCode: code },
         priority: 'high',
         ttlSeconds: expect.any(Number) as number,
@@ -248,6 +255,91 @@ describe('friends on the Convex server', () => {
     for (const id of [ALICE, BOB]) {
       expect(JSON.stringify(push.sent)).not.toContain(id);
     }
+  });
+
+  it('a friend request pushes the asked player, named, in their language (#631)', async () => {
+    const t = await setup();
+    await as(t, BOB).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[bob]',
+      platform: 'ios',
+      locale: 'el',
+    });
+    await ask(t, ALICE, BOB);
+    expect(push.sent).toEqual([]);
+    await runScheduled(t);
+    const alice = await nameFor(t, BOB, ALICE);
+    expect(alice).toMatchObject({ kind: 'username' });
+    expect(push.sent).toEqual([
+      {
+        to: 'ExponentPushToken[bob]',
+        ...pushText('friendRequest', 'el', alice),
+        data: { screen: 'friends' },
+        priority: 'normal',
+        ttlSeconds: FRIEND_PUSH_TTL_SECONDS,
+      },
+    ]);
+    expect(JSON.stringify(push.sent)).not.toContain(ALICE);
+  });
+
+  it('an accepted request pushes the asker "New friend" (#631)', async () => {
+    const t = await setup();
+    await as(t, ALICE).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[alice]',
+      platform: 'ios',
+      locale: 'en',
+    });
+    await befriend(t, ALICE, BOB);
+    await runScheduled(t);
+    expect(push.sent).toEqual([
+      {
+        to: 'ExponentPushToken[alice]',
+        ...pushText('friendAccepted', 'en', await nameFor(t, ALICE, BOB)),
+        data: { screen: 'friends' },
+        priority: 'normal',
+        ttlSeconds: FRIEND_PUSH_TTL_SECONDS,
+      },
+    ]);
+  });
+
+  it('asking a player who asked you first accepts, and pushes them "New friend" (#631)', async () => {
+    const t = await setup();
+    await as(t, ALICE).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[alice]',
+      platform: 'ios',
+      locale: 'en',
+    });
+    await ask(t, ALICE, BOB);
+    await expect(ask(t, BOB, ALICE)).resolves.toBe('friends');
+    await runScheduled(t);
+    expect(push.sent.map(({ to, title }) => [to, title])).toEqual([
+      ['ExponentPushToken[alice]', 'New friend'],
+    ]);
+  });
+
+  it('a friend request answered before its push goes out sends nothing (#631)', async () => {
+    const t = await setup();
+    await as(t, BOB).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[bob]',
+      platform: 'ios',
+      locale: 'en',
+    });
+    await ask(t, ALICE, BOB);
+    await as(t, BOB).mutation(api.friends.declineFriendRequest, { playerId: ALICE });
+    await runScheduled(t);
+    expect(push.sent).toEqual([]);
+  });
+
+  it('a friendship ended before the "New friend" push goes out sends nothing (#631)', async () => {
+    const t = await setup();
+    await as(t, ALICE).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[alice]',
+      platform: 'ios',
+      locale: 'en',
+    });
+    await befriend(t, ALICE, BOB);
+    await as(t, BOB).mutation(api.friends.removeFriend, { playerId: ALICE });
+    await runScheduled(t);
+    expect(push.sent).toEqual([]);
   });
 
   it('a friend invite answered before the push goes out sends nothing', async () => {

@@ -1,7 +1,8 @@
 /**
  * A tap on a turn push (#285) opens its game (`game/<gameId>`, from the
  * push's `data.gameId`). A tap on a friend invite push (#406) opens the
- * invite (`invite/<code>`, from `data.inviteCode`).
+ * invite (`invite/<code>`, from `data.inviteCode`). A tap on a friend
+ * request or "New friend" push (#631) opens Friends (`data.screen`).
  *
  * The root layout (`app/_layout.tsx`) listens. A tap waits here until its
  * game is on the screen (#325):
@@ -15,7 +16,7 @@
  *   it again): the layout tries again after `RETRY_MS`, at most
  *   `MAX_TRIES` times, then drops the tap.
  *
- * A push only opens an online game or an invite: an id that is not one
+ * A push only opens an online game, an invite or Friends: an id that is not one
  * (a local save slot, or not an id at all) does nothing.
  */
 import { normalizeInviteCode } from '@tavli/contracts';
@@ -24,7 +25,7 @@ import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { createStore, useStore } from 'zustand';
 
-import { gameHref, inviteHref, isLocalGameId } from '@/features/match/routes';
+import { FRIENDS_HREF, gameHref, inviteHref, isLocalGameId } from '@/features/match/routes';
 
 /** A Convex document id: letters and digits. Anything else in a push is not a game. */
 const GAME_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -35,10 +36,11 @@ export const PUSH_TAP_RETRY_MS = 500;
 /** How many times the layout navigates to the game of one tap. */
 export const PUSH_TAP_MAX_TRIES = 3;
 
-/** What a tap opens: an online game or an invite. */
+/** What a tap opens: an online game, an invite or Friends (#631). */
 export type TapTarget =
   | { readonly kind: 'game'; readonly id: string }
-  | { readonly kind: 'invite'; readonly code: string };
+  | { readonly kind: 'invite'; readonly code: string }
+  | { readonly kind: 'friends' };
 
 /** The game a tap opens, or `null`. */
 export function gameOfTap(tap: PushTap): string | null {
@@ -47,22 +49,37 @@ export function gameOfTap(tap: PushTap): string | null {
   return gameId;
 }
 
-/** What a tap opens (a game first), or `null`. */
+/** What a tap opens (a game first, then an invite, then a screen), or `null`. */
 export function targetOfTap(tap: PushTap): TapTarget | null {
   const gameId = gameOfTap(tap);
   if (gameId !== null) return { kind: 'game', id: gameId };
   const code = tap.inviteCode === null ? null : normalizeInviteCode(tap.inviteCode);
-  return code === null ? null : { kind: 'invite', code };
+  if (code !== null) return { kind: 'invite', code };
+  return tap.screen === 'friends' ? { kind: 'friends' } : null;
 }
 
 /** The route of a target, for the router. */
 export function tapTargetHref(target: TapTarget) {
-  return target.kind === 'game' ? gameHref(target.id) : inviteHref(target.code);
+  switch (target.kind) {
+    case 'game':
+      return gameHref(target.id);
+    case 'invite':
+      return inviteHref(target.code);
+    case 'friends':
+      return FRIENDS_HREF;
+  }
 }
 
 /** The path of a target, as `usePathname` gives it. */
 function pathOf(target: TapTarget): string {
-  return target.kind === 'game' ? `/game/${target.id}` : `/invite/${target.code}`;
+  switch (target.kind) {
+    case 'game':
+      return `/game/${target.id}`;
+    case 'invite':
+      return `/invite/${target.code}`;
+    case 'friends':
+      return FRIENDS_HREF;
+  }
 }
 
 /** A tap whose game or invite is not on the screen yet. */

@@ -464,7 +464,7 @@
       "savedTitle": "Delete your account?",
       "games": "Games in progress end now. You resign them, so you lose them.",
       "invites": "Your open invites are cancelled.",
-      "pushes": "Turn notifications stop.",
+      "pushes": "Notifications stop.",
       "guestName": "Your guest name is deleted.",
       "savedName": "Your username and your ways to sign in are removed.",
       "kept": "Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.",
@@ -1145,7 +1145,7 @@
       "turnPushes": {
         "title": "Turn notifications",
         "body": "In an online game, the app can tell you when it is your turn.",
-        "where": "Settings › Turn notifications"
+        "where": "Settings › Notifications"
       },
       "quickInvites": {
         "title": "Quicker friend invites",
@@ -1231,6 +1231,11 @@
         "title": "Take a move back on the board",
         "body": "Drag the checker you just moved back where it came from, or tap it and then tap where it was. It works like Undo: a move that hit or pinned a checker puts that checker back too.",
         "where": "In a game, on the board"
+      },
+      "betterPushes": {
+        "title": "Better notifications",
+        "body": "Notifications now name the other player and come in the app language. You also hear when a game starts, when a player asks to be your friend and when they accept.",
+        "where": "Settings › Notifications"
       }
     }
   },
@@ -1320,17 +1325,17 @@
     }
   },
   "notifications": {
-    "channel": "Your turn",
+    "channel": "Games and friends",
     "offer": {
-      "title": "Turn notifications?",
-      "why": "We tell you when it is your turn, so you do not have to keep the app open.",
+      "title": "Turn on notifications?",
+      "why": "We tell you when it is your turn, when a game starts and when a player asks to be your friend. You do not have to keep the app open.",
       "turnOn": "Turn on",
       "notNow": "Not now"
     },
     "settings": {
-      "label": "Turn notifications",
-      "on": "On. We tell you when it is your turn in an online game.",
-      "undetermined": "Off. Turn them on to hear when it is your turn.",
+      "label": "Notifications",
+      "on": "On. We tell you about your turn, new games and friend requests.",
+      "undetermined": "Off. Turn them on to hear about your turn, new games and friends.",
       "denied": "Off in the phone settings.",
       "turnOn": "Turn on",
       "openSettings": "Open phone settings"

@@ -12,6 +12,7 @@ import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import { hasOnlineAccount } from '@/features/online/accountHint';
+import i18n, { currentAppLanguage } from '@/i18n';
 import { auth, notifications, pushTokens, storage } from '@/services';
 
 import { sendPushPermissionAnswered } from './pushAnalytics';
@@ -26,7 +27,7 @@ function make(): TurnPushes | undefined {
   if (auth === undefined || notifications === undefined || pushTokens === undefined) {
     return undefined;
   }
-  return createTurnPushes({
+  const pushes = createTurnPushes({
     storage,
     notifications,
     pushTokens,
@@ -34,7 +35,20 @@ function make(): TurnPushes | undefined {
     onAnswer: (answer) => sendPushPermissionAnswered(answer),
     // A phone that never used an online account asks the server nothing.
     hasAccount: hasOnlineAccount,
+    // The server writes the pushes in the app language (#631).
+    locale: currentAppLanguage,
   });
+  // A new app language registers the token again, with the new language.
+  const onLanguage = () => void pushes.sync();
+  i18n.on('languageChanged', onLanguage);
+  const stop = pushes.stop;
+  return {
+    ...pushes,
+    stop() {
+      i18n.off('languageChanged', onLanguage);
+      stop();
+    },
+  };
 }
 
 /** `null` until the first call. */

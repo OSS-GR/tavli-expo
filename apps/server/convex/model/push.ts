@@ -1,11 +1,19 @@
 /**
- * The pure parts of the pushes: "your turn" (#280) and "game over"
- * (#316). Who gets a push after a save, the text, the messages, which
+ * The pure parts of the pushes: "your turn" (#280), "game over" (#316),
+ * friend invites (#406), friend requests and match starts (#631). Who gets
+ * a push after a save, the text in each language, the messages, which
  * tokens to drop or retry. No Convex types; `push.ts` holds the
  * functions. See "Push" in `docs/architecture/online-game-service.md`.
  */
 
-import type { OnlineGameStatus, PushErrorCode, PushMessage, PushResult } from '@tavli/contracts';
+import type {
+  OnlineGameStatus,
+  PlayerName,
+  PushErrorCode,
+  PushLocale,
+  PushMessage,
+  PushResult,
+} from '@tavli/contracts';
 import { PLAYERS } from '@tavli/engine';
 import type { MatchFlow, PlayerId } from '@tavli/engine';
 import { waitingFor } from '@tavli/online';
@@ -14,26 +22,146 @@ import { waitingFor } from '@tavli/online';
 export const MAX_PUSH_TOKENS_PER_PLAYER = 5;
 
 /**
- * The text of a "your turn" push. English for now; the one place to
- * change it. It holds no names and no emails.
+ * What a push says (#631): each kind of push, as the receiver reads it.
+ * `matchStart` is the first push of a new match (`rankedStart` for Play
+ * ranked: a match was found).
  */
-export const TURN_PUSH_TEXT = {
-  title: 'Your turn',
-  body: 'An online game is waiting for your move.',
-} as const;
+export type PushTextKind =
+  | 'turn'
+  | 'matchStart'
+  | 'rankedStart'
+  | 'matchEnd'
+  | 'friendInvite'
+  | 'friendRequest'
+  | 'friendAccepted';
+
+/** The text of one kind of push: the body names the other player when the server has a name. */
+interface PushTextForms {
+  readonly title: string;
+  readonly named: (name: string) => string;
+  readonly unnamed: string;
+}
 
 /**
- * The text of a "game over" push (#316): the match is over. English for
- * now; the one place to change it. It holds no names, no emails and not
- * who won.
+ * The text of every push, in each language (#631): the one place to
+ * change it. Greek follows `docs/design/greek-copy.md`: a name goes first
+ * with no article. A push holds no emails, no moves and not who won.
  */
-export const MATCH_END_PUSH_TEXT = {
-  title: 'Tavlaki',
-  body: 'Your game is over. See the result.',
-} as const;
+export const PUSH_TEXTS: Readonly<
+  Record<PushLocale, Readonly<Record<PushTextKind, PushTextForms>>>
+> = {
+  en: {
+    turn: {
+      title: 'Your turn',
+      named: (name) => `${name} is waiting for your move.`,
+      unnamed: 'An online game is waiting for your move.',
+    },
+    matchStart: {
+      title: 'New game',
+      named: (name) => `Your game with ${name} has started. Your roll.`,
+      unnamed: 'Your online game has started. Your roll.',
+    },
+    rankedStart: {
+      title: 'Match found',
+      named: (name) => `Your ranked game with ${name} has started. Your roll.`,
+      unnamed: 'Your ranked game has started. Your roll.',
+    },
+    matchEnd: {
+      title: 'Game over',
+      named: (name) => `Your game with ${name} is over. See the result.`,
+      unnamed: 'Your game is over. See the result.',
+    },
+    friendInvite: {
+      title: 'Game invite',
+      named: (name) => `${name} invites you to a game.`,
+      unnamed: 'A friend invites you to a game.',
+    },
+    friendRequest: {
+      title: 'Friend request',
+      named: (name) => `${name} wants to be your friend.`,
+      unnamed: 'A player wants to be your friend.',
+    },
+    friendAccepted: {
+      title: 'New friend',
+      named: (name) => `${name} accepted your friend request.`,
+      unnamed: 'A player accepted your friend request.',
+    },
+  },
+  el: {
+    turn: {
+      title: 'Σειρά σου',
+      named: (name) => `${name} περιμένει την κίνησή σου.`,
+      unnamed: 'Ένα online παιχνίδι περιμένει την κίνησή σου.',
+    },
+    matchStart: {
+      title: 'Νέο παιχνίδι',
+      named: (name) => `Το παιχνίδι με ${name} ξεκίνησε. Ρίξε το ζάρι σου.`,
+      unnamed: 'Το online παιχνίδι σου ξεκίνησε. Ρίξε το ζάρι σου.',
+    },
+    rankedStart: {
+      title: 'Βρέθηκε αντίπαλος',
+      named: (name) => `Το παιχνίδι κατάταξης με ${name} ξεκίνησε. Ρίξε το ζάρι σου.`,
+      unnamed: 'Το παιχνίδι κατάταξης ξεκίνησε. Ρίξε το ζάρι σου.',
+    },
+    matchEnd: {
+      title: 'Τέλος παιχνιδιού',
+      named: (name) => `Το παιχνίδι με ${name} τελείωσε. Δες το αποτέλεσμα.`,
+      unnamed: 'Το παιχνίδι σου τελείωσε. Δες το αποτέλεσμα.',
+    },
+    friendInvite: {
+      title: 'Πρόσκληση σε παιχνίδι',
+      named: (name) => `${name} σε προσκαλεί σε παιχνίδι.`,
+      unnamed: 'Ένας φίλος σε προσκαλεί σε παιχνίδι.',
+    },
+    friendRequest: {
+      title: 'Αίτημα φιλίας',
+      named: (name) => `${name} θέλει να γίνετε φίλοι.`,
+      unnamed: 'Ένας παίκτης θέλει να γίνετε φίλοι.',
+    },
+    friendAccepted: {
+      title: 'Νέα φιλία',
+      named: (name) => `${name} αποδέχτηκε το αίτημα φιλίας σου.`,
+      unnamed: 'Ένας παίκτης αποδέχτηκε το αίτημα φιλίας σου.',
+    },
+  },
+};
 
-/** Which push: "your turn", or "game over" (the match is over). */
-export type PushKind = 'turn' | 'matchEnd';
+/** A name as a push writes it: the username, or "Guest 4821" ("Επισκέπτης 4821"), like the app. */
+export function pushNameText(name: PlayerName, locale: PushLocale): string {
+  if (name.kind === 'username') return name.name;
+  return `${locale === 'el' ? 'Επισκέπτης' : 'Guest'} ${name.number}`;
+}
+
+/** The title and body of a push of `kind` in `locale`, naming `name` when there is one. */
+export function pushText(
+  kind: PushTextKind,
+  locale: PushLocale,
+  name: PlayerName | null,
+): { readonly title: string; readonly body: string } {
+  const forms = PUSH_TEXTS[locale][kind];
+  return {
+    title: forms.title,
+    body: name === null ? forms.unnamed : forms.named(pushNameText(name, locale)),
+  };
+}
+
+/** "Your turn" in English with no name: what an old token row (no language) and no name read. */
+export const TURN_PUSH_TEXT = pushText('turn', 'en', null);
+
+/** "Game over" (#316) in English with no name. */
+export const MATCH_END_PUSH_TEXT = pushText('matchEnd', 'en', null);
+
+/** One phone to push to: its token and the language of its pushes (#631). */
+export interface PushTarget {
+  readonly token: string;
+  readonly locale: PushLocale;
+}
+
+/**
+ * Which push a save schedules: "your turn" (`turn`; `matchStart` for the
+ * first push of a new match, #631), or "game over" (the match is over).
+ */
+export type PushKind = 'turn' | 'matchStart' | 'matchEnd';
 
 /** What the server waits for: a side, in one game of the match. */
 export interface TurnWait {
@@ -47,6 +175,14 @@ export interface TurnWait {
 
 /** What the server waits for before a new match: nobody, and the match runs. */
 export const NEW_MATCH_WAIT: TurnWait = { side: null, game: 0, over: false };
+
+/**
+ * True when `before` is the wait before a new match (`NEW_MATCH_WAIT`):
+ * the save started the match, so its push is `matchStart` (#631).
+ */
+export function isNewMatch(before: TurnWait): boolean {
+  return before.side === null && before.game === 0 && !before.over;
+}
 
 /** What the server waits for in `flow`. */
 export function turnWait(flow: MatchFlow): TurnWait {
@@ -117,17 +253,34 @@ export function turnPushTtl(turnDeadline: number | null, now: number): number | 
 }
 
 /**
- * One "your turn" message per token, with `high` priority (the phone shows
- * it at once) and `ttlSeconds` from `turnPushTtl`.
+ * What a game push names (#631): the other player as the receiver sees
+ * them (`nameSeenBy`: `null` when the receiver blocks them, or there is
+ * no name), and whether the game is ranked.
+ */
+export interface GamePushAbout {
+  readonly name: PlayerName | null;
+  readonly ranked: boolean;
+}
+
+/** A game push that names nobody, in a friend game. */
+export const NOBODY: GamePushAbout = { name: null, ranked: false };
+
+/**
+ * One "your turn" message per phone, in its language, with `high`
+ * priority (the phone shows it at once) and `ttlSeconds` from
+ * `turnPushTtl`. `textKind` is `turn`, or `matchStart` / `rankedStart` for
+ * the first push of a new match.
  */
 export function turnMessages(
-  tokens: readonly string[],
+  targets: readonly PushTarget[],
   gameId: string,
   ttlSeconds: number,
+  name: PlayerName | null = null,
+  textKind: 'turn' | 'matchStart' | 'rankedStart' = 'turn',
 ): PushMessage[] {
-  return tokens.map((to) => ({
-    to,
-    ...TURN_PUSH_TEXT,
+  return targets.map(({ token, locale }) => ({
+    to: token,
+    ...pushText(textKind, locale, name),
     data: { gameId },
     priority: 'high',
     ttlSeconds,
@@ -146,10 +299,14 @@ export const MATCH_END_PUSH_TTL_SECONDS = 24 * 60 * 60;
  * waits for the player, so the phone may hold it to save power) and a
  * time to live of `MATCH_END_PUSH_TTL_SECONDS`.
  */
-export function matchEndMessages(tokens: readonly string[], gameId: string): PushMessage[] {
-  return tokens.map((to) => ({
-    to,
-    ...MATCH_END_PUSH_TEXT,
+export function matchEndMessages(
+  targets: readonly PushTarget[],
+  gameId: string,
+  name: PlayerName | null = null,
+): PushMessage[] {
+  return targets.map(({ token, locale }) => ({
+    to: token,
+    ...pushText('matchEnd', locale, name),
     data: { gameId },
     priority: 'normal',
     ttlSeconds: MATCH_END_PUSH_TTL_SECONDS,
@@ -157,20 +314,24 @@ export function matchEndMessages(tokens: readonly string[], gameId: string): Pus
 }
 
 /**
- * The messages of a push of `kind` to `tokens`, sent at `now`. A turn
- * push lives until `turnDeadline` (`turnPushTtl`): with no time left it
- * is no messages, so nothing is sent.
+ * The messages of a push of `kind` to `targets`, sent at `now`, naming
+ * `about.name`. A turn push lives until `turnDeadline` (`turnPushTtl`):
+ * with no time left it is no messages, so nothing is sent. A match start
+ * says "Match found" in a ranked game.
  */
 export function pushMessages(
   kind: PushKind,
-  tokens: readonly string[],
+  targets: readonly PushTarget[],
   gameId: string,
   turnDeadline: number | null,
   now: number,
+  about: GamePushAbout = NOBODY,
 ): PushMessage[] {
-  if (kind === 'matchEnd') return matchEndMessages(tokens, gameId);
+  if (kind === 'matchEnd') return matchEndMessages(targets, gameId, about.name);
   const ttl = turnPushTtl(turnDeadline, now);
-  return ttl === null ? [] : turnMessages(tokens, gameId, ttl);
+  if (ttl === null) return [];
+  const textKind = kind === 'turn' ? 'turn' : about.ranked ? 'rankedStart' : 'matchStart';
+  return turnMessages(targets, gameId, ttl, about.name, textKind);
 }
 
 /**
@@ -189,7 +350,7 @@ export function pushStillDue(
   version: number,
 ): boolean {
   if (game === null || game.version !== version) return false;
-  return game.status === (kind === 'turn' ? 'active' : 'finished');
+  return game.status === (kind === 'matchEnd' ? 'finished' : 'active');
 }
 
 /** The tokens whose result failed with one of `codes`. */
@@ -249,35 +410,57 @@ export function tokensOverCap<T extends { readonly token: string }>(
   return rows.filter((row) => row.token !== keep).slice(0, over);
 }
 
-/**
- * The text of a friend invite push (#406): a friend invites the player to
- * a game. English for now; the one place to change it. It holds no names
- * and no emails: not even which friend.
- */
-export const FRIEND_INVITE_PUSH_TEXT = {
-  title: 'Tavlaki',
-  body: 'A friend invites you to a game.',
-} as const;
+/** A friend invite push (#406) in English with no name. */
+export const FRIEND_INVITE_PUSH_TEXT = pushText('friendInvite', 'en', null);
 
 /**
- * One friend invite message per token, with `high` priority and a time
- * to live up to the invite's end (`turnPushTtl` on `expiresAt`). The data
- * holds only the invite code, so a tap opens the invite. No time left: no
- * messages.
+ * One friend invite message per phone, in its language, naming the
+ * inviter (#631), with `high` priority and a time to live up to the
+ * invite's end (`turnPushTtl` on `expiresAt`). The data holds only the
+ * invite code, so a tap opens the invite. No time left: no messages.
  */
 export function friendInviteMessages(
-  tokens: readonly string[],
+  targets: readonly PushTarget[],
   inviteCode: string,
   expiresAt: number,
   now: number,
+  name: PlayerName | null = null,
 ): PushMessage[] {
   const ttlSeconds = turnPushTtl(expiresAt, now);
   if (ttlSeconds === null) return [];
-  return tokens.map((to) => ({
-    to,
-    ...FRIEND_INVITE_PUSH_TEXT,
+  return targets.map(({ token, locale }) => ({
+    to: token,
+    ...pushText('friendInvite', locale, name),
     data: { inviteCode },
     priority: 'high',
     ttlSeconds,
+  }));
+}
+
+/** The friend pushes (#631): a friend request, and a request accepted. */
+export type FriendPushKind = 'friendRequest' | 'friendAccepted';
+
+/**
+ * How long the push service keeps a friend push, in seconds: one day,
+ * like "game over". Nothing waits on it.
+ */
+export const FRIEND_PUSH_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * One friend push per phone, in its language, naming the other player,
+ * with `normal` priority and a time to live of one day. A tap opens
+ * Friends (`data.screen`).
+ */
+export function friendMessages(
+  kind: FriendPushKind,
+  targets: readonly PushTarget[],
+  name: PlayerName | null,
+): PushMessage[] {
+  return targets.map(({ token, locale }) => ({
+    to: token,
+    ...pushText(kind, locale, name),
+    data: { screen: 'friends' },
+    priority: 'normal',
+    ttlSeconds: FRIEND_PUSH_TTL_SECONDS,
   }));
 }
