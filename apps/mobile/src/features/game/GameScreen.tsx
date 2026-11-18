@@ -139,7 +139,7 @@ import {
 import { boardDiceBox, settleTargets } from '@/features/board/boardDice';
 import { pinnedCheckers, sideOf, toneOf, type BoardView } from '@/features/board/boardModel';
 import { flowPaths } from '@/features/board/combined';
-import { BOARD_GESTURES, SWIPE_AREA } from '@/features/board/interaction';
+import { BOARD_GESTURES, keepPeak, SWIPE_AREA, swipeEnd } from '@/features/board/interaction';
 import { DiceRow } from '@/features/board/DiceRow';
 import { DICE_LAND_MS } from '@/features/board/diceMotion';
 import {
@@ -842,44 +842,62 @@ export function GameScreen({
     },
   });
 
-  // The swipe-to-roll area around the board (#183): a swipe may start on the
-  // strips and the space around the board, like on the dev board screen. It
-  // needs more movement than the board's own pan, so on the board that one
-  // always activates first and wins: checkers still drag there. In landscape
-  // the move list scrolls in this region, and a card may cover the board:
-  // there the pan is off (`enabled: false`), so it never takes their
-  // touches. Never turn it off with a huge `minDistance`: on iOS a pan that
-  // stays began stops the board's tap from ending, so a tap on a checker
-  // did nothing in landscape (#611).
+  // The swipe-to-roll area (#183, #625): the whole game screen (the seats,
+  // the board region, the buttons), so a swipe may start anywhere. It needs
+  // more movement than the board's own pan, so on the board that one always
+  // activates first and wins: checkers still drag there, and a swipe that
+  // starts on the board rolls through the board. A tap never activates a
+  // pan, so the buttons keep their taps; a swipe that starts on a button
+  // rolls (the active pan cancels the press). It is on only while you may
+  // roll and no card covers the board (`enabled: false` otherwise), so it
+  // never takes the touches of a card, a move or the rails' scroll. Never
+  // turn it off with a huge `minDistance`: on iOS a pan that stays began
+  // stops the board's tap from ending (#611).
   //
+  // It rolls when the finger lifts, with the fastest finger speed of the
+  // swipe (`keepPeak`), so a flick that slows at the end still throws hard.
   // Where the finger went down picks the side the dice come in from, and
-  // that needs the board's points: the frame sits between the strips in the
-  // classic layout, so its origin shifts the touch into the board's space.
+  // that needs the board's points: the board frame's origin in this view
+  // (the middle's place plus the frame's place in it) shifts the touch into
+  // the board's space.
   const areaStartX = useSharedValue(0);
   const areaStartY = useSharedValue(0);
+  const areaVX = useSharedValue(0);
+  const areaVY = useSharedValue(0);
+  const middleX = useSharedValue(0);
+  const middleY = useSharedValue(0);
   const boardFrameX = useSharedValue(0);
   const boardFrameY = useSharedValue(0);
   const swipeArea = usePanGesture({
-    enabled: !landscape && !blocked,
+    // Off while the move list shows: it scrolls (in landscape next to the
+    // board), and a scroll must never roll. The board's own pan still rolls.
+    enabled: canRoll && phase === 'awaiting-roll' && !blocked && !showMoveList,
     minDistance: SWIPE_AREA.minDistance,
     testID: 'game-swipe-area',
     onBegin: (e) => {
       'worklet';
       areaStartX.set(e.x);
       areaStartY.set(e.y);
+      areaVX.set(0);
+      areaVY.set(0);
+    },
+    onUpdate: (e) => {
+      'worklet';
+      keepPeak(areaVX, areaVY, e);
     },
     onDeactivate: (e) => {
       'worklet';
       if (!e.canceled) {
-        scheduleOnRN(roll, {
-          dx: e.x - areaStartX.get(),
-          dy: e.y - areaStartY.get(),
-          x: e.x - boardFrameX.get(),
-          y: e.y - boardFrameY.get(),
-          ...(e.velocityX === undefined || e.velocityY === undefined
-            ? {}
-            : { vx: e.velocityX, vy: e.velocityY }),
-        });
+        keepPeak(areaVX, areaVY, e);
+        const dx = middleX.get() + boardFrameX.get();
+        const dy = middleY.get() + boardFrameY.get();
+        const swipe = swipeEnd(
+          { x: areaStartX.get(), y: areaStartY.get() },
+          e,
+          areaVX.get(),
+          areaVY.get(),
+        );
+        scheduleOnRN(roll, { ...swipe, x: swipe.x - dx, y: swipe.y - dy });
       }
     },
   });
@@ -2421,24 +2439,26 @@ export function GameScreen({
   // their native parent too (#173).
   return (
     <View style={styles.screen(landscape, island)}>
-      <View
-        testID="game-content"
-        style={styles.content(landscape)}
-        collapsable={false}
-        importantForAccessibility={hideScreen ? 'no-hide-descendants' : 'auto'}
-        accessibilityElementsHidden={hideScreen}>
-        {lead}
-        {/* Classic: the board, centred in the space that is left; a card
+      <GestureDetector gesture={swipeArea}>
+        <View
+          testID="game-content"
+          style={styles.content(landscape)}
+          collapsable={false}
+          importantForAccessibility={hideScreen ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={hideScreen}>
+          {lead}
+          {/* Classic: the board, centred in the space that is left; a card
             covers that whole space, so it has room. Tall: the board as
             large as it gets. Landscape: the board between the rails. The
-            swipe area around the board (#183) covers this region (not
-            while a card is up): on the board the board's own pan (it needs
-            less movement) always wins the race, so checkers still drag. */}
-        <GestureDetector gesture={swipeArea}>
+            swipe area (#183, #625) covers the whole content around it. */}
           <View
             testID="game-middle"
             style={tall ? styles.boardArea : styles.middle}
-            collapsable={false}>
+            collapsable={false}
+            onLayout={(e) => {
+              middleX.set(e.nativeEvent.layout.x);
+              middleY.set(e.nativeEvent.layout.y);
+            }}>
             <View
               testID="game-board-frame"
               style={
@@ -2457,10 +2477,10 @@ export function GameScreen({
             {hints}
             {cardOverlay ?? inlay}
           </View>
-        </GestureDetector>
-        {landscape ? null : moveList}
-        {trail}
-      </View>
+          {landscape ? null : moveList}
+          {trail}
+        </View>
+      </GestureDetector>
       {endSheet !== null ? (
         <SupportAskCover covered={ask.open} fill="absolute">
           {endSheet}

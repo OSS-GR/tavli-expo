@@ -323,3 +323,67 @@ export function dragPoint(
   'worklet';
   return { x: checker.x + finger.x - start.x, y: checker.y + finger.y - start.y };
 }
+
+// ---------------------------------------------------------------------------
+// Swipe to roll (#625). Worklets.
+
+/** A swipe that ended: what `onBoardSwipe` gets. */
+export interface SwipeEnd {
+  readonly x: number;
+  readonly y: number;
+  readonly dx: number;
+  readonly dy: number;
+  readonly vx?: number;
+  readonly vy?: number;
+}
+
+/** A pan event: Gesture Handler gives the finger speed (pt/s) on most of them. */
+export interface SwipeSample {
+  readonly x: number;
+  readonly y: number;
+  readonly velocityX?: number;
+  readonly velocityY?: number;
+}
+
+/**
+ * The faster of the speed kept so far (`vx`, `vy`) and the speed of `e`.
+ * A flick often slows down just before the finger lifts, so the throw
+ * takes the fastest moment of the swipe, not the last one (#625).
+ */
+export function fasterSpeed(
+  vx: number,
+  vy: number,
+  e: SwipeSample,
+): { readonly vx: number; readonly vy: number } {
+  'worklet';
+  const ex = e.velocityX;
+  const ey = e.velocityY;
+  if (ex === undefined || ey === undefined || !Number.isFinite(ex) || !Number.isFinite(ey)) {
+    return { vx, vy };
+  }
+  return Math.hypot(ex, ey) > Math.hypot(vx, vy) ? { vx: ex, vy: ey } : { vx, vy };
+}
+
+/**
+ * The swipe from `start` (where the finger went down) to `e` (where it
+ * lifted), with the fastest speed it had (`vx`, `vy`; none when 0).
+ */
+export function swipeEnd(start: ScreenPoint, e: SwipeSample, vx: number, vy: number): SwipeEnd {
+  'worklet';
+  const swipe = { x: start.x, y: start.y, dx: e.x - start.x, dy: e.y - start.y };
+  return vx === 0 && vy === 0 ? swipe : { ...swipe, vx, vy };
+}
+
+/** A number on the UI thread (a Reanimated shared value). */
+export interface SharedNumber {
+  get(): number;
+  set(value: number): void;
+}
+
+/** Keeps the fastest finger speed of a swipe in `vx`, `vy`. */
+export function keepPeak(vx: SharedNumber, vy: SharedNumber, e: SwipeSample): void {
+  'worklet';
+  const v = fasterSpeed(vx.get(), vy.get(), e);
+  vx.set(v.vx);
+  vy.set(v.vy);
+}
