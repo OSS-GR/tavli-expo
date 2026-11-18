@@ -9,6 +9,10 @@
  * - no text has a line limit (`numberOfLines` cuts it with "…");
  * - no box around a text has a fixed `height` or `maxHeight`, up to the
  *   nearest scroll view (a scroll view can always show more).
+ *
+ * A Skia canvas is skipped: its `Text` (the board's stack counts) is drawn
+ * at the board's own size, not with the system font. The pass inlay
+ * (#613) leaves the board in view, so the check meets the canvas there.
  */
 import { StyleSheet } from 'react-native';
 
@@ -52,6 +56,7 @@ export function textScalingProblems(tree: Json): string[] {
       for (const n of node) walk(n, ancestors);
       return;
     }
+    if (node.type === 'Canvas') return;
     if (node.type === 'Text') {
       const text = JSON.stringify(textOf(node));
       const decorative = hidden(node) || ancestors.some(hidden);

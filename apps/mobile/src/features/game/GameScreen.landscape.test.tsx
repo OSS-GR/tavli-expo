@@ -31,7 +31,7 @@ import { DEFAULT_SETTINGS, type HomeBoardSide } from '@/features/settings/settin
 import { settingsStore } from '@/features/settings/store';
 
 import { createGameStore, type GameStore } from './gameStore';
-import { GameScreen, scoreText } from './GameScreen';
+import { GameScreen, PASS_NOTICE_MS, scoreText } from './GameScreen';
 
 import { center, playToTheEnd, press } from '../../../test/boardPlay';
 import { runOnFakeTimers } from '../../../test/clock';
@@ -383,7 +383,7 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
   });
 
-  it('keeps an open "no legal moves" card until OK', async () => {
+  it('keeps an open "no legal moves" inlay and its 2 s (#613)', async () => {
     // Ann is on the bar and Bob holds all six entry points.
     const closed: BoardState = createBoard(
       {
@@ -405,17 +405,18 @@ describe('<GameScreen /> turning the phone mid-turn (#185)', () => {
     });
     store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
     await show(store, TALL_SPACE);
-    const card = screen.getByTestId('pass-card');
+    const inlay = screen.getByTestId('pass-inlay');
+    await act(async () => {
+      jest.advanceTimersByTime(PASS_NOTICE_MS - 500);
+    });
     await setWindow(LANDSCAPE_SE);
     await layoutBoard(LANDSCAPE_SPACE);
-    expect(screen.getByTestId('pass-card')).toBe(card);
-    // The card's timer does not close it: your own pass waits for OK (#178).
+    expect(screen.getByTestId('pass-inlay')).toBe(inlay);
+    // Turning the phone does not start the 2 s again.
     await act(async () => {
-      jest.advanceTimersByTime(10_000);
+      jest.advanceTimersByTime(510);
     });
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
-    await press('pass-ok-button');
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
   });
 });
 

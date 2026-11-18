@@ -13,7 +13,7 @@
  *
  * `diceWereChosen` asks the other way round, for dice the state may no
  * longer hold: a chosen double that no checker can play passes at once
- * (#205), so the pass card has the dice and the state has none.
+ * (#205), so the pass inlay has the dice and the state has none.
  */
 import type { Dice, FlowEvent, MatchFlow } from '@tavli/engine';
 

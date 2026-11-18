@@ -107,7 +107,7 @@ async function playToTheEnd(store: GameStore) {
     if (view.phase === 'awaiting-answer') {
       questions++;
       await press('mother-play-on-button');
-    } else if (passNotice(flow) && card('pass-ok-button')) await press('pass-ok-button');
+    } else if (passNotice(flow) && card('pass-inlay-cover')) await press('pass-inlay-cover');
     else if (view.phase === 'opening-roll') await pressOpeningRoll();
     else if (openingStatus(view.game) && card('opening-overlay')) await press('opening-overlay');
     else if (view.phase === 'awaiting-roll') await press('roll-button');

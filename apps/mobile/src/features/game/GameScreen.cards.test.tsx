@@ -5,7 +5,8 @@
  * Each card comes and goes with direct store actions and presses (no full
  * games), so these tests stay fast. They run on fake timers: on a real
  * clock a busy machine can close a card (the opening result after 3 s,
- * a pass after 3 s) before the test looks at it (#152).
+ * a pass after 2 s) before the test looks at it (#152). The pass inlay
+ * (#613) covers only the bar: the board stays readable under it.
  */
 import {
   asodio,
@@ -135,7 +136,7 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     expect(screen.getByTestId('move-list')).toBeOnTheScreen();
   });
 
-  it('the pass card (no legal moves)', async () => {
+  it('the pass inlay (no legal moves) leaves the board readable (#613)', async () => {
     const store = newStore();
     // Ann is on the bar and Bob holds all six entry points.
     const closed = createBoard(
@@ -151,25 +152,26 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
     });
-    expect(screen.getByText('No legal moves')).toBeOnTheScreen();
-    expectBoardHidden();
+    expect(within(screen.getByTestId('pass-inlay')).getByText('No moves')).toBeOnTheScreen();
+    expectBoardShown();
+    // Focus goes to the inlay, so its Close action is at hand.
     expect(focus).toHaveBeenCalledWith(expect.anything(), 'focus');
-    await press('pass-ok-button');
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    await press('pass-inlay-cover');
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     expectBoardShown();
   });
 
-  it('the "Board locked" card (Asodio)', async () => {
+  it('the locked board inlay (Asodio)', async () => {
     const store = newStore(asodioRules);
     await show(store);
     await act(async () => {
       store.getState().dispatch({ type: 'rollOpening', player: 'white', die: 5 });
       store.getState().dispatch({ type: 'rollOpening', player: 'black', die: 3 });
     });
-    expect(screen.getByText('Board locked')).toBeOnTheScreen();
-    expectBoardHidden();
-    await press('pass-ok-button');
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(screen.getByTestId('pass-inlay-reason')).toHaveTextContent(/^The board opens only with/);
+    expectBoardShown();
+    await press('pass-inlay-cover');
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     expectBoardShown();
     // The status notes over the board sit outside the layer a card hides.
     expect(screen.getByTestId('loading-lock-hint')).toBeOnTheScreen();
@@ -177,7 +179,7 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     expect(layer.queryByTestId('loading-lock-hint', hidden)).toBeNull();
   });
 
-  it('two passes in a row: each card takes focus and is read', async () => {
+  it('two passes in a row: each inlay takes focus and is read', async () => {
     const announce = jest
       .spyOn(AccessibilityInfo, 'announceForAccessibility')
       .mockImplementation(() => {});
@@ -198,24 +200,22 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
       await act(async () => {
         store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
       });
-      expect(screen.getByText('Ann rolled 6-6. No checker can move.')).toBeOnTheScreen();
+      expect(screen.getByText('Ann rolled 6-6 · Bob’s turn')).toBeOnTheScreen();
       expect(focus).toHaveBeenCalledTimes(1);
-      // Bob rolls while the first card still shows (the store, not the screen).
+      // Bob rolls while the first inlay still shows (the store, not the screen).
       await act(async () => {
         store.getState().dispatch({ type: 'roll', player: 'black', dice: [5, 5] });
       });
-      expect(screen.getByText('Bob rolled 5-5. No checker can move.')).toBeOnTheScreen();
+      expect(screen.getByText('Bob rolled 5-5 · Ann’s turn')).toBeOnTheScreen();
       expect(focus).toHaveBeenCalledTimes(2);
-      expect(announce).toHaveBeenLastCalledWith(
-        expect.stringContaining('Bob rolled 5-5. No checker can move.'),
-      );
-      expectBoardHidden();
+      expect(announce).toHaveBeenLastCalledWith(expect.stringContaining('Bob rolled 5-5'));
+      expectBoardShown();
     } finally {
       announce.mockRestore();
     }
   });
 
-  it('the "Army frozen" card (Asodio)', async () => {
+  it('the frozen army inlay (Asodio)', async () => {
     const store = newStore(asodioRules);
     startAt(store, SAMPLE_POSITIONS.asodioFrozen, 'asodio');
     await show(store);
@@ -223,11 +223,11 @@ describe('<GameScreen /> cards hide the board from screen readers (#153)', () =>
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 5] });
     });
-    // The card's title. White's strip says "Army frozen" too: with no pip
+    // The inlay's reason line. White's strip says "Army frozen": with no pip
     // count (#238) the note is the strip's only detail.
-    expect(within(screen.getByTestId('pass-card')).getByText('Army frozen')).toBeOnTheScreen();
-    expectBoardHidden();
-    await press('pass-ok-button');
+    expect(screen.getByTestId('pass-inlay-reason')).toHaveTextContent(/last checker is pinned/);
+    expectBoardShown();
+    await press('pass-inlay-cover');
     expectBoardShown();
   });
 

@@ -43,7 +43,8 @@ export type WhatsNewEntryId =
   | 'signOutEverywhere'
   | 'downloadData'
   | 'onlineReview'
-  | 'widerBoard';
+  | 'widerBoard'
+  | 'passInlay';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -66,6 +67,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       { id: 'downloadData', icon: 'share' },
       { id: 'onlineReview', icon: 'chart' },
       { id: 'widerBoard', icon: 'smartphone' },
+      { id: 'passInlay', icon: 'dices' },
     ],
   },
   {

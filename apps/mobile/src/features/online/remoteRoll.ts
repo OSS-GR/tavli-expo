@@ -20,7 +20,7 @@ export interface RemoteRoll {
   /** Who rolled: the other player. */
   readonly player: PlayerId;
   readonly dice: Dice;
-  /** The roll had no legal move: the pass card shows after the dice. */
+  /** The roll had no legal move: the pass inlay shows after the dice. */
   readonly pass: boolean;
 }
 

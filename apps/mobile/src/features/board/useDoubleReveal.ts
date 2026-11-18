@@ -7,7 +7,7 @@
  * (`DOUBLE_SPLIT_AT_MS` after the roll). A short "Doubles!" label shows
  * from the split on, for `DOUBLE_LABEL_MS`.
  *
- * Dice at rest (`rollKey` null: the pass card, the tutorial, a double chosen
+ * Dice at rest (`rollKey` null: the pass inlay, the tutorial, a double chosen
  * after a 1-2 in Acey-Deucey, see `diceWereRolled`) show the four
  * dice at once. So does a double with a used die: the player was quicker
  * than the beat, and a faded die must be one of the four. Once split, the

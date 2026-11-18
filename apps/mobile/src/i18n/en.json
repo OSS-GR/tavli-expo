@@ -1081,6 +1081,11 @@
         "body": "After an online game, Review shows your biggest mistakes and the best moves, as after a game vs the computer. It looks at your own turns only.",
         "where": "Online game › end of the game › Review"
       },
+      "passInlay": {
+        "title": "A quieter “No moves”",
+        "body": "When a roll has no move, a small plate on the bar says so for 2 seconds and the board stays in view. The dice that can’t be played are crossed out. A tap on the board closes it at once.",
+        "where": "Any game › a roll with no move"
+      },
       "widerBoard": {
         "title": "A wider board on its side",
         "body": "Turn your phone on its side and the board is 10% wider. The points get the extra room, so the checkers are easier to tell apart and to drag.",
@@ -1433,6 +1438,10 @@
       }
     },
     "announce": {
+      "next": "The turn passes to {{name}}.",
+      "next_you": "Your turn.",
+      "passed": "{{name}} rolled {{dice}}. No checker can move.",
+      "passed_you": "You rolled {{dice}}. No checker can move.",
       "rolled": "{{name}} rolled {{dice}}.",
       "rolled_you": "You rolled {{dice}}.",
       "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",
@@ -1444,26 +1453,21 @@
       "chosenStarter_you": "You start."
     },
     "pass": {
-      "title": "No legal moves",
-      "body": "{{name}} rolled {{dice}}. No checker can move.",
-      "next": "The turn passes to {{name}}.",
-      "ok": "OK",
-      "autoClose": "Closes by itself after 3.5 s.",
-      "autoCloseSoon": "Closes by itself in a moment.",
-      "body_you": "You rolled {{dice}}. No checker can move.",
-      "next_you": "Your turn.",
-      "lockedTitle": "Board locked",
-      "locked": "{{name}} rolled {{dice}}. The board opens only with a 1-2 or a double.",
-      "locked_you": "You rolled {{dice}}. The board opens only with a 1-2 or a double.",
-      "lockedDouble": "{{name}} rolled {{dice}}. The board opens only with a double.",
-      "lockedDouble_you": "You rolled {{dice}}. The board opens only with a double.",
-      "frozenTitle": "Army frozen",
-      "frozen": "{{name}} rolled {{dice}}. Their last checker is pinned, so no checker can move.",
-      "frozen_you": "You rolled {{dice}}. Your last checker is pinned, so no checker can move.",
-      "bodyChosen": "{{name}} chose {{dice}}. No checker can move.",
-      "bodyChosen_you": "You chose {{dice}}. No checker can move.",
-      "frozenChosen": "{{name}} chose {{dice}}. Their last checker is pinned, so no checker can move.",
-      "frozenChosen_you": "You chose {{dice}}. Your last checker is pinned, so no checker can move."
+      "title": "No moves",
+      "title_you": "No moves for you",
+      "line": "{{rolled}} · {{next}}",
+      "rolled": "{{name}} rolled {{dice}}",
+      "rolled_you": "You rolled {{dice}}",
+      "chose": "{{name}} chose {{dice}}",
+      "chose_you": "You chose {{dice}}",
+      "next": "{{name}}’s turn",
+      "next_you": "Your turn",
+      "locked": "The board opens only with a 1-2 or a double",
+      "lockedDouble": "The board opens only with a double",
+      "frozen": "Their last checker is pinned",
+      "frozen_you": "Your last checker is pinned",
+      "close": "Close",
+      "ok": "OK"
     },
     "end": {
       "gameWinner": "{{name}} wins the game!",

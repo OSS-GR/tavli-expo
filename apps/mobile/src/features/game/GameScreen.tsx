@@ -54,7 +54,7 @@
  * server's dice (`rollSent`), then plays as offline. The other player's
  * dice are thrown over the board from their wall when their roll's view
  * arrives (`remoteRoll`, #373). A roll with
- * no legal move shows its dice first, then the pass card (`passWaits`).
+ * no legal move shows its dice first, then the pass inlay (`passWaits`).
  * The other player is remote: while the server waits for them the board is
  * locked, and their whole turn arrives at once and flies from
  * `game.lastTurn`. Its sounds, the other player's rolls and the game end
@@ -74,7 +74,7 @@
  * once no checker can touch an opponent checker again (`isRace`), your
  * Roll comes with a Fast forward button. Then the bot plays both sides
  * with `FAST_FORWARD_TIMING` until the game ends: the dice show at rest
- * (no throw), every pass card closes by itself, and Stop gives you the
+ * (no throw), every pass inlay closes by itself, and Stop gives you the
  * board back. Your turns it plays are marked (`onAutoEvent`) for the review.
  *
  * The dice throw (#183): every roll — swipe, tap on the board, Roll button,
@@ -87,6 +87,7 @@ import type { BotRunner, Difficulty } from '@tavli/contracts';
 import {
   applyMoveToBoard,
   currentPrompt,
+  diceMoves,
   isRace,
   STANDARD_VARIANT_IDS,
   type GameRecord,
@@ -122,7 +123,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
 import { MoveList } from '@/features/accessibility/MoveList';
-import { useMoveListShown } from '@/features/accessibility/screenReader';
+import { useMoveListShown, useScreenReaderEnabled } from '@/features/accessibility/screenReader';
 import { markMatchIntroPlayed, matchIntroDue } from '@/features/intro/introRuns';
 import { TableScene } from '@/features/intro/TableScene';
 import { TABLE_SCENE_MS } from '@/features/intro/tableMotion';
@@ -174,6 +175,7 @@ import { useConfirmHint, useTurnNote } from './confirmHint';
 import { lostLine, lostReason } from './lostNote';
 import { DoubleChoices } from './DoubleChoices';
 import { GameCard } from './GameCard';
+import { PassInlay } from './PassInlay';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, storeEvents, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type BoardStore, type DieView } from './gameStore';
@@ -222,12 +224,11 @@ const TABLE_INTRO_WIDTH = 336;
  */
 export const OPENING_TIE_WAIT_MS = 1000;
 /**
- * The "no legal moves" card when the bot cannot move closes by itself after
- * this time (OK closes it sooner). A person's own pass card waits for OK (#178).
+ * "No moves" (the inlay on the bar, #613) closes by itself after this time,
+ * in every case: the bot, you, online, fast forward (owner, 2026-11-17).
+ * A tap closes it sooner. With a screen reader on it waits for Close.
  */
-export const BOT_PASS_NOTICE_MS = 3500;
-/** During a fast forward every pass card closes by itself after this time (OK closes it sooner). */
-export const FAST_FORWARD_PASS_MS = 1200;
+export const PASS_NOTICE_MS = 2000;
 /** "Bot plays on." (the bot's answer to the mother question) shows this long. */
 export const BOT_ANSWER_NOTE_MS = 2000;
 /** The final position stays on screen this long before the match-end screen opens. */
@@ -477,7 +478,7 @@ export function GameScreen({
   const clockAlert = online?.clock?.alert ?? null;
   useAnnouncement(clockAlert?.text ?? null, clockAlert?.key);
 
-  // "No legal moves": the flow has passed the turn already; the card says why.
+  // No legal moves: the flow has passed the turn already; the inlay says why.
   const pass = passNotice(flow);
   const [passDismissed, setPassDismissed] = useState<string | null>(null);
   const passKey = pass?.key ?? null;
@@ -485,24 +486,20 @@ export function GameScreen({
   const [passReady, setPassReady] = useState<string | null>(null);
   const passWaits = online !== undefined && pass !== null && passReady !== pass.key;
   const showPass = pass !== null && !passWaits && passDismissed !== pass.key;
-  // Your own pass (in pass-and-play: the player who passed) waits for OK, so
-  // there is time to read why. The bot's pass closes by itself, so the game
-  // goes on (#178), and so does the other player's pass online (#347).
-  // Not while paused: the menu covers the card.
-  const botPassed =
-    pass !== null && (pass.player === botPlayer || (me !== null && pass.player !== me));
-  // During a fast forward every pass card closes by itself, and soon.
-  const passClosesItself = botPassed || fastForwarding;
-  const passMs = fastForwarding ? FAST_FORWARD_PASS_MS : BOT_PASS_NOTICE_MS;
+  // Every pass closes by itself after `PASS_NOTICE_MS` (#613), yours too:
+  // there is nothing to decide. Not while paused (the menu covers the
+  // board), and not with a screen reader on: it waits for Close.
+  const screenReader = useScreenReaderEnabled();
+  const passRuns = showPass && !paused && !screenReader;
   // Keyed on the pass, not the notice object (a new one on each render).
   useEffect(() => {
-    if (!showPass || !passClosesItself || passKey === null || paused) return;
-    const timer = setTimeout(() => setPassDismissed(passKey), passMs);
+    if (!passRuns || passKey === null) return;
+    const timer = setTimeout(() => setPassDismissed(passKey), PASS_NOTICE_MS);
     return () => clearTimeout(timer);
-  }, [showPass, passClosesItself, passKey, paused, passMs]);
+  }, [passRuns, passKey]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
-  // pass card shows, the board stays with the player who passed.
+  // pass inlay shows, the board stays with the player who passed.
   const active: PlayerId = showPass && pass ? pass.player : view.toMove;
   const viewer: PlayerId =
     me !== null
@@ -1282,7 +1279,7 @@ export function GameScreen({
     const timer = setTimeout(() => setOnlineLineSeen(onlineLineKey), OPENING_RESULT_MS);
     return () => clearTimeout(timer);
   }, [onlineLineKey]);
-  // The pass card says it already, and its dice show first (#355).
+  // The pass inlay says it already, and its dice show first (#355).
   const onlineLine =
     onlineLineText !== null &&
     onlineLineSeen !== onlineLineKey &&
@@ -1299,11 +1296,14 @@ export function GameScreen({
   // user asked for it, and a remount closes it (it is screen state).
   useAnnouncement(shownHint === null ? null : hintSpokenText(t, shownHint));
 
-  // Dice in the controls row: this turn's, or the faded dice of a pass.
-  const passDice: DieView[] = pass ? diceView(pass.dice, []) : [];
+  // The dice on the board: this turn's, or the dice of a pass, all slashed
+  // as dice that cannot be played (#613).
+  const passDice: DieView[] = pass
+    ? diceView(pass.dice, diceMoves(pass.dice), diceMoves(pass.dice))
+    : [];
   const dice = showPass || passWaits ? passDice : view.dice;
 
-  // Online (#355): the pass card waits until the dice of the pass have
+  // Online (#355): the pass inlay waits until the dice of the pass have
   // shown: after the throw (yours or theirs, #373), or after the dice
   // tumbled in the row (Reduce Motion).
   const passWaitMs =
@@ -1647,6 +1647,8 @@ export function GameScreen({
   const over = gameOver || matchOver || (online?.ended ?? null) !== null;
   const notice = online?.notice ?? null;
   let card = null;
+  // "No moves" is no card: an inlay on the bar, the board stays in view (#613).
+  let inlay = null;
   if (ended !== null && timedOut !== null) {
     // Online (#530): "Time ran out", over the end of the game you lost on time.
     card = (
@@ -1755,42 +1757,38 @@ export function GameScreen({
           : 'body';
     // A double chosen after a 1-2 that no checker can play (#205): "chose", not "rolled".
     const chosen = diceWereChosen(flow, pass.dice);
-    const text =
-      chosen && reason === 'body'
-        ? 'bodyChosen'
-        : chosen && reason === 'frozen'
-          ? 'frozenChosen'
-          : reason;
     const vars = { name: nameOf(pass.player), dice: pass.dice.join('-') };
     // The player to move now comes from the engine (an extra roll keeps the same player).
     const next = game.state.toMove;
-    card = (
-      <GameCard
-        // A new pass is a new card: focus moves and it is read again.
+    const rolledText = isYou(pass.player)
+      ? t(`game.pass.${chosen ? 'chose' : 'rolled'}_you`, vars)
+      : t(`game.pass.${chosen ? 'chose' : 'rolled'}`, vars);
+    const nextText = isYou(next)
+      ? t('game.pass.next_you')
+      : t('game.pass.next', { name: nameOf(next) });
+    const reasonText =
+      reason === 'body'
+        ? undefined
+        : reason === 'frozen'
+          ? isYou(pass.player)
+            ? t('game.pass.frozen_you')
+            : t('game.pass.frozen')
+          : t(`game.pass.${reason}`);
+    const title = isYou(pass.player) ? t('game.pass.title_you') : t('game.pass.title');
+    inlay = (
+      <PassInlay
+        // A new pass is a new inlay: its line starts again and it is read again.
         key={pass.key}
-        testID="pass-card"
+        title={title}
+        line={t('game.pass.line', { rolled: rolledText, next: nextText })}
+        reason={reasonText}
+        spoken={[title, rolledText, reasonText, nextText].filter((x) => x !== undefined).join('. ')}
+        closeLabel={t('game.pass.close')}
         announceKey={`${matchKey}:pass:${pass.key}`}
-        title={
-          reason === 'body'
-            ? t('game.pass.title')
-            : reason === 'frozen'
-              ? t('game.pass.frozenTitle')
-              : t('game.pass.lockedTitle')
-        }
-        lines={[
-          isYou(pass.player) ? t(`game.pass.${text}_you`, vars) : t(`game.pass.${text}`, vars),
-          isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }),
-        ]}
-        {...(passClosesItself
-          ? { footnote: fastForwarding ? t('game.pass.autoCloseSoon') : t('game.pass.autoClose') }
-          : {})}>
-        <ActionButton
-          testID="pass-ok-button"
-          label={t('game.pass.ok')}
-          kind="secondary"
-          onPress={() => setPassDismissed(pass.key)}
-        />
-      </GameCard>
+        durationMs={PASS_NOTICE_MS}
+        running={passRuns}
+        onClose={() => setPassDismissed(pass.key)}
+      />
     );
   } else if (!over && choosing) {
     // `chosenStarterRolls` (#207): one button per player, the person first
@@ -2417,7 +2415,7 @@ export function GameScreen({
             </View>
             {landscape ? moveList : null}
             {hints}
-            {cardOverlay}
+            {cardOverlay ?? inlay}
           </View>
         </GestureDetector>
         {landscape ? null : moveList}

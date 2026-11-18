@@ -11,7 +11,7 @@
  * a new view, which starts the bot's next turn (or, after a pass, the
  * other player's). It waits a moment before it rolls, as a person would
  * (`ONLINE_BOT_ROLL_MS`), and longer after the other player's pass, so
- * their phone shows their dice and the pass card first.
+ * their phone shows their dice and the pass inlay first.
  *
  * The opening of a new match (#379): the bot rolls its own opening die
  * after the same wait, while its die is not in, whatever `waitingFor`
@@ -65,7 +65,7 @@ export const MAX_TRIES_PER_TURN = 3;
 export const ONLINE_BOT_ROLL_MS = 900;
 /**
  * After the other player's pass, the bot waits longer before its roll:
- * their phone shows their dice, then the pass card (#355). A person on
+ * their phone shows their dice, then the pass inlay (#355). A person on
  * the other side waits for the same card before Roll.
  */
 export const ONLINE_BOT_ROLL_AFTER_PASS_MS = 5500;
