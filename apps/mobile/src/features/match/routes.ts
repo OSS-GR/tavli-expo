@@ -134,7 +134,7 @@ export function friendInviteHref(playerId: string) {
   return { pathname: '/friends/invite/[id]', params: { id: playerId } } as const;
 }
 
-/** The screen of a friend link (#406): what `tavlaki://add/<token>` opens. */
+/** The screen of a friend link (#406): what `https://tavlaki.com/add/<token>` opens. */
 export function friendLinkHref(token: string) {
   return { pathname: '/add/[token]', params: { token } } as const;
 }

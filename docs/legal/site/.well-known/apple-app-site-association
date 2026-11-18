@@ -7,6 +7,10 @@
           {
             "/": "/i/*",
             "comment": "An invite link (#332): https://tavlaki.com/i/<code> opens the invite in the app."
+          },
+          {
+            "/": "/add/*",
+            "comment": "A friend link (#629): https://tavlaki.com/add/<token> opens the friend link screen in the app."
           }
         ]
       }

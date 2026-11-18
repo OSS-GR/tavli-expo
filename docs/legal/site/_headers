@@ -7,3 +7,7 @@
 # Invite pages hold a code: keep them out of search engines.
 /i/*
   X-Robots-Tag: noindex
+
+# Friend link pages hold a token (#629): keep them out of search engines too.
+/add/*
+  X-Robots-Tag: noindex

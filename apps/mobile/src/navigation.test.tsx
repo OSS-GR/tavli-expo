@@ -1633,7 +1633,7 @@ describe('friends (#406)', () => {
     expect(router.getPathname()).toBe('/friends/add');
     const token = await onlineFake.server().friendsFor('me').myFriendLink();
     expect(await screen.findByTestId('add-friend-link')).toHaveTextContent(
-      `tavlaki://add/${token}`,
+      `https://tavlaki.com/add/${token}`,
     );
   });
 

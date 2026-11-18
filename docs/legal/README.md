@@ -24,10 +24,11 @@
 | [site/el/terms/index.html](site/el/terms/index.html) | Greek static page, served at `https://tavlaki.com/el/terms` |
 | [site/delete/index.html](site/delete/index.html) | Delete your account (#447), served at `https://tavlaki.com/delete/`: the web page Google Play asks for. How to delete in the app, how to ask by email without it, what is deleted, what is kept, and how long it takes. It follows the policy's "Delete your account" and `deleteAccountOf` (`apps/server/convex/account.ts`) |
 | [site/el/delete/index.html](site/el/delete/index.html) | The Greek page, served at `https://tavlaki.com/el/delete/`. Copy every change from the English page |
-| [site/.well-known/apple-app-site-association](site/.well-known/apple-app-site-association) | iOS universal links (#332): `https://tavlaki.com/i/<code>` opens the app. JSON with no file extension |
+| [site/.well-known/apple-app-site-association](site/.well-known/apple-app-site-association) | iOS universal links (#332): `https://tavlaki.com/i/<code>` and the friend link `https://tavlaki.com/add/<token>` (#629) open the app. JSON with no file extension |
 | [site/i/index.html](site/i/index.html) | The invite fallback page (#332), served for every `https://tavlaki.com/i/<code>`. English and Greek on one page |
-| [site/_redirects](site/_redirects) | Host rule (Cloudflare Workers static assets, Pages, Netlify): rewrite `/i/*` to the fallback page |
-| [site/_headers](site/_headers) | Host rule: serve the association file as `application/json`; `noindex` on invite pages |
+| [site/add/index.html](site/add/index.html) | The friend link fallback page (#629), served for every `https://tavlaki.com/add/<token>`. English and Greek on one page |
+| [site/_redirects](site/_redirects) | Host rule (Cloudflare Workers static assets, Pages, Netlify): rewrite `/i/*` and `/add/*` to their fallback pages |
+| [site/_headers](site/_headers) | Host rule: serve the association file as `application/json`; `noindex` on invite and friend link pages |
 | [wrangler.jsonc](wrangler.jsonc) | The Cloudflare Worker that serves `site/` at `tavlaki.com` (static files only, no code) |
 
 The app opens the terms from the username step (`termsUrl` in `apps/mobile/src/features/online/usernameStep.ts`): `https://tavlaki.com/el/terms` when the app language is Greek, else `https://tavlaki.com/terms`.
@@ -77,6 +78,8 @@ Owner steps (`tavlaki.com` DNS is on Cloudflare, so a Cloudflare Worker is the s
 5. Check the fallback page: `https://tavlaki.com/i/ABCD2345` shows "Get Tavlaki" and the address stays the same. `_redirects` rewrites `/i/*` to `/i/` (status `200`, a rewrite; `/i/index.html` as the target is a loop on Cloudflare, and the deploy fails). If your host does not read `_redirects`, add the same rewrite there. Also check that `https://tavlaki.com/`, `/el/`, `/privacy` and `/terms` still open.
 6. Make a new production build (`eas build -p ios --profile production`) and send it to TestFlight. The entitlement `applinks:tavlaki.com` is in that build only: older builds never open the link. EAS turns on the Associated Domains capability for `com.tavlaki` by itself.
 7. Test on an iPhone: "Universal links" in [`docs/process/running-the-app.md`](../process/running-the-app.md#universal-links-332).
+
+Friend links (#629) work the same way: `https://tavlaki.com/add/<token>` opens the app's friend link screen, and anywhere else the fallback page `site/add/index.html` (Get Tavlaki, then **Paste a friend link** in Friends › Add a friend). The association file holds `/add/*` too; the app's entitlement is the same `applinks:tavlaki.com`, so no new build is needed. iOS reads a changed association file only from Apple's cache, which can take a day, or at the app's next install or update.
 
 Do not add analytics, cookies or outside fonts to the site. The invite pages carry a code in the address, so `_headers` and the page ask search engines not to index them, and the page sends no referrer to the TestFlight link.
 
