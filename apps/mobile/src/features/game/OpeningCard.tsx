@@ -8,9 +8,9 @@
  * - A tie keeps both dice on screen with "Tie: both rolled 4. Roll again."
  *   until the next roll.
  * - The result ("You start", "Maria starts with 6-3.") has a Play button
- *   that closes it at once; the screen also closes it after
- *   `closeAfterMs`, and the gold countdown line under Play shows that
- *   time (#615), like every card that closes by itself.
+ *   that closes it at once; it also closes by itself after `closeAfterMs`,
+ *   timed by the gold countdown line under Play (#615), like every card
+ *   that closes by itself.
  * - With the house rule `rerollBoth` (#207) the starter does not play the
  *   opening dice but rolls both dice again: "Maria starts (6-3) and rolls
  *   again." The engine decides; `rollsAgain` only picks the words.
@@ -65,8 +65,9 @@ export interface OpeningCardProps {
   /** Closes the result. */
   onClose: () => void;
   /**
-   * The screen closes the result after this time: the countdown line under
-   * Play shows it. Without it there is no line.
+   * The result closes by itself after this time: the countdown line under
+   * Play runs the timer and calls `onClose` (#615). Without it there is no
+   * line and no timer.
    */
   closeAfterMs?: number;
   onDieLanded?: () => void;
@@ -267,12 +268,12 @@ export function OpeningCard({
               onPress={onClose}
             />
             {closeAfterMs === undefined ? null : (
-              // The screen runs the timer: the line only shows it.
               <CountdownLine
                 testID="opening-countdown"
                 style={styles.countdown}
                 durationMs={closeAfterMs}
                 running
+                onEnd={onClose}
               />
             )}
           </>

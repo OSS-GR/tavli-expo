@@ -523,11 +523,9 @@ export function GameScreen({
   const opening = openingStatus(game);
   const [openingDismissed, setOpeningDismissed] = useState<string | null>(null);
   const decided = opening?.kind === 'decided';
-  useEffect(() => {
-    if (!decided) return;
-    const timer = setTimeout(() => setOpeningDismissed(gameKey), OPENING_RESULT_MS);
-    return () => clearTimeout(timer);
-  }, [decided, gameKey]);
+  // The result closes after `OPENING_RESULT_MS`: the card's countdown line
+  // runs that timer (#615), so the line and the close agree, and a result
+  // under another card is not closed unseen.
   // Online too (#379): the first game's opening waits for each player's die.
   const showOpening = opening !== null && !(decided && openingDismissed === gameKey);
   // "Grab a chair" (#509): when a match opens, the table scene plays over the

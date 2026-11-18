@@ -48,11 +48,12 @@ export function CountdownLine({ durationMs, running, onEnd, style, testID }: Cou
   useEffect(() => {
     end.current = onEnd;
   }, [onEnd]);
+  const timed = onEnd !== undefined;
   useEffect(() => {
-    if (!running) return;
+    if (!running || !timed) return;
     const timer = setTimeout(() => end.current?.(), durationMs);
     return () => clearTimeout(timer);
-  }, [running, durationMs]);
+  }, [running, timed, durationMs]);
 
   const lineStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: left.get() }] }));
 
