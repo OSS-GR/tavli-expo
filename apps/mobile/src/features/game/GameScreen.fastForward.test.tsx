@@ -180,6 +180,12 @@ describe('<GameScreen /> fast forward a race', () => {
     });
     expect(screen.getByTestId('race-card')).toBeOnTheScreen();
     expect(screen.getByText("It's a race")).toBeOnTheScreen();
+    // A yes or no question, no footnote (#615).
+    expect(screen.getByTestId('race-card')).toHaveTextContent(
+      "It's a race" +
+        "The checkers can't interact anymore. Want the bot to finish this game? It rolls for both sides and plays your checkers as well as it can. You can stop it at any time." +
+        "Yes, fast forwardNoDon't ask again",
+    );
     expect(announce).toHaveBeenCalledWith(expect.stringContaining("It's a race"));
     // The card answers first: no Roll, no swipe, and the board is hidden from screen readers.
     expect(screen.queryByTestId('roll-button')).toBeNull();
@@ -190,7 +196,7 @@ describe('<GameScreen /> fast forward a race', () => {
     ).toBeOnTheScreen();
   });
 
-  it('Play on: Fast forward stays next to Roll, and the card does not come back', async () => {
+  it('No: Fast forward stays next to Roll, and the card does not come back', async () => {
     const user = setupUser();
     const store = newStore();
     setPosition(store, longRace);

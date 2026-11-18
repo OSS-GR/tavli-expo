@@ -1070,6 +1070,83 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     announce.mockRestore();
   });
 
+  describe('a notice that only gives news closes by itself (#615)', () => {
+    /** Your turn comes back refused with this code, once. */
+    async function refusedOnce(code: 'STALE_VERSION' | 'BAD_REQUEST') {
+      let refuse = true;
+      const game = await openGame('portes', 1, 5, BOT_THINK_MS, (server) => {
+        const real = server.transportFor('me');
+        return {
+          subscribe: (id, onView, onError) => real.subscribe(id, onView, onError),
+          rollDice: (request) => real.rollDice(request),
+          sendTurn: (request) => {
+            if (!refuse) return real.sendTurn(request);
+            refuse = false;
+            return Promise.reject({ code, message: 'refused for the test' });
+          },
+          setDraft: (request) => real.setDraft(request),
+          sendAnswer: (request) => real.sendAnswer(request),
+          resign: (id) => real.resign(id),
+          gameRecord: (request) => real.gameRecord(request),
+          listMyGames: (request) => real.listMyGames(request),
+          watchMyGames: (request, onList, onError) => real.watchMyGames(request, onList, onError),
+        };
+      });
+      await untilYourTurn(game);
+      await playTurnByTaps(game);
+      return game;
+    }
+
+    it('"The game changed": no OK, the countdown, closed after PASS_NOTICE_MS', async () => {
+      const user = setupUser();
+      await refusedOnce('STALE_VERSION');
+      await user.press(screen.getByTestId('confirm-button'));
+      const card = await screen.findByTestId('online-notice-card');
+      expect(card).toHaveTextContent(/The game changed/);
+      expect(screen.queryByTestId('online-notice-ok-button')).toBeNull();
+      expect(
+        screen.getByTestId('online-notice-card-countdown', { includeHiddenElements: true }),
+      ).toBeOnTheScreen();
+      await act(async () => {
+        jest.advanceTimersByTime(PASS_NOTICE_MS - 50);
+      });
+      expect(screen.getByTestId('online-notice-card')).toBeOnTheScreen();
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+      expect(screen.queryByTestId('online-notice-card')).toBeNull();
+    });
+
+    it('"Not accepted": a tap over the board closes it at once', async () => {
+      const user = setupUser();
+      await refusedOnce('BAD_REQUEST');
+      await user.press(screen.getByTestId('confirm-button'));
+      expect(await screen.findByTestId('online-notice-card')).toHaveTextContent(/Not accepted/);
+      expect(screen.queryByTestId('online-notice-ok-button')).toBeNull();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('online-notice-cover'));
+      });
+      expect(screen.queryByTestId('online-notice-card')).toBeNull();
+    });
+
+    it('with a screen reader on, it keeps OK and waits', async () => {
+      const reader = jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+      const user = setupUser();
+      await refusedOnce('STALE_VERSION');
+      await user.press(screen.getByTestId('confirm-button'));
+      expect(await screen.findByTestId('online-notice-card')).toHaveTextContent(/The game changed/);
+      await act(async () => {
+        jest.advanceTimersByTime(PASS_NOTICE_MS * 5);
+      });
+      expect(screen.getByTestId('online-notice-card')).toBeOnTheScreen();
+      expect(screen.queryByTestId('online-notice-card-countdown')).toBeNull();
+      await user.press(screen.getByTestId('online-notice-ok-button'));
+      expect(screen.queryByTestId('online-notice-card')).toBeNull();
+      // Back to the RN mock's answer: mockRestore would leave `undefined`.
+      reader.mockResolvedValue(false);
+    });
+  });
+
   it('resigns the match while your turn is on its way: the resign goes after it', async () => {
     const user = setupUser();
     // Your turn waits on the way until `deliver()`.

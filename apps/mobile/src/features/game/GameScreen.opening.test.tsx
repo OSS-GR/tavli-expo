@@ -204,8 +204,11 @@ describe('<GameScreen /> opening roll (#176)', () => {
     // The title names the starter; the slots are gone.
     expect(card().getByRole('header', { name: 'Maria starts' })).toBeOnTheScreen();
     expect(screen.queryByTestId('opening-die-white-slot', hidden)).toBeNull();
-    // It closes by itself, with no line that says so (#499).
+    // It closes by itself, with no line that says so (#499): the gold
+    // countdown line under Play shows it (#615), hidden from screen readers.
     expect(card().queryByText(/Closes by itself/)).toBeNull();
+    expect(screen.getByTestId('opening-countdown', hidden)).toBeOnTheScreen();
+    expect(screen.queryByTestId('opening-countdown')).toBeNull();
     expect(announced()).toContain('Maria starts with 6-3.');
     expect(OPENING_RESULT_MS).toBeGreaterThanOrEqual(3000);
 

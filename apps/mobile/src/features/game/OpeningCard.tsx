@@ -8,7 +8,9 @@
  * - A tie keeps both dice on screen with "Tie: both rolled 4. Roll again."
  *   until the next roll.
  * - The result ("You start", "Maria starts with 6-3.") has a Play button
- *   that closes it at once; the screen also closes it after a moment.
+ *   that closes it at once; the screen also closes it after
+ *   `closeAfterMs`, and the gold countdown line under Play shows that
+ *   time (#615), like every card that closes by itself.
  * - With the house rule `rerollBoth` (#207) the starter does not play the
  *   opening dice but rolls both dice again: "Maria starts (6-3) and rolls
  *   again." The engine decides; `rollsAgain` only picks the words.
@@ -30,6 +32,7 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
 
+import { CountdownLine } from './CountdownLine';
 import { openingDice, type OpeningStatus } from './opening';
 import { useAnnouncement } from './useAnnouncement';
 
@@ -61,6 +64,11 @@ export interface OpeningCardProps {
   onRoll: () => void;
   /** Closes the result. */
   onClose: () => void;
+  /**
+   * The screen closes the result after this time: the countdown line under
+   * Play shows it. Without it there is no line.
+   */
+  closeAfterMs?: number;
   onDieLanded?: () => void;
 }
 
@@ -145,6 +153,7 @@ export function OpeningCard({
   waiting = null,
   onRoll,
   onClose,
+  closeAfterMs,
   onDieLanded,
 }: OpeningCardProps) {
   const { t } = useTranslation();
@@ -250,12 +259,23 @@ export function OpeningCard({
       </View>
       <View style={styles.actions}>
         {decided ? (
-          <ActionButton
-            testID="opening-ok-button"
-            label={t('game.opening.play')}
-            icon="play"
-            onPress={onClose}
-          />
+          <>
+            <ActionButton
+              testID="opening-ok-button"
+              label={t('game.opening.play')}
+              icon="play"
+              onPress={onClose}
+            />
+            {closeAfterMs === undefined ? null : (
+              // The screen runs the timer: the line only shows it.
+              <CountdownLine
+                testID="opening-countdown"
+                style={styles.countdown}
+                durationMs={closeAfterMs}
+                running
+              />
+            )}
+          </>
         ) : waiting !== null ? (
           <Text testID="opening-waiting" style={styles.waiting}>
             {waiting}
@@ -350,6 +370,9 @@ const styles = StyleSheet.create((theme) => ({
   actions: {
     alignSelf: 'stretch',
     paddingTop: theme.space.xs,
+  },
+  countdown: {
+    marginTop: theme.space.md,
   },
   waiting: {
     ...theme.type.body,

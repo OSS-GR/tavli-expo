@@ -319,6 +319,12 @@ export interface OnlineNoticeCard {
   readonly key: string;
   readonly title: string;
   readonly text: string;
+  /**
+   * It only gives news (#615): no OK, it closes after `PASS_NOTICE_MS` with
+   * the countdown line, and a tap closes it sooner. With a screen reader on
+   * it keeps OK and waits.
+   */
+  readonly closesItself: boolean;
   readonly onClose: () => void;
 }
 
@@ -1667,21 +1673,47 @@ export function GameScreen({
       </GameCard>
     );
   } else if (!over && notice !== null) {
-    // Online (#255): "Your time ran out", "The game changed", ….
-    card = (
+    // Online (#255): "Your time ran out", "The game changed", …. A notice
+    // that only gives news closes by itself (#615), like the pass inlay:
+    // not while paused, and with a screen reader on it keeps OK.
+    const byItself = notice.closesItself && !screenReader;
+    const noticeCard = (
       <GameCard
         key={notice.key}
         testID="online-notice-card"
         announceKey={`${matchKey}:notice:${notice.key}`}
         title={notice.title}
-        lines={[notice.text]}>
-        <ActionButton
-          testID="online-notice-ok-button"
-          label={t('game.pass.ok')}
-          kind="secondary"
-          onPress={notice.onClose}
-        />
+        lines={[notice.text]}
+        {...(byItself
+          ? {
+              countdown: {
+                durationMs: PASS_NOTICE_MS,
+                running: !paused,
+                onEnd: notice.onClose,
+              },
+            }
+          : {})}>
+        {byItself ? null : (
+          <ActionButton
+            testID="online-notice-ok-button"
+            label={t('game.pass.ok')}
+            kind="secondary"
+            onPress={notice.onClose}
+          />
+        )}
       </GameCard>
+    );
+    card = byItself ? (
+      <Pressable
+        testID="online-notice-cover"
+        // A tap anywhere over the board closes it sooner.
+        style={styles.tapArea}
+        onPress={notice.onClose}
+        accessible={false}>
+        {noticeCard}
+      </Pressable>
+    ) : (
+      noticeCard
     );
   } else if (!over && askHuman && prompt && prompt.kind === 'chooseDouble') {
     // Acey-Deucey after a 1-2 (#205): six dice buttons, no way to close it
@@ -1826,17 +1858,17 @@ export function GameScreen({
         testID="race-card"
         announceKey={`${raceKey}:raceOffer`}
         title={t('game.fastForward.offer.title')}
-        lines={[t('game.fastForward.offer.body')]}
-        footnote={t('game.fastForward.offer.settingsNote')}>
+        lines={[t('game.fastForward.offer.body')]}>
+        {/* A yes or no question (#615); "Yes" keeps the button's name. */}
         <ActionButton
           testID="race-fast-forward-button"
-          label={t('game.fastForward.button')}
+          label={t('game.fastForward.offer.yes')}
           accessibilityLabel={t('game.fastForward.label')}
           onPress={() => answer(true)}
         />
         <ActionButton
           testID="race-play-on-button"
-          label={t('game.fastForward.offer.playOn')}
+          label={t('game.fastForward.offer.no')}
           kind="secondary"
           onPress={() => answer(false)}
         />
@@ -1899,6 +1931,7 @@ export function GameScreen({
             {...(openingWait === null ? {} : { waiting: openingWait })}
             onRoll={roll}
             onClose={() => setOpeningDismissed(gameKey)}
+            closeAfterMs={OPENING_RESULT_MS}
             onDieLanded={onDiceLanded}
           />
         </Pressable>

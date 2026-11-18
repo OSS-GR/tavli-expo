@@ -7,7 +7,7 @@ How the app speaks Greek (#549). Read this before you add or change a string in 
 - Write Greek as a Greek person would say it, not a copy of the English sentence. Keep the meaning, drop the English shape. Bad: «Δεν υπάρχει πια επαφή: τα πούλια απλώς τρέχουν για το σπίτι». Good: «Τα πούλια δεν συναντιούνται πια· από εδώ και πέρα μετράνε μόνο τα ζάρια».
 - Warm and everyday, like a friend at the kafeneio. Short. Never formal or bureaucratic.
 - Always the informal singular (εσύ), the welcome flow too. Only the legal texts use εσείς.
-- Buttons use the words Greek apps use: Συνέχεια, Ακύρωση / Άκυρο, Αποθήκευση, Κλείσιμο, Πίσω, Δοκίμασε ξανά, or a short imperative («Ρίξε τα ζάρια», «Θα παίξω εγώ», «Μη με ξαναρωτήσεις»).
+- Buttons use the words Greek apps use: Συνέχεια, Ακύρωση / Άκυρο, Αποθήκευση, Κλείσιμο, Πίσω, Δοκίμασε ξανά, or a short imperative («Ρίξε τα ζάρια», «Θα παίξω» (the verb says who: no «εγώ»), «Μη με ξαναρωτήσεις»).
 - An error title is «Κάτι πήγε στραβά», never «Δεν έγινε».
 - A name in a sentence goes first with no colon and no article: «{{name}} έφερε 5-3», «{{name}} κέρδισε». A label may keep a colon: «Σειρά: {{name}}». Usernames have no gender, so avoid words that need one («Με καλούς τρόπους», not «Να είσαι ευγενικός»).
 - Greek quotes «…», the Greek question mark «;», and the middle dot «·».

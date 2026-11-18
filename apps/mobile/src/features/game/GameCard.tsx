@@ -8,6 +8,9 @@
  *
  * An `eyebrow` is a short line in caps over the title, in the problem
  * color ("TIME RAN OUT", #530). Screen readers hear it with the title.
+ *
+ * A card that only gives news closes by itself (#615): it gets a
+ * `countdown`, the gold line of the pass inlay, which runs the timer.
  */
 import { displayCaps } from '@tavli/ui';
 import type { ReactNode } from 'react';
@@ -16,6 +19,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { useFocusOnShow } from '@/features/accessibility/focus';
 
+import { CountdownLine } from './CountdownLine';
 import { useAnnouncement } from './useAnnouncement';
 
 export interface GameCardProps {
@@ -34,6 +38,11 @@ export interface GameCardProps {
    * every time it opens.
    */
   announceKey?: string;
+  /**
+   * The card closes by itself (#615): the countdown line shows at the
+   * bottom and calls `onEnd` when it runs out, only while `running`.
+   */
+  countdown?: { durationMs: number; running: boolean; onEnd: () => void };
   /** Centers the texts (Figma: the "Time ran out" card, #530). */
   centered?: boolean;
   testID?: string;
@@ -46,6 +55,7 @@ export function GameCard({
   footnote,
   children,
   announceKey,
+  countdown,
   centered = false,
   testID,
 }: GameCardProps) {
@@ -79,6 +89,15 @@ export function GameCard({
       ))}
       {children ? <View style={styles.actions}>{children}</View> : null}
       {footnote ? <Text style={styles.footnote}>{footnote}</Text> : null}
+      {countdown ? (
+        <CountdownLine
+          {...(testID ? { testID: `${testID}-countdown` } : {})}
+          style={styles.countdown}
+          durationMs={countdown.durationMs}
+          running={countdown.running}
+          onEnd={countdown.onEnd}
+        />
+      ) : null}
     </View>
   );
 }
@@ -111,6 +130,9 @@ const styles = StyleSheet.create((theme) => ({
   actions: {
     gap: theme.space.sm,
     paddingTop: theme.space.sm,
+  },
+  countdown: {
+    marginTop: theme.space.sm,
   },
   footnote: {
     ...theme.type.caption,

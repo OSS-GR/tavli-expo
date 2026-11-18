@@ -147,13 +147,30 @@ type Overlay =
 
 const NO_OVERLAY: Overlay = { kind: 'none' };
 
+/**
+ * The notices' texts. `news` (#615): the notice only gives news ("The game
+ * changed", "Not accepted"), so it closes by itself; the others ask you to
+ * do something (Confirm or roll again) and keep OK.
+ */
 const NOTICE_KEYS = {
-  timedOut: { title: 'online.notice.timedOutTitle', text: 'online.notice.timedOut' },
-  stale: { title: 'online.notice.staleTitle', text: 'online.notice.stale' },
-  sendFailed: { title: 'online.notice.sendFailedTitle', text: 'online.notice.sendFailed' },
-  rollFailed: { title: 'online.notice.sendFailedTitle', text: 'online.notice.rollFailed' },
-  refused: { title: 'online.notice.refusedTitle', text: 'online.notice.refused' },
-} as const satisfies Record<OnlineNotice, { title: string; text: string }>;
+  timedOut: {
+    title: 'online.notice.timedOutTitle',
+    text: 'online.notice.timedOut',
+    news: false,
+  },
+  stale: { title: 'online.notice.staleTitle', text: 'online.notice.stale', news: true },
+  sendFailed: {
+    title: 'online.notice.sendFailedTitle',
+    text: 'online.notice.sendFailed',
+    news: false,
+  },
+  rollFailed: {
+    title: 'online.notice.sendFailedTitle',
+    text: 'online.notice.rollFailed',
+    news: false,
+  },
+  refused: { title: 'online.notice.refusedTitle', text: 'online.notice.refused', news: true },
+} as const satisfies Record<OnlineNotice, { title: string; text: string; news: boolean }>;
 
 function OnlineBoard({
   store,
@@ -272,6 +289,7 @@ function OnlineBoard({
           key: `${matchKey}:n${noticeCount}:${notice}`,
           title: t(NOTICE_KEYS[notice].title),
           text: t(NOTICE_KEYS[notice].text),
+          closesItself: NOTICE_KEYS[notice].news,
           onClose: () => store.getState().clearNotice(),
         };
 
