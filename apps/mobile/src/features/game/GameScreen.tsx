@@ -488,15 +488,11 @@ export function GameScreen({
   const showPass = pass !== null && !passWaits && passDismissed !== pass.key;
   // Every pass closes by itself after `PASS_NOTICE_MS` (#613), yours too:
   // there is nothing to decide. Not while paused (the menu covers the
-  // board), and not with a screen reader on: it waits for Close.
+  // board), and not with a screen reader on: it waits for Close. The
+  // inlay runs the timer itself, so a pass under a card (an online notice)
+  // waits until the inlay is in view.
   const screenReader = useScreenReaderEnabled();
   const passRuns = showPass && !paused && !screenReader;
-  // Keyed on the pass, not the notice object (a new one on each render).
-  useEffect(() => {
-    if (!passRuns || passKey === null) return;
-    const timer = setTimeout(() => setPassDismissed(passKey), PASS_NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [passRuns, passKey]);
 
   // Pass-and-play "flip": the player to move sits at the bottom. While the
   // pass inlay shows, the board stays with the player who passed.

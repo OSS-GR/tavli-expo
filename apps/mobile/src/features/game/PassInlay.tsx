@@ -6,15 +6,17 @@
  * (who rolled what, whose turn), and in Asodio one reason line.
  *
  * The countdown is the inlay itself: a gold line at the foot of the plate
- * that shrinks to the middle while `running`. The screen owns the timer
- * (`PASS_NOTICE_MS`); a tap anywhere over the board closes it sooner.
+ * that shrinks to the middle while `running`, and the inlay calls
+ * `onClose` when it ends. The timer runs only while the inlay is mounted,
+ * so a pass under a card is not closed unseen. A tap anywhere over the
+ * board closes it sooner.
  *
  * Screen readers: the plate reads as one element with a Close action and
  * gets focus when it shows, and the screen does not close it by itself
  * while a screen reader is on. The board under it stays readable: the
  * inlay covers only the bar.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -73,12 +75,23 @@ export function PassInlay({
     shown.set(withTiming(1, { duration: reduceMotion ? 0 : FADE_IN_MS }));
   }, [shown, reduceMotion]);
 
-  // The screen's timer starts again in full after a pause, so the line does too.
+  // After a pause the line starts again in full.
   useEffect(() => {
     cancelAnimation(left);
     left.set(1);
     if (running) left.set(withTiming(0, { duration: durationMs, easing: Easing.linear }));
   }, [left, running, durationMs]);
+
+  // The timer starts again in full after a pause, as the line does.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    if (!running) return;
+    const timer = setTimeout(() => close.current(), durationMs);
+    return () => clearTimeout(timer);
+  }, [running, durationMs]);
 
   const lineStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: left.get() }] }));
   const fadeStyle = useAnimatedStyle(() => ({ opacity: shown.get() }));
