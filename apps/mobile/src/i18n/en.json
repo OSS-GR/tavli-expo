@@ -1226,6 +1226,11 @@
         "title": "Portrait or landscape board",
         "body": "Pick how a game starts with your phone upright: the board standing and filling the screen, or lying across it as on a table. A picture shows each one.",
         "where": "Settings › Board & look"
+      },
+      "takeBack": {
+        "title": "Take a move back on the board",
+        "body": "Drag the checker you just moved back where it came from, or tap it and then tap where it was. It works like Undo: a move that hit or pinned a checker puts that checker back too.",
+        "where": "In a game, on the board"
       }
     }
   },

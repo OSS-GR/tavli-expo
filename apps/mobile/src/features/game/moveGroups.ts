@@ -55,6 +55,16 @@ export function undoSize(groups: readonly MoveGroup[], game: GameFlow): number {
   return Math.max(1, Math.min(size, game.played.length));
 }
 
+/**
+ * The moves one Undo takes back now, in the order played: the group on
+ * top, or the last move. Empty when nothing is played. The board's
+ * take-back (#626) puts the checker of these moves back where they started.
+ */
+export function takeBackMoves(groups: readonly MoveGroup[], game: GameFlow): readonly Move[] {
+  if (game.played.length === 0) return [];
+  return game.played.slice(game.played.length - undoSize(groups, game));
+}
+
 /** The groups after the group on top (or one move) was taken back. */
 export function dropTop(groups: readonly MoveGroup[], game: GameFlow): readonly MoveGroup[] {
   return groups.filter((g) => g.state === game.state && !isTop(g, game));

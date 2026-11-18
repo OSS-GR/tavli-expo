@@ -7,7 +7,7 @@ import {
   type Move,
 } from '@tavli/engine';
 
-import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
+import { addGroup, dropTop, takeBackMoves, undoSize, type MoveGroup } from './moveGroups';
 
 const board = createBoard(
   { white: { points: { 13: 2, 6: 13 } }, black: { points: { 1: 15 } } },
@@ -74,5 +74,22 @@ describe('move groups (#180)', () => {
     const flow = play(rolled([5, 3]), m(13, 10, 3));
     const groups: MoveGroup[] = [{ state: flow.state, played: flow.played, size: 2 }];
     expect(undoSize(groups, flow)).toBe(1);
+  });
+});
+
+describe('takeBackMoves (#626)', () => {
+  it('gives the moves one Undo takes back, in the order played', () => {
+    const start = rolled([2, 2]);
+    expect(takeBackMoves([], start)).toEqual([]);
+    let flow = play(play(start, m(13, 11, 2)), m(11, 9, 2));
+    let groups: readonly MoveGroup[] = addGroup([], flow, 2);
+    expect(takeBackMoves(groups, flow)).toEqual([m(13, 11, 2), m(11, 9, 2)]);
+    flow = play(flow, m(6, 4, 2));
+    expect(takeBackMoves(groups, flow)).toEqual([m(6, 4, 2)]);
+    flow = undo(flow);
+    expect(takeBackMoves(groups, flow)).toEqual([m(13, 11, 2), m(11, 9, 2)]);
+    groups = dropTop(groups, flow);
+    flow = undo(undo(flow));
+    expect(takeBackMoves(groups, flow)).toEqual([]);
   });
 });

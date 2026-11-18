@@ -115,9 +115,10 @@ describe('<GameScreen /> the same checker after a hit (#179)', () => {
     await tapTap(top(13, 2), point(8));
     expect(played(store)).toEqual(['13/8*']);
     expect(store.getState().flow.game.state.board.bar.black).toBe(0);
-    // The hitter on 8 is selected: its target (8/5) lights up.
+    // The hitter on 8 is selected: its target (8/5) lights up, and 13,
+    // where it came from, to take the move back (#626).
     await touch(PAN, [top(8, 1)]);
-    expect(targetRings()).toBe(1);
+    expect(targetRings()).toBe(2);
     await touch(PAN, [point(5)]);
     expect(played(store)).toEqual(['13/8*', '8/5']);
   });
@@ -160,9 +161,10 @@ describe('<GameScreen /> the same checker after a hit (#179)', () => {
     const store = await whiteToPlay('plakoto', door());
     await tapTap(top(13, 2), point(8));
     expect(played(store)).toEqual(['13/8*']);
-    // The pinner sits on top of the pinned checker.
+    // The pinner sits on top of the pinned checker. Its target (8/5) and
+    // 13, to take the move back (#626), light up.
     await touch(PAN, [top(8, 1, true)]);
-    expect(targetRings()).toBe(1);
+    expect(targetRings()).toBe(2);
     await touch(PAN, [point(5)]);
     expect(played(store)).toEqual(['13/8*', '8/5']);
   });
@@ -319,8 +321,9 @@ describe('<GameScreen /> the same checker after a hit, Black on the classic boar
     const store = await blackToPlay([5, 3]);
     await tapTap(topOf(13, 2), at(8));
     expect(played(store)).toEqual(['13/8*']);
+    // Its target and, to take the move back (#626), where it came from.
     await touch(PAN, [topOf(8, 1)]);
-    expect(targetRings()).toBe(1);
+    expect(targetRings()).toBe(2);
     await touch(PAN, [at(5)]);
     expect(played(store)).toEqual(['13/8*', '8/5']);
   });

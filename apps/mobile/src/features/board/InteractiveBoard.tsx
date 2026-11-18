@@ -11,6 +11,8 @@
  * - Moves, hits and undos fly as short animations (`flights.ts`).
  * - With `hint` (#209) the hint's checkers and targets get the same rings
  *   while no checker is selected (`hintMarks.ts`).
+ * - With `takeBack` (#626) the checker of the turn's last move can go back
+ *   where it came from, by drag or by tap-tap: the Undo button on the board.
  *
  * Two gestures race (`BOARD_GESTURES`, #174): a pan for the drag and a tap
  * for tap-tap. Hit-testing uses the same rects that draw the points
@@ -65,6 +67,7 @@ import {
   resolveDrop,
   resolveTap,
   swipeEnd,
+  withTakeBack,
   type MovableSource,
   type SwipeEnd,
 } from './interaction';
@@ -132,6 +135,21 @@ export interface InteractiveBoardProps {
    * speed of the swipe (pt/s, when Gesture Handler gave one).
    */
   onBoardSwipe?: (swipe: SwipeEnd) => void;
+  /**
+   * The turn's last move group (#626), while it may be taken back: its
+   * checker may be dragged, or tapped and then tapped, back to where the
+   * group started (`withTakeBack`). `onTakeBack` takes it back, as the Undo
+   * button does; `from` as in `onMove`. Returns `false` if nothing was taken
+   * back (the checker flies back). Default: none (the tutorial).
+   */
+  takeBack?: {
+    moves: readonly Move[];
+    onTakeBack: (
+      moves: readonly Move[],
+      geo: BoardGeometry,
+      from: { x: number; y: number } | null,
+    ) => boolean;
+  };
   /** A checker was selected, and the next tap hit no target (the selection is dropped). */
   onMissTap?: () => void;
   /**
@@ -199,6 +217,7 @@ export function InteractiveBoard({
   onSteps,
   onBoardTap,
   onBoardSwipe,
+  takeBack,
   onMissTap,
   overlay,
   cue = false,
@@ -255,7 +274,12 @@ export function InteractiveBoard({
   }, [geo, fresh, onGeometry]);
   const picture = geo ? layoutBoard(geo, board, view, marks) : null;
   const combined = onSteps && legal.length > 0 ? (paths ?? []) : [];
-  const sources = geo ? buildSources(geo, board, view, mover, legal, combined) : [];
+  // The legal moves, then the take-back (#626) on the checker moved last.
+  const forward = geo ? buildSources(geo, board, view, mover, legal, combined) : [];
+  const sources =
+    geo && takeBack && takeBack.moves.length > 0
+      ? withTakeBack(geo, board, view, mover, forward, takeBack.moves)
+      : forward;
 
   // JS state: the selected source (tap-tap, or the one being dragged) and
   // the checker hidden while it is dragged. Both belong to one position:
@@ -316,13 +340,18 @@ export function InteractiveBoard({
   };
 
   const doMove = (source: number, target: number, from: { x: number; y: number } | null) => {
-    const moves = sources[source]?.targets[target]?.moves ?? [];
+    const chosen = sources[source]?.targets[target];
+    const moves = chosen?.moves ?? [];
     const [move] = moves;
     setSelected(null);
     const played =
       move !== undefined &&
       geo !== null &&
-      (moves.length > 1 ? (onSteps?.(moves, geo, from) ?? false) : onMove(move, geo, from));
+      (chosen?.undo === true
+        ? (takeBack?.onTakeBack(moves, geo, from) ?? false)
+        : moves.length > 1
+          ? (onSteps?.(moves, geo, from) ?? false)
+          : onMove(move, geo, from));
     if (played) {
       if (from) dropped.current = true;
       setDragKey(null);
@@ -346,7 +375,8 @@ export function InteractiveBoard({
     }
   };
   const onSwipe = (swipe: SwipeEnd) => {
-    if (sources.length === 0) onBoardSwipe?.(swipe);
+    // Only while no checker can move on: a take-back alone does not count.
+    if (forward.length === 0) onBoardSwipe?.(swipe);
   };
   const onDragStart = (source: number) => {
     setSelected(source);
