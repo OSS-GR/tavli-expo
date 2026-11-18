@@ -1217,6 +1217,11 @@
         "body": "Lost a phone? Sign out of your account on every phone at once. Your games and username stay; sign in again with your Apple ID or email.",
         "where": "Settings › Account › Sign out of all phones"
       },
+      "swipeRoll": {
+        "title": "Swipe anywhere to roll",
+        "body": "Swipe anywhere on the game screen to roll, not only on the board. The dice fly when you lift your finger, and a slow swipe throws them as hard as the Roll button.",
+        "where": "Any game › before you roll"
+      },
       "boardStart": {
         "title": "Portrait or landscape board",
         "body": "Pick how a game starts with your phone upright: the board standing and filling the screen, or lying across it as on a table. A picture shows each one.",

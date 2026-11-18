@@ -16,6 +16,7 @@ import {
   SETTLE_MS,
   shrinkBox,
   stopTime,
+  swipeFloor,
   swipeToThrow,
   tapThrow,
   throwBox,
@@ -164,32 +165,38 @@ describe('entryPoint', () => {
 describe('swipeToThrow', () => {
   it('comes in from the wall closest to the touch, straight into the field', () => {
     // A touch on the left of the field: the dice fly right, from the left wall.
-    const left = swipeToThrow({ x: 60, y: 410 }, { x: 0, y: 0 }, { x: 0, y: -700 }, BOX, DIE);
+    const left = swipeToThrow({ x: 60, y: 410 }, { x: 0, y: 0 }, { x: 0, y: -1000 }, BOX, DIE);
     expect(left.at).toEqual({ x: BOX.left, y: 410 });
-    expect(left.velocity.x).toBeCloseTo(700);
+    expect(left.velocity.x).toBeCloseTo(1000);
     expect(left.velocity.y).toBe(0);
     // A touch at the bottom, even far off to the side: from the bottom wall.
-    const bottom = swipeToThrow({ x: 300, y: 600 }, { x: 0, y: 0 }, { x: 0, y: -700 }, BOX, DIE);
+    const bottom = swipeToThrow({ x: 300, y: 600 }, { x: 0, y: 0 }, { x: 0, y: -1000 }, BOX, DIE);
     expect(bottom.at).toEqual({ x: 300, y: BOX.bottom });
     expect(bottom.velocity.y).toBeLessThan(0);
     expect(bottom.velocity.x).toBe(0);
     // A touch beyond the far wall: from the far wall, into the field.
-    const above = swipeToThrow({ x: 180, y: 200 }, { x: 0, y: 0 }, { x: 0, y: -700 }, BOX, DIE);
+    const above = swipeToThrow({ x: 180, y: 200 }, { x: 0, y: 0 }, { x: 0, y: -1000 }, BOX, DIE);
     expect(above.at).toEqual({ x: 180, y: BOX.top });
     expect(above.velocity.y).toBeGreaterThan(0);
   });
 
   it('prefers the player’s wall when the touch is as close to two walls', () => {
     // The middle: as close to the bottom as to the top, so the bottom wins.
-    const middle = swipeToThrow({ x: 180, y: 410 }, { x: 60, y: -80 }, { x: 0, y: -700 }, BOX, DIE);
+    const middle = swipeToThrow(
+      { x: 180, y: 410 },
+      { x: 60, y: -80 },
+      { x: 0, y: -1000 },
+      BOX,
+      DIE,
+    );
     expect(middle.at).toEqual({ x: 180, y: BOX.bottom });
     expect(middle.velocity.y).toBeLessThan(0);
     expect(middle.velocity.x).toBe(0);
   });
 
   it('aims with the swipe when there is no touch (the opening card)', () => {
-    const none = swipeToThrow(undefined, { x: 60, y: -80 }, { x: 0, y: -700 }, BOX, DIE);
-    expect(Math.hypot(none.velocity.x, none.velocity.y)).toBeCloseTo(700);
+    const none = swipeToThrow(undefined, { x: 60, y: -80 }, { x: 0, y: -1000 }, BOX, DIE);
+    expect(Math.hypot(none.velocity.x, none.velocity.y)).toBeCloseTo(1000);
     expect(none.velocity.x / none.velocity.y).toBeCloseTo(60 / -80);
   });
 
@@ -218,25 +225,33 @@ describe('swipeToThrow', () => {
   });
 
   it('works out the speed from the swipe when there is no velocity', () => {
-    const t = swipeToThrow(undefined, { x: 0, y: -90 }, undefined, BOX, DIE);
+    // 165 pt over a typical 0.15 s swipe: 1100 pt/s.
+    const t = swipeToThrow(undefined, { x: 0, y: -165 }, undefined, BOX, DIE);
     expect(t.velocity.x).toBeCloseTo(0);
-    expect(t.velocity.y).toBeCloseTo(-600);
-    const nan = swipeToThrow(undefined, { x: 90, y: 0 }, { x: NaN, y: NaN }, BOX, DIE);
-    expect(nan.velocity.x).toBeCloseTo(600);
+    expect(t.velocity.y).toBeCloseTo(-1100);
+    const nan = swipeToThrow(undefined, { x: 165, y: 0 }, { x: NaN, y: NaN }, BOX, DIE);
+    expect(nan.velocity.x).toBeCloseTo(1100);
   });
 
   it('uses the finger velocity with no swipe, and throws straight up with neither', () => {
-    const flick = swipeToThrow(undefined, { x: 0, y: 0 }, { x: 700, y: 0 }, BOX, DIE);
-    expect(flick).toEqual({ at: { x: 40, y: 410 }, velocity: { x: 700, y: 0 } });
+    const flick = swipeToThrow(undefined, { x: 0, y: 0 }, { x: 1000, y: 0 }, BOX, DIE);
+    expect(flick).toEqual({ at: { x: 40, y: 410 }, velocity: { x: 1000, y: 0 } });
     const none = swipeToThrow(undefined, { x: 0, y: 0 }, undefined, BOX, DIE);
     expect(none.at).toEqual({ x: 180, y: 520 });
     expect(none.velocity.x).toBeCloseTo(0);
-    expect(none.velocity.y).toBeCloseTo(-THROW_TUNING.minSpeed);
+    expect(none.velocity.y).toBeCloseTo(-swipeFloor());
   });
 
-  it('clamps a slow drag and a wild flick', () => {
+  it('never throws slower than the Roll button, and clamps a wild flick (#625)', () => {
+    // The floor is the button's throw: between the slowest and the fastest throw.
+    expect(swipeFloor()).toBe((THROW_TUNING.minSpeed + THROW_TUNING.maxSpeed) / 2);
     const slow = swipeToThrow(undefined, { x: 10, y: 0 }, { x: 10, y: 0 }, BOX, DIE);
-    expect(Math.hypot(slow.velocity.x, slow.velocity.y)).toBeCloseTo(THROW_TUNING.minSpeed);
+    expect(Math.hypot(slow.velocity.x, slow.velocity.y)).toBeCloseTo(swipeFloor());
+    // With a touch too: a slow swipe from the wall gets the floor.
+    const touched = swipeToThrow({ x: 300, y: 600 }, { x: 0, y: -20 }, { x: 0, y: -100 }, BOX, DIE);
+    expect(Math.hypot(touched.velocity.x, touched.velocity.y)).toBeCloseTo(swipeFloor());
+    const button = buttonThrow(BOX, 1);
+    expect(Math.hypot(button.velocity.x, button.velocity.y)).toBeCloseTo(swipeFloor());
     const wild = swipeToThrow(undefined, { x: 0, y: -10 }, { x: 0, y: -9000 }, BOX, DIE);
     expect(Math.hypot(wild.velocity.x, wild.velocity.y)).toBeCloseTo(THROW_TUNING.maxSpeed);
   });
