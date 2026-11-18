@@ -16,11 +16,9 @@
  * while a screen reader is on. The board under it stays readable: the
  * inlay covers only the bar.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, {
-  cancelAnimation,
-  Easing,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -30,6 +28,7 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { useFocusOnShow } from '@/features/accessibility/focus';
 
+import { CountdownLine } from './CountdownLine';
 import { useAnnouncement } from './useAnnouncement';
 
 /** How fast the inlay comes in. */
@@ -68,32 +67,12 @@ export function PassInlay({
   useAnnouncement(spoken, announceKey);
   const plateRef = useFocusOnShow();
   const reduceMotion = useReducedMotion();
-  const left = useSharedValue(1);
   const shown = useSharedValue(reduceMotion ? 1 : 0);
 
   useEffect(() => {
     shown.set(withTiming(1, { duration: reduceMotion ? 0 : FADE_IN_MS }));
   }, [shown, reduceMotion]);
 
-  // After a pause the line starts again in full.
-  useEffect(() => {
-    cancelAnimation(left);
-    left.set(1);
-    if (running) left.set(withTiming(0, { duration: durationMs, easing: Easing.linear }));
-  }, [left, running, durationMs]);
-
-  // The timer starts again in full after a pause, as the line does.
-  const close = useRef(onClose);
-  useEffect(() => {
-    close.current = onClose;
-  }, [onClose]);
-  useEffect(() => {
-    if (!running) return;
-    const timer = setTimeout(() => close.current(), durationMs);
-    return () => clearTimeout(timer);
-  }, [running, durationMs]);
-
-  const lineStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: left.get() }] }));
   const fadeStyle = useAnimatedStyle(() => ({ opacity: shown.get() }));
 
   return (
@@ -132,9 +111,13 @@ export function PassInlay({
                 {reason}
               </Text>
             ) : null}
-            <View style={styles.track}>
-              <Animated.View testID="pass-inlay-countdown" style={[styles.fill, lineStyle]} />
-            </View>
+            <CountdownLine
+              testID="pass-inlay-countdown"
+              style={styles.track}
+              durationMs={durationMs}
+              running={running}
+              onEnd={onClose}
+            />
           </View>
         </View>
       </Animated.View>
@@ -211,15 +194,6 @@ const styles = StyleSheet.create((theme) => ({
     left: theme.space.lg,
     right: theme.space.lg,
     bottom: theme.space.sm,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: theme.colors.accentWash,
-    overflow: 'hidden',
-  },
-  fill: {
-    flex: 1,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: theme.colors.accentLight,
+    width: 'auto',
   },
 }));

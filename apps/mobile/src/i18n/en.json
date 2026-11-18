@@ -1532,10 +1532,10 @@
       "started": "Fast forward. The bot plays both sides to the end of the game.",
       "offer": {
         "title": "It's a race",
-        "body": "No more contact: the checkers only run home now. The bot can play both sides to the end of this game.",
-        "playOn": "Play on",
-        "never": "Don't ask again",
-        "settingsNote": "The Fast forward button stays next to Roll dice. You can turn this card off in Settings."
+        "body": "The checkers can't interact anymore. Want the bot to finish this game? It rolls for both sides and plays your checkers as well as it can. You can stop it at any time.",
+        "yes": "Yes, fast forward",
+        "no": "No",
+        "never": "Don't ask again"
       }
     },
     "menu": {

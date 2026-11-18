@@ -1,5 +1,5 @@
 # Fast forward a race vs the bot (docs/rules/tavli-match.md, "Fast forward
-# a race"): a race opens with the race card, Play on leaves the button
+# a race"): a race opens with the race card, No leaves the button
 # next to Roll, the bot plays both sides, and the game ends with the
 # game-end sheet.
 appId: com.tavlaki.dev

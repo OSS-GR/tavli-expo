@@ -204,8 +204,11 @@ describe('<GameScreen /> opening roll (#176)', () => {
     // The title names the starter; the slots are gone.
     expect(card().getByRole('header', { name: 'Maria starts' })).toBeOnTheScreen();
     expect(screen.queryByTestId('opening-die-white-slot', hidden)).toBeNull();
-    // It closes by itself, with no line that says so (#499).
+    // It closes by itself, with no line that says so (#499): the gold
+    // countdown line under Play shows it (#615), hidden from screen readers.
     expect(card().queryByText(/Closes by itself/)).toBeNull();
+    expect(screen.getByTestId('opening-countdown', hidden)).toBeOnTheScreen();
+    expect(screen.queryByTestId('opening-countdown')).toBeNull();
     expect(announced()).toContain('Maria starts with 6-3.');
     expect(OPENING_RESULT_MS).toBeGreaterThanOrEqual(3000);
 
@@ -214,6 +217,21 @@ describe('<GameScreen /> opening roll (#176)', () => {
     await wait(20);
     expect(screen.queryByTestId('opening-card')).toBeNull();
     expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+  });
+
+  it('the result waits while paused (#615)', async () => {
+    const store = newStore({ white: 'Maria', black: 'Nikos' });
+    const view = await render(<GameScreen store={store} paused />);
+    await rollDie(store, 'white', 6);
+    await rollDie(store, 'black', 3);
+    await wait(OPENING_RESULT_MS * 3);
+    expect(screen.getByTestId('opening-card', hidden)).toBeOnTheScreen();
+    // Back from the menu: the full time runs again.
+    await view.rerender(<GameScreen store={store} />);
+    await wait(OPENING_RESULT_MS - 10);
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    await wait(20);
+    expect(screen.queryByTestId('opening-card')).toBeNull();
   });
 
   it('Play or a tap on the board closes the result early', async () => {
