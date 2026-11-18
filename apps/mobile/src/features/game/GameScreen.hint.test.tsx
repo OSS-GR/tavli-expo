@@ -150,6 +150,10 @@ function best(store: GameStore) {
 const rings = () => countNodes(screen.toJSON() as JsonNode, 'DashPathEffect');
 
 const hintButton = () => screen.queryByTestId('hint-button');
+/** The hint's dim circle when it cannot be used (hidden from screen readers). */
+const dimHint = () =>
+  screen.queryByTestId('hint-placeholder-circle', { includeHiddenElements: true });
+const hintPlace = () => screen.queryByTestId('hint-placeholder', { includeHiddenElements: true });
 
 /**
  * Plays the Analyzer's best turns with seeded dice until, after a few
@@ -229,6 +233,19 @@ describe('<GameScreen /> Hint button (#209)', () => {
     expect(store.getState().flow.game.phase).toBe('moving');
     expect(screen.getByTestId('undo-button')).toBeOnTheScreen();
     expect(hintButton()).toBeNull();
+    // With Undo and Confirm, the hint's place shows a dim circle.
+    expect(dimHint()).toBeOnTheScreen();
+  });
+
+  it('before the roll its place stays empty, like Undo’s: no dim circle (#619)', async () => {
+    const store = await show();
+    expect(store.getState().flow.game.phase).toBe('awaiting-roll');
+    expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
+    expect(screen.queryByTestId('undo-button')).toBeNull();
+    // The place is kept, so the buttons never move; only the circle waits.
+    expect(hintPlace()).toBeOnTheScreen();
+    expect(dimHint()).toBeNull();
+    expect(hintButton()).toBeNull();
   });
 
   it('has no Hint without an Analyzer (online games, later)', async () => {
@@ -257,6 +274,7 @@ describe('<GameScreen /> Hint button (#209)', () => {
     expect(game.phase).toBe('moving');
     expect(screen.getByTestId('bot-turn')).toBeOnTheScreen();
     expect(hintButton()).toBeNull();
+    expect(dimHint()).toBeNull();
   });
 
   it('hides with Settings → Show hints off', async () => {

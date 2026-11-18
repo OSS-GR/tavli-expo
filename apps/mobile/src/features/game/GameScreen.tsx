@@ -1363,6 +1363,9 @@ export function GameScreen({
   let showDice = false;
   let undoButton = null;
   let hintButton = null;
+  // Undo and Confirm show (after the roll): only then does the hint's dim
+  // circle show too (#619).
+  let turnButtons = false;
   let mainButton = null;
   let status: { readonly testID: string; readonly text: string } | null = null;
   // Portrait: "or swipe the board" sits left of Roll, in Undo's place.
@@ -1442,6 +1445,7 @@ export function GameScreen({
     );
   } else if (phase === 'moving' || phase === 'awaiting-confirm' || showPass || passWaits) {
     showDice = true;
+    turnButtons = true;
     hintButton = hintProps ? (
       <RailButton
         testID="hint-button"
@@ -1480,19 +1484,28 @@ export function GameScreen({
       />
     );
   }
-  // The hint keeps its place when it cannot be used yet (a dim circle), so
-  // the buttons never move between the roll and the move.
+  // The hint keeps its place when it cannot be used, so the buttons never
+  // move between the roll and the move. With Undo and Confirm it is a dim
+  // circle; before the roll, in the opening and on the other side's turn
+  // the place stays empty, like Undo's (#619).
   const hintSlot =
     hintButton ??
     (analyzer !== undefined && showHints ? (
       <View
+        testID="hint-placeholder"
         style={styles.hintPlaceholder(iconLabelShown(windowSize.fontScale))}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
         <View style={styles.hintPlaceholderBox(Math.max(sideSize, circleBox ?? sideSize))}>
-          <View style={styles.hintPlaceholderCircle(sideSize)}>
-            <Icon name="lightbulb" color={ui.colors.textFaint} size={Math.round(sideSize * 0.4)} />
-          </View>
+          {turnButtons ? (
+            <View testID="hint-placeholder-circle" style={styles.hintPlaceholderCircle(sideSize)}>
+              <Icon
+                name="lightbulb"
+                color={ui.colors.textFaint}
+                size={Math.round(sideSize * 0.4)}
+              />
+            </View>
+          ) : null}
         </View>
       </View>
     ) : null);
