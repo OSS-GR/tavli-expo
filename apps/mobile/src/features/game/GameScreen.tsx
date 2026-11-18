@@ -869,7 +869,9 @@ export function GameScreen({
   const boardFrameX = useSharedValue(0);
   const boardFrameY = useSharedValue(0);
   const swipeArea = usePanGesture({
-    enabled: canRoll && phase === 'awaiting-roll' && !blocked,
+    // Off while the move list shows: it scrolls (in landscape next to the
+    // board), and a scroll must never roll. The board's own pan still rolls.
+    enabled: canRoll && phase === 'awaiting-roll' && !blocked && !showMoveList,
     minDistance: SWIPE_AREA.minDistance,
     testID: 'game-swipe-area',
     onBegin: (e) => {

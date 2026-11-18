@@ -307,6 +307,38 @@ describe('<GameScreen /> dice', () => {
     const row = screen.getByTestId('dice-row', { includeHiddenElements: true });
     expect(row.props.accessibilityLabel).toBe(`Dice ${game.state.dice!.join('-')}, 2 left to play`);
   });
+
+  it('the area stays off while the move list shows, so its scroll never rolls', async () => {
+    const store = newStore();
+    await act(async () => {
+      settingsStore.getState().setSetting('moveList', 'on');
+    });
+    await render(<GameScreen store={store} />);
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'rollOpening', player: 'white', die: 6 });
+      dispatch({ type: 'rollOpening', player: 'black', die: 1 });
+      dispatch({ type: 'move', player: 'white', move: { from: 13, to: 7, die: 6 } });
+      dispatch({ type: 'move', player: 'white', move: { from: 8, to: 7, die: 1 } });
+      dispatch({ type: 'confirm', player: 'white' });
+    });
+    await act(async () => {
+      fireEvent(screen.getByTestId('game-board', { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 500 } },
+      });
+    });
+    await touch('game-swipe-area', [
+      { x: 187, y: 6 },
+      { x: 187, y: 60 },
+    ]);
+    expect(store.getState().flow.game.state.dice).toBeNull();
+    // A swipe on the board still rolls.
+    await touch('game-board-pan', [
+      { x: 20, y: 200 },
+      { x: 120, y: 120 },
+    ]);
+    expect(store.getState().flow.game.state.dice).not.toBeNull();
+  });
 });
 
 describe('<GameScreen /> swiping while the bot waits', () => {
