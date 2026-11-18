@@ -82,6 +82,12 @@ export interface TurnPushesDeps {
    * `sync()` when it changes. Default: English.
    */
   readonly locale?: () => PushLocale;
+  /**
+   * Calls the listener when the app language changes; returns the
+   * unsubscribe. A change registers the token again, with the new
+   * language (#631). `stop()` unsubscribes.
+   */
+  readonly onLocaleChange?: (listener: () => void) => () => void;
 }
 
 export interface TurnPushes {
@@ -148,6 +154,7 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
     onAnswer,
     hasAccount = () => true,
     locale = () => 'en',
+    onLocaleChange,
   } = deps;
   const store = createStore<TurnPushesState>()(() => ({
     ...loadSaved(storage),
@@ -230,6 +237,8 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
   function sync(): Promise<void> {
     return queue(syncNow);
   }
+
+  let stopLocaleListener = onLocaleChange?.(() => void sync());
 
   return {
     store,
@@ -316,6 +325,8 @@ export function createTurnPushes(deps: TurnPushesDeps): TurnPushes {
     stop() {
       stopTokenListener?.();
       stopTokenListener = null;
+      stopLocaleListener?.();
+      stopLocaleListener = undefined;
     },
   };
 }

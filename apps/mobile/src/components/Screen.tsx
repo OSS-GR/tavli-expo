@@ -35,14 +35,19 @@ export interface ScreenProps {
   hidden?: boolean;
 }
 
-export function Screen({ children, testID, hidden = false }: ScreenProps) {
+export function Screen({ children, testID, hidden }: ScreenProps) {
+  // Only a screen that can be covered keeps its native view and sets the
+  // props; the others stay a plain view.
+  const cover =
+    hidden === undefined
+      ? {}
+      : {
+          collapsable: false,
+          importantForAccessibility: hidden ? ('no-hide-descendants' as const) : ('auto' as const),
+          accessibilityElementsHidden: hidden,
+        };
   return (
-    <View
-      testID={testID}
-      style={styles.screen}
-      collapsable={false}
-      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
-      accessibilityElementsHidden={hidden}>
+    <View testID={testID} style={styles.screen} {...cover}>
       {children}
     </View>
   );

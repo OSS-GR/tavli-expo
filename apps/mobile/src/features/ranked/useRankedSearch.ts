@@ -237,15 +237,21 @@ export function useRankedSearch({
       setProblem(null);
       try {
         await call();
-        // The watch brings the new seek too; this one shows it at once.
-        apply(await matchmaking.mySeek());
-        return true;
       } catch (error) {
         setProblem(problemOf(error));
-        return false;
-      } finally {
         setBusy(false);
+        return false;
       }
+      // The call worked: only it decides the result. The watch brings the
+      // new seek too; this read shows it at once, and a failed read waits
+      // for the watch.
+      try {
+        apply(await matchmaking.mySeek());
+      } catch {
+        // The watch shows the seek.
+      }
+      setBusy(false);
+      return true;
     },
     [apply, matchmaking],
   );

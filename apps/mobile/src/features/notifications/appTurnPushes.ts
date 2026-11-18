@@ -27,7 +27,7 @@ function make(): TurnPushes | undefined {
   if (auth === undefined || notifications === undefined || pushTokens === undefined) {
     return undefined;
   }
-  const pushes = createTurnPushes({
+  return createTurnPushes({
     storage,
     notifications,
     pushTokens,
@@ -37,18 +37,11 @@ function make(): TurnPushes | undefined {
     hasAccount: hasOnlineAccount,
     // The server writes the pushes in the app language (#631).
     locale: currentAppLanguage,
-  });
-  // A new app language registers the token again, with the new language.
-  const onLanguage = () => void pushes.sync();
-  i18n.on('languageChanged', onLanguage);
-  const stop = pushes.stop;
-  return {
-    ...pushes,
-    stop() {
-      i18n.off('languageChanged', onLanguage);
-      stop();
+    onLocaleChange: (listener) => {
+      i18n.on('languageChanged', listener);
+      return () => i18n.off('languageChanged', listener);
     },
-  };
+  });
 }
 
 /** `null` until the first call. */

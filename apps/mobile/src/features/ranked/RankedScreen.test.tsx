@@ -452,6 +452,21 @@ describe('<RankedScreen /> with a saved account', () => {
     seek.mockRestore();
   });
 
+  it('a seek the server took counts even when the read after it fails (#631)', async () => {
+    const user = setupUser();
+    await saved();
+    const { onSearchStarted } = await open();
+    const read = jest
+      .spyOn(onlineFake.matchmaking, 'mySeek')
+      .mockRejectedValueOnce(new Error('server'));
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    expect(screen.queryByTestId('ranked-problem')).toBeNull();
+    expect(onSearchStarted).toHaveBeenCalledTimes(1);
+    read.mockRestore();
+  });
+
   it('a search that starts asks the route to offer turn notifications, once per search (#631)', async () => {
     const user = setupUser();
     await saved();

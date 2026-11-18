@@ -486,3 +486,39 @@ describe('the push language (#631)', () => {
     ]);
   });
 });
+
+describe('a change of the app language (#631)', () => {
+  it('registers the token again with the new language, until stop', async () => {
+    let language: PushLocale = 'el';
+    let listener: (() => void) | null = null;
+    const authStore = createMemoryAuthStore();
+    const auth = createMemoryAuthProvider(authStore);
+    const notifications = createMemoryPushNotifications('android');
+    const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
+    const pushes = createTurnPushes({
+      storage: optedIn(),
+      notifications,
+      pushTokens,
+      auth,
+      onAnswer: () => undefined,
+      locale: () => language,
+      onLocaleChange: (next) => {
+        listener = next;
+        return () => {
+          listener = null;
+        };
+      },
+    });
+    await auth.signInAsGuest();
+    notifications.setPermission('granted');
+    await pushes.sync();
+    language = 'en';
+    listener!();
+    await pushes.sync();
+    expect(pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token: notifications.token, platform: 'android', locale: 'en' },
+    ]);
+    pushes.stop();
+    expect(listener).toBeNull();
+  });
+});
