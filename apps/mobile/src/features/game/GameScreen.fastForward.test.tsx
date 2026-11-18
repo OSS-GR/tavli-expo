@@ -191,9 +191,9 @@ describe('<GameScreen /> fast forward a race', () => {
     expect(screen.queryByTestId('roll-button')).toBeNull();
     expect(screen.queryByTestId('fast-forward-button')).toBeNull();
     expect(screen.queryByTestId('game-board')).toBeNull();
-    expect(
-      button('Fast forward: the bot plays both sides to the end of the game'),
-    ).toBeOnTheScreen();
+    // Each answer reads what it shows (#615).
+    expect(button('Yes, fast forward')).toBeOnTheScreen();
+    expect(button('No')).toBeOnTheScreen();
   });
 
   it('No: Fast forward stays next to Roll, and the card does not come back', async () => {

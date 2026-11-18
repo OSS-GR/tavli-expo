@@ -1857,11 +1857,10 @@ export function GameScreen({
         announceKey={`${raceKey}:raceOffer`}
         title={t('game.fastForward.offer.title')}
         lines={[t('game.fastForward.offer.body')]}>
-        {/* A yes or no question (#615); "Yes" keeps the button's name. */}
+        {/* A yes or no question (#615): each button reads what it shows. */}
         <ActionButton
           testID="race-fast-forward-button"
           label={t('game.fastForward.offer.yes')}
-          accessibilityLabel={t('game.fastForward.label')}
           onPress={() => answer(true)}
         />
         <ActionButton
@@ -1930,6 +1929,7 @@ export function GameScreen({
             onRoll={roll}
             onClose={() => setOpeningDismissed(gameKey)}
             closeAfterMs={OPENING_RESULT_MS}
+            closeRuns={!paused}
             onDieLanded={onDiceLanded}
           />
         </Pressable>

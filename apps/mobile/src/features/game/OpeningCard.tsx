@@ -70,6 +70,12 @@ export interface OpeningCardProps {
    * line and no timer.
    */
   closeAfterMs?: number;
+  /**
+   * The close runs only while this is true: not while paused (#615). With a
+   * screen reader on it still closes after `closeAfterMs`: the result is
+   * read at once, and the move list takes over.
+   */
+  closeRuns?: boolean;
   onDieLanded?: () => void;
 }
 
@@ -155,6 +161,7 @@ export function OpeningCard({
   onRoll,
   onClose,
   closeAfterMs,
+  closeRuns = true,
   onDieLanded,
 }: OpeningCardProps) {
   const { t } = useTranslation();
@@ -272,7 +279,7 @@ export function OpeningCard({
                 testID="opening-countdown"
                 style={styles.countdown}
                 durationMs={closeAfterMs}
-                running
+                running={closeRuns}
                 onEnd={onClose}
               />
             )}

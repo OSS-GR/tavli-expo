@@ -219,6 +219,21 @@ describe('<GameScreen /> opening roll (#176)', () => {
     expect(screen.getByTestId('game-board')).toBeOnTheScreen();
   });
 
+  it('the result waits while paused (#615)', async () => {
+    const store = newStore({ white: 'Maria', black: 'Nikos' });
+    const view = await render(<GameScreen store={store} paused />);
+    await rollDie(store, 'white', 6);
+    await rollDie(store, 'black', 3);
+    await wait(OPENING_RESULT_MS * 3);
+    expect(screen.getByTestId('opening-card', hidden)).toBeOnTheScreen();
+    // Back from the menu: the full time runs again.
+    await view.rerender(<GameScreen store={store} />);
+    await wait(OPENING_RESULT_MS - 10);
+    expect(screen.getByTestId('opening-card')).toBeOnTheScreen();
+    await wait(20);
+    expect(screen.queryByTestId('opening-card')).toBeNull();
+  });
+
   it('Play or a tap on the board closes the result early', async () => {
     const user = setupUser();
     const store = newStore();
