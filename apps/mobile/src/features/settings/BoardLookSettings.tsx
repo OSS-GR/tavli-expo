@@ -1,7 +1,8 @@
 /**
  * Settings → Board & look (#501, Figma "08 Settings"): a big preview of
  * the board as picked, a row of the board themes, the app colors right
- * under them (they follow the board by default), Board layout, Your home
+ * under them (they follow the board by default), Board starting position
+ * (Portrait or Landscape, with pictures, #623), Your home
  * and Pass-and-play view. Every pick saves at once and shows in the
  * preview.
  *
@@ -26,14 +27,13 @@ import { boardLayout, useBoardTheme } from '@/features/board/BoardCanvas';
 import { SAMPLE_POSITIONS } from '@/features/board/positions';
 import { StaticBoard } from '@/features/board/StaticBoard';
 
+import { BoardLayoutPicker } from './BoardLayoutPicker';
 import { BoardThemeStrip } from './BoardThemeStrip';
 import { BlockHint } from './SettingBlock';
 import {
   BOARD_FLIP_MODES,
-  BOARD_LAYOUT_MODES,
   HOME_BOARD_SIDES,
   type BoardFlipMode,
-  type BoardLayoutMode,
   type HomeBoardSide,
 } from './settings';
 import { SettingsChip } from './SettingsChip';
@@ -43,17 +43,12 @@ import { useSettings } from './store';
 export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
   const { t } = useTranslation();
   const boardTheme = useBoardTheme();
-  const layout = useSettings((s) => s.boardLayout);
   const homeSide = useSettings((s) => s.homeBoardSide);
   const flipMode = useSettings((s) => s.boardFlipMode);
   const appTheme = useSettings((s) => s.theme);
   const boardThemeId = useSettings((s) => s.boardTheme);
   const setSetting = useSettings((s) => s.setSetting);
 
-  const layoutOptions: SegmentOption<BoardLayoutMode>[] = BOARD_LAYOUT_MODES.map((mode) => ({
-    value: mode,
-    label: t(`settings.boardLayout.${mode}`),
-  }));
   const homeOptions: SegmentOption<HomeBoardSide>[] = HOME_BOARD_SIDES.map((side) => ({
     value: side,
     label: t(`settings.homeBoard.${side}`),
@@ -123,17 +118,12 @@ export function BoardLookSettings({ onBack }: { onBack?: () => void }) {
         <BlockHint>{t('settings.theme.hint')}</BlockHint>
       </View>
 
-      <SectionCard title={t('settings.boardLayout.label')} padded>
-        <SegmentedControl
-          testID="settings-board-layout"
-          label={t('settings.boardLayout.label')}
-          options={layoutOptions}
-          value={layout}
-          onChange={(mode) => setSetting('boardLayout', mode)}
-        />
-        <BlockHint>{t(`settings.boardLayout.${layout}Hint`)}</BlockHint>
+      <View style={styles.group}>
+        <SectionCard title={t('settings.boardLayout.label')} padded>
+          <BoardLayoutPicker testID="settings-board-layout" />
+        </SectionCard>
         <BlockHint>{t('settings.boardLayout.hint')}</BlockHint>
-      </SectionCard>
+      </View>
 
       <SectionCard title={t('settings.homeBoard.label')} padded>
         <SegmentedControl

@@ -164,7 +164,7 @@ Not drawn (#350).
   - Back button (to usage data) and "Step 3 of 3".
   - A live preview of the start position. It follows every pick (theme, home side, tall or classic).
   - Title "Set up your board" and a short note: the preview shows the choice, and Settings can change it later.
-  - The three pickers from Settings → Board: the board theme, **Your home** (bottom right or bottom left) and **Board layout** (tall or classic). The defaults are picked.
+  - The three pickers from Settings → Board: the board theme, **Your home** (bottom right or bottom left) and **Board starting position** (Portrait or Landscape, #623). The defaults are picked.
   - **Continue** (main button).
 - **States:** Each tap saves at once. If the app closes before **Continue**, the step shows again on the next launch.
 - **Goes to:** Home, or an invite link or push tap that opened the app.
@@ -416,7 +416,7 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
   - **Sound and feel:** Sound (toggle). Haptics (toggle). Sound also follows the phone's silent switch.
   - **Language:** **Ελληνικά / English**. The app switches at once.
   - **Look:** Board theme (MVP1 has one wooden board; the row says "more boards later").
-  - **Board** (#175, #184, not drawn): the board theme, **Board layout** (**Tall** / **Classic**, a small picture of the game screen each) and **Your home** (bottom right / bottom left).
+  - **Board** (#175, #184, not drawn): the board theme, **Board starting position** (**Portrait** / **Landscape**, a picture of the game screen each, and a phone on its side, #623) and **Your home** (bottom right / bottom left).
   - **Help** (#571, not drawn): **How to play ›** opens the How to play hub (Figma frame 20): each game's page has its lessons on top, then the rules.
   - **Privacy:** Share anonymous usage data (toggle; calls `optIn()` / `optOut()` on the Analytics port, #61). Privacy policy link. Events: `docs/architecture/analytics-events.md`.
   - Footer: app version, build, licenses.

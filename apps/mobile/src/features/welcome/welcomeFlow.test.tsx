@@ -178,7 +178,7 @@ describe('first launch', () => {
     expect(screen.getByRole('header', { name: 'Set up your board' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Walnut Kafeneio' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Bottom right' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Tall' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Portrait' })).toBeChecked();
     await user.press(screen.getByRole('button', { name: 'Continue' }));
 
     expect(screen).toHavePathname('/');
@@ -240,7 +240,7 @@ describe('first launch', () => {
 
     await user.press(screen.getByRole('radio', { name: 'Olive Inlay' }));
     await user.press(screen.getByRole('radio', { name: 'Bottom left' }));
-    await user.press(screen.getByRole('radio', { name: 'Classic' }));
+    await user.press(screen.getByRole('radio', { name: 'Landscape' }));
     await user.press(screen.getByRole('button', { name: 'Continue' }));
 
     expect(screen).toHavePathname('/');

@@ -221,24 +221,26 @@ describe('Settings → Board & look', () => {
     expect(screen.getByRole('header', { name: 'Ταμπλό και εμφάνιση' })).toBeOnTheScreen();
   });
 
-  it('picks the board layout: tall by default, or classic (#184)', async () => {
+  it('picks the board starting position: portrait by default, or landscape (#184, #623)', async () => {
     const user = userEvent.setup();
     await grantUsageData();
     await render(<BoardLookSettings />);
 
     const group = screen.getByTestId('settings-board-layout');
-    expect(group).toHaveAccessibleName('Board layout');
-    expect(within(group).getByRole('radio', { name: 'Tall' })).toBeChecked();
-    expect(within(group).getByRole('radio', { name: 'Classic' })).not.toBeChecked();
+    expect(group).toHaveAccessibleName('Board starting position');
+    expect(within(group).getByRole('radio', { name: 'Portrait' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Landscape' })).not.toBeChecked();
+    // Each option shows its hint on its tile, and the phone on its side is below them.
     expect(
-      screen.getByText('The board on its side, as big as the screen allows. Bigger checkers.'),
+      screen.getByText('Stands on its side and fills the screen. Bigger checkers.'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByText('Turn your phone on its side and the board goes wide, whichever you pick.'),
     ).toBeOnTheScreen();
 
-    await user.press(within(group).getByRole('radio', { name: 'Classic' }));
+    await user.press(within(group).getByRole('radio', { name: 'Landscape' }));
     expect(settingsStore.getState().boardLayout).toBe('classic');
-    expect(
-      screen.getByText('The board as on a table, as wide as the screen. Smaller checkers.'),
-    ).toBeOnTheScreen();
+    expect(within(group).getByRole('radio', { name: 'Landscape' })).toBeChecked();
     expect(recorded.sent.at(-1)).toEqual({
       type: 'track',
       event: 'settings_changed',
@@ -246,18 +248,18 @@ describe('Settings → Board & look', () => {
     });
   });
 
-  it('names the board layouts in Greek', async () => {
+  it('names the board starting positions in Greek', async () => {
     await act(async () => {
       await i18n.changeLanguage('el');
     });
     await render(<BoardLookSettings />);
     const group = screen.getByTestId('settings-board-layout');
-    expect(group).toHaveAccessibleName('Διάταξη ταμπλό');
-    expect(within(group).getByRole('radio', { name: 'Ψηλό' })).toBeChecked();
-    expect(within(group).getByRole('radio', { name: 'Κλασικό' })).toBeOnTheScreen();
+    expect(group).toHaveAccessibleName('Πώς ξεκινά το ταμπλό');
+    expect(within(group).getByRole('radio', { name: 'Κατακόρυφο' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Οριζόντιο' })).toBeOnTheScreen();
     expect(
       screen.getByText(
-        'Ισχύει μόνο για το παιχνίδι. Στο μάθημα και στους κανόνες το ταμπλό είναι πάντα ψηλό.',
+        'Έτσι ξεκινά το παιχνίδι με το κινητό όρθιο. Στο μάθημα και στους κανόνες το ταμπλό είναι πάντα κατακόρυφο.',
       ),
     ).toBeOnTheScreen();
   });

@@ -41,7 +41,7 @@ const PHONE_SHAPE = 0.5;
  *
  * The preview sits in an upright phone outline (#362), so the tall board
  * on its side clearly reads as "the phone held upright"; inside it the
- * board follows the Tall or Classic pick as on the game screen.
+ * board follows the Portrait or Landscape pick as on the game screen.
  */
 export function WelcomeBoardScreen({ onBack, onContinue }: WelcomeBoardScreenProps) {
   const { t } = useTranslation();
@@ -88,7 +88,7 @@ export function WelcomeBoardScreen({ onBack, onContinue }: WelcomeBoardScreenPro
         <Text style={styles.label}>{t('settings.boardTheme.label')}</Text>
         <BoardThemePicker testID="welcome-board-theme" />
         <HomeBoardSidePicker testID="welcome-board-home" />
-        <BoardLayoutPicker testID="welcome-board-layout" />
+        <BoardLayoutPicker testID="welcome-board-layout" labelAbove />
       </ScrollView>
 
       <View style={styles.buttons}>

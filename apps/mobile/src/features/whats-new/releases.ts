@@ -18,6 +18,7 @@ import type { IconName } from '@/components/icons';
 /** The entries the page can show. Each one has its strings in `whatsNew.entries`. */
 export type WhatsNewEntryId =
   | 'home'
+  | 'boardStart'
   | 'playFriend'
   | 'joinCode'
   | 'turnPushes'
@@ -60,6 +61,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-19',
+    entries: [{ id: 'boardStart', icon: 'smartphone' }],
+  },
   {
     date: '2026-11-18',
     entries: [

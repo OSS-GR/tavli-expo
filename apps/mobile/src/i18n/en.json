@@ -221,12 +221,13 @@
       "hintMatched": "The game, the tutorial and the rules use this board. The app colors change with it (App colors, below)."
     },
     "boardLayout": {
-      "label": "Board layout",
-      "tall": "Tall",
-      "classic": "Classic",
-      "tallHint": "The board on its side, as big as the screen allows. Bigger checkers.",
-      "classicHint": "The board as on a table, as wide as the screen. Smaller checkers.",
-      "hint": "Only for the game. The tutorial and the rules always show the tall board."
+      "label": "Board starting position",
+      "tall": "Portrait",
+      "classic": "Landscape",
+      "tallHint": "Stands on its side and fills the screen. Bigger checkers.",
+      "classicHint": "Lies as on a table, across the screen. Smaller checkers.",
+      "sideways": "Turn your phone on its side and the board goes wide, whichever you pick.",
+      "hint": "How a game starts with the phone upright. The tutorial and the rules always show the portrait board."
     },
     "homeBoard": {
       "label": "Your home",
@@ -234,7 +235,7 @@
       "left": "Bottom left",
       "rightHint": "Your checkers go round counterclockwise.",
       "leftHint": "Your checkers go round clockwise.",
-      "hint": "Pick it as on a real board, seen from your seat. Your home is always at the bottom of the screen. The tall board lies on its side, so there your home is on the other side."
+      "hint": "Pick it as on a real board, seen from your seat. Your home is always at the bottom of the screen. The portrait board lies on its side, so there your home is on the other side."
     },
     "moveList": {
       "label": "Move list",
@@ -1215,6 +1216,11 @@
         "title": "Sign out of all phones",
         "body": "Lost a phone? Sign out of your account on every phone at once. Your games and username stay; sign in again with your Apple ID or email.",
         "where": "Settings › Account › Sign out of all phones"
+      },
+      "boardStart": {
+        "title": "Portrait or landscape board",
+        "body": "Pick how a game starts with your phone upright: the board standing and filling the screen, or lying across it as on a table. A picture shows each one.",
+        "where": "Settings › Board & look"
       }
     }
   },
