@@ -61,12 +61,15 @@ import {
   BOARD_GESTURES,
   buildSources,
   dragPoint,
+  keepPeak,
   panEnd,
   pickSource,
   resolveDrop,
   resolveTap,
+  swipeEnd,
   withTakeBack,
   type MovableSource,
+  type SwipeEnd,
 } from './interaction';
 import type { BoardHighlights, Mark } from './skia/BoardScene';
 import { DragChecker, FlightChecker } from './skia/MovingCheckers';
@@ -126,19 +129,12 @@ export interface InteractiveBoardProps {
   onBoardTap?: (at: { x: number; y: number }) => void;
   /**
    * A swipe that did not start on a movable checker, while none can move
-   * (e.g. swipe the board to roll). `x`, `y` are where the finger went down
-   * (they pick the side the dice come in from), `dx`, `dy` the swipe, and
-   * `vx`, `vy` the finger speed at the end (pt/s, when Gesture Handler gave
-   * one).
+   * (e.g. swipe the board to roll). It comes when the finger lifts (#625).
+   * `x`, `y` are where the finger went down (they pick the side the dice
+   * come in from), `dx`, `dy` the swipe, and `vx`, `vy` the fastest finger
+   * speed of the swipe (pt/s, when Gesture Handler gave one).
    */
-  onBoardSwipe?: (swipe: {
-    x: number;
-    y: number;
-    dx: number;
-    dy: number;
-    vx?: number;
-    vy?: number;
-  }) => void;
+  onBoardSwipe?: (swipe: SwipeEnd) => void;
   /**
    * The turn's last move group (#626), while it may be taken back: its
    * checker may be dragged, or tapped and then tapped, back to where the
@@ -306,6 +302,11 @@ export function InteractiveBoard({
   const dragY = useSharedValue(0);
   const dragR = useSharedValue(1);
   const dragVisible = useSharedValue(0);
+  // A swipe that did not start on a movable checker (#625): it rolls when
+  // the finger lifts, with the fastest finger speed it had.
+  const swiping = useSharedValue(false);
+  const peakVX = useSharedValue(0);
+  const peakVY = useSharedValue(0);
 
   // A dropped checker is replaced by its flight, or just lands (the move
   // that ends a turn has no flight). Hide the drag copy once the new
@@ -373,19 +374,9 @@ export function InteractiveBoard({
       else if (pickSource(sources, x, y, 0) !== selected) onMissTap?.();
     }
   };
-  const onSwipe = (e: { x: number; y: number; velocityX?: number; velocityY?: number }) => {
+  const onSwipe = (swipe: SwipeEnd) => {
     // Only while no checker can move on: a take-back alone does not count.
-    if (forward.length === 0) {
-      onBoardSwipe?.({
-        x: startX.get(),
-        y: startY.get(),
-        dx: e.x - startX.get(),
-        dy: e.y - startY.get(),
-        ...(e.velocityX === undefined || e.velocityY === undefined
-          ? {}
-          : { vx: e.velocityX, vy: e.velocityY }),
-      });
-    }
+    if (forward.length === 0) onBoardSwipe?.(swipe);
   };
   const onDragStart = (source: number) => {
     setSelected(source);
@@ -418,6 +409,9 @@ export function InteractiveBoard({
     onBegin: (e) => {
       'worklet';
       dragging.set(false);
+      swiping.set(false);
+      peakVX.set(0);
+      peakVY.set(0);
       startX.set(e.x);
       startY.set(e.y);
       const i = pickSource(sources, e.x, e.y);
@@ -435,7 +429,8 @@ export function InteractiveBoard({
       const s = sources[i];
       // A swipe that does not start on a movable checker moves nothing.
       if (s === undefined) {
-        scheduleOnRN(onSwipe, e);
+        swiping.set(true);
+        keepPeak(peakVX, peakVY, e);
         return;
       }
       const p = dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e);
@@ -447,6 +442,10 @@ export function InteractiveBoard({
     },
     onUpdate: (e) => {
       'worklet';
+      if (swiping.get()) {
+        keepPeak(peakVX, peakVY, e);
+        return;
+      }
       const s = sources[dragIndex.get()];
       if (!dragging.get() || s === undefined) return;
       const p = dragPoint(s.checker, { x: startX.get(), y: startY.get() }, e);
@@ -457,6 +456,18 @@ export function InteractiveBoard({
       'worklet';
       const i = dragIndex.get();
       const s = sources[i];
+      if (swiping.get()) {
+        swiping.set(false);
+        if (!e.canceled) {
+          keepPeak(peakVX, peakVY, e);
+          scheduleOnRN(
+            onSwipe,
+            swipeEnd({ x: startX.get(), y: startY.get() }, e, peakVX.get(), peakVY.get()),
+          );
+        }
+        dragIndex.set(-1);
+        return;
+      }
       const end = panEnd(dragging.get(), e.canceled);
       if (end === 'cancel') {
         scheduleOnRN(onDragCanceled, i);

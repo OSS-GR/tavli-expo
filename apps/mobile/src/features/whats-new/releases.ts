@@ -46,6 +46,7 @@ export type WhatsNewEntryId =
   | 'onlineReview'
   | 'widerBoard'
   | 'passInlay'
+  | 'swipeRoll'
   | 'takeBack';
 
 export interface WhatsNewEntry {
@@ -64,7 +65,10 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-20',
-    entries: [{ id: 'takeBack', icon: 'undo' }],
+    entries: [
+      { id: 'swipeRoll', icon: 'dices' },
+      { id: 'takeBack', icon: 'undo' },
+    ],
   },
   {
     date: '2026-11-19',

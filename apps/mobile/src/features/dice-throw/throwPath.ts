@@ -218,6 +218,14 @@ export interface ThrowStart {
 const SWIPE_SECONDS = 0.15;
 
 /**
+ * The slowest swipe throw: the speed of the Roll button's throw
+ * (`buttonThrow`), so a swipe is never weaker than a tap (#625).
+ */
+export function swipeFloor(tuning: ThrowTuning = THROW_TUNING): number {
+  return (tuning.minSpeed + tuning.maxSpeed) / 2;
+}
+
+/**
  * The gap from the middle of the pair to each die at the start, across the
  * throw, in die sizes (`planThrow`).
  */
@@ -236,8 +244,11 @@ export const PAIR_GAP = 0.62;
  *   no position (the opening card rolls without a throw): then the swipe
  *   itself aims, and the dice come in from the wall behind the throw
  *   (`entryPoint`).
- * - Speed: the finger speed from Gesture Handler (`velocity`, pt/s). Without
- *   a usable one (0 or not a number), `translation` over a typical swipe time.
+ * - Speed: the finger speed from Gesture Handler (`velocity`, pt/s; the
+ *   screens pass the fastest of the swipe). Without a usable one (0 or not
+ *   a number), `translation` over a typical swipe time. A swipe never
+ *   throws slower than the Roll button (`swipeFloor`, #625): a slow swipe
+ *   gets the button's throw, a fast flick up to `maxSpeed`.
  * - The two dice start side by side across the throw (`PAIR_GAP`), kept
  *   inside the field (`shrinkBox`). A start on the bar moves to the
  *   player's side of it (`bar.shelter`), so the dice never slide along
@@ -277,7 +288,7 @@ export function swipeToThrow(
       at: offBar(entryPoint(room, direction), room, bar, dieSize),
       velocity: clampSpeed(
         { x: (direction.x / length) * speed, y: (direction.y / length) * speed },
-        tuning.minSpeed,
+        swipeFloor(tuning),
         tuning.maxSpeed,
       ),
     };
@@ -311,14 +322,11 @@ export function swipeToThrow(
           x: direction.x < 0 ? room.right : room.left,
           y: Math.min(room.bottom, Math.max(room.top, p.y)),
         };
-  const pace = speed > 0 ? speed : tuning.minSpeed;
+  const floor = swipeFloor(tuning);
+  const pace = speed > 0 ? speed : floor;
   return {
     at: offBar(start, room, bar, dieSize),
-    velocity: clampSpeed(
-      { x: direction.x * pace, y: direction.y * pace },
-      tuning.minSpeed,
-      tuning.maxSpeed,
-    ),
+    velocity: clampSpeed({ x: direction.x * pace, y: direction.y * pace }, floor, tuning.maxSpeed),
   };
 }
 
