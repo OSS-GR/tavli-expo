@@ -77,8 +77,8 @@ describe('WelcomeBoardScreen', () => {
     expect(screen.getByRole('radio', { name: 'Walnut Kafeneio' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Bottom right' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Bottom left' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Tall' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Classic' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Portrait' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Landscape' })).not.toBeChecked();
     // Each group has a name for screen readers.
     const groups = ['welcome-board-theme', 'welcome-board-home', 'welcome-board-layout'].map(
       (id) =>
@@ -89,7 +89,7 @@ describe('WelcomeBoardScreen', () => {
       expect.objectContaining({ accessibilityRole: 'radiogroup', accessibilityLabel: 'Your home' }),
       expect.objectContaining({
         accessibilityRole: 'radiogroup',
-        accessibilityLabel: 'Board layout',
+        accessibilityLabel: 'Board starting position',
       }),
     ]);
   });
@@ -115,9 +115,9 @@ describe('WelcomeBoardScreen', () => {
     expect(JSON.stringify(previewCanvas())).not.toBe(beforeSide);
 
     const beforeLayout = JSON.stringify(previewCanvas());
-    await user.press(screen.getByRole('radio', { name: 'Classic' }));
+    await user.press(screen.getByRole('radio', { name: 'Landscape' }));
     expect(settingsStore.getState().boardLayout).toBe('classic');
-    expect(screen.getByRole('radio', { name: 'Classic' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Landscape' })).toBeChecked();
     expect(JSON.stringify(previewCanvas())).not.toBe(beforeLayout);
   });
 
@@ -150,7 +150,7 @@ describe('WelcomeBoardScreen', () => {
     expect(screen.getByLabelText('Βήμα 3 από 3')).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: getTheme('walnut-kafeneio').name.el })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Κάτω δεξιά' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Ψηλό' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Κατακόρυφο' })).toBeChecked();
     expect(screen.getByRole('button', { name: 'Συνέχεια' })).toBeOnTheScreen();
   });
 });
