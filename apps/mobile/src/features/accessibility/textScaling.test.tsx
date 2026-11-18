@@ -341,7 +341,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     const passing = storeAt(closed, 'portes');
     passing.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
     await showGame(passing);
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
 
     // Maria pins Bob's mother (his last checker, on his own 24).
@@ -408,7 +408,7 @@ describe.each(LANGUAGES)('large system fonts (%s)', (language) => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('choose-double-6'));
     });
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
     expect(problems()).toEqual([]);
   }
 

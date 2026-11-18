@@ -19,7 +19,7 @@ import type { BoardThrowProps as MockBoardThrowProps } from '@/features/dice-thr
 import { buildSources } from '@/features/board/interaction';
 import { fitBoardWithShadow, slotRect } from '@/features/board/geometry';
 import {
-  BOT_PASS_NOTICE_MS,
+  PASS_NOTICE_MS,
   ONLINE_PASS_DICE_MS,
   OPENING_TIE_WAIT_MS,
   PASS_AFTER_THROW_MS,
@@ -160,7 +160,7 @@ const botName = (game: Game) => `Guest ${guestNumberOf(game.server, 'bot')}`;
  * view. Your turn waits for your roll (#355): with `roll` (the default) it
  * taps Roll, and the server rolls, so the turn can be played; a roll with
  * no legal move passes, and it goes on. Without `roll` it stops at the
- * Roll button. The other player's pass card closes by itself first.
+ * Roll button. The other player's pass inlay closes by itself first.
  */
 async function untilYourTurn(game: Game, { roll = true }: { roll?: boolean } = {}) {
   for (let i = 0; i < 400; i++) {
@@ -168,7 +168,7 @@ async function untilYourTurn(game: Game, { roll = true }: { roll?: boolean } = {
     if (
       now.waitingFor === 'white' &&
       screen.queryByTestId('online-wait') === null &&
-      screen.queryByTestId('pass-card') === null
+      screen.queryByTestId('pass-inlay') === null
     ) {
       if (now.game.phase !== 'awaiting-roll') return;
       const button = screen.queryByTestId('roll-button');
@@ -653,7 +653,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
     const diceText = (dice: readonly number[]) =>
       dice[0] === dice[1] ? /^You rolled double/ : new RegExp(`^You rolled ${either(dice)}`);
     const passText = (who: string, dice: readonly number[]) =>
-      new RegExp(`${who} rolled ${either(dice)}\\. No checker can move\\.`);
+      new RegExp(`${who} rolled ${either(dice)} · `);
 
     it('asks the server to roll when you tap Roll, then throws its dice', async () => {
       const user = setupUser();
@@ -760,7 +760,7 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       expect(screen.getByTestId('board-dice')).toBeOnTheScreen();
     });
 
-    it('shows the dice of your roll with no legal move first, then the pass card', async () => {
+    it('shows the dice of your roll with no legal move first, then the pass inlay', async () => {
       const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, stuck('white'));
       await untilYourTurn(game, { roll: false });
       await act(async () => {
@@ -773,15 +773,15 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       const dice = passed.game.lastTurn!.dice;
       // Your dice show; the card waits for them.
       expect(screen.queryByTestId('roll-button')).toBeNull();
-      expect(screen.queryByTestId('pass-card')).toBeNull();
+      expect(screen.queryByTestId('pass-inlay')).toBeNull();
       expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
       await wait(PASS_AFTER_THROW_MS + ONLINE_PASS_DICE_MS);
-      expect(screen.getByTestId('pass-card')).toHaveTextContent(passText('You', dice));
+      expect(screen.getByTestId('pass-inlay')).toHaveTextContent(passText('You', dice));
       // The bot waits for the card too before it rolls.
       expect(view(game).version).toBe(passed.version);
     });
 
-    it('shows the bot’s roll with no legal move: its dice, the pass card, then your Roll', async () => {
+    it('shows the bot’s roll with no legal move: its dice, the pass inlay, then your Roll', async () => {
       const game = await openGame('portes', 1, 5, BOT_THINK_MS, undefined, stuck('black'));
       expect(view(game).waitingFor).toBe('black');
       // The bot taps Roll after a moment, as a person would.
@@ -792,16 +792,16 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       const dice = passed.game.lastTurn!.dice;
       // Its dice are thrown first, from its wall (#373): no card, no Roll yet.
       expect(mockThrows).toEqual([{ wall: 'top', values: dice }]);
-      expect(screen.queryByTestId('pass-card')).toBeNull();
+      expect(screen.queryByTestId('pass-inlay')).toBeNull();
       expect(screen.queryByTestId('roll-button')).toBeNull();
       expect(diceLabel()).toMatch(new RegExp(`^Dice ${high(dice)}`));
       // The card waits until the thrown dice have shown, as after your throw.
       await wait(PASS_AFTER_THROW_MS);
-      expect(screen.getByTestId('pass-card')).toHaveTextContent(passText(botName(game), dice));
+      expect(screen.getByTestId('pass-inlay')).toHaveTextContent(passText(botName(game), dice));
       expect(screen.queryByTestId('roll-button')).toBeNull();
       // The card closes by itself; then your turn waits for your roll.
-      await wait(BOT_PASS_NOTICE_MS);
-      expect(screen.queryByTestId('pass-card')).toBeNull();
+      await wait(PASS_NOTICE_MS);
+      expect(screen.queryByTestId('pass-inlay')).toBeNull();
       expect(screen.getByTestId('roll-button')).toBeOnTheScreen();
     });
 

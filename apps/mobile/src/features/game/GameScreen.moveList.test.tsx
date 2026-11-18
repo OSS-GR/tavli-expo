@@ -83,8 +83,14 @@ async function playWithButtons(store: GameStore) {
     if (view.phase === 'awaiting-answer') {
       questions++;
       await pressButton('Play on');
-    } else if (passNotice(flow) && shows('pass-card')) await pressButton('OK');
-    else if (view.phase === 'opening-roll') await pressButton(/: roll, or swipe the board$/);
+    } else if (passNotice(flow) && shows('pass-inlay')) {
+      // With a screen reader the inlay waits: its Close action closes it (#613).
+      await act(async () => {
+        fireEvent(screen.getByTestId('pass-inlay'), 'accessibilityAction', {
+          nativeEvent: { actionName: 'activate' },
+        });
+      });
+    } else if (view.phase === 'opening-roll') await pressButton(/: roll, or swipe the board$/);
     else if (openingStatus(view.game) && shows('opening-card')) {
       // The result closes by itself (3 s); a screen reader user waits.
       await waitFor(() => expect(screen.queryByTestId('opening-card')).toBeNull(), {

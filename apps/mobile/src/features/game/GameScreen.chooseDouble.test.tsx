@@ -3,7 +3,7 @@
  * played 1-2 lets the player choose a double (`chooseDouble`). A person
  * answers on a card with six dice buttons; the bot answers by itself, so it
  * gets no card. A chosen double that no checker can play passes, and the
- * pass card says "chose", not "rolled".
+ * pass inlay says "chose", not "rolled".
  */
 import { InlineBotRunner, createBot } from '@tavli/bot';
 import {
@@ -141,7 +141,7 @@ describe('<GameScreen /> the "choose a double" card (#205)', () => {
     }
     // Nothing else to press: no Roll, and Undo · Confirm are off.
     expect(screen.queryByTestId('roll-button')).toBeNull();
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
   });
 
   it.each(VALUES)('a person chooses %i: the turn starts with that double', async (value) => {
@@ -310,7 +310,7 @@ const NO_SIXES: BoardState = createBoard(
 );
 
 describe('<GameScreen /> a chosen double with no move passes (#205)', () => {
-  it('the pass card says "Ann chose 6-6", not "rolled"', async () => {
+  it('the pass inlay says "Ann chose 6-6", not "rolled"', async () => {
     const store = aceyDeucey('white', NO_SIXES);
     await show(store);
     await whitePlaysAceDeuce(store, ['24/23', '24/22']);
@@ -319,14 +319,13 @@ describe('<GameScreen /> a chosen double with no move passes (#205)', () => {
     const { flow } = store.getState();
     expect(flow.game.lastTurn).toMatchObject({ player: 'white', dice: [6, 6], moves: [] });
     expect(flow.game.state.toMove).toBe('black');
-    const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText('No legal moves')).toBeOnTheScreen();
-    expect(card.getByText('Ann chose 6-6. No checker can move.')).toBeOnTheScreen();
-    expect(card.getByText('The turn passes to Bob.')).toBeOnTheScreen();
+    const card = within(screen.getByTestId('pass-inlay'));
+    expect(card.getByText('No moves')).toBeOnTheScreen();
+    expect(card.getByText('Ann chose 6-6 · Bob’s turn')).toBeOnTheScreen();
     expect(said().some((t) => /rolled 6-6/.test(t))).toBe(false);
 
-    await press('pass-ok-button');
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    await press('pass-inlay-cover');
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     // Bob's own roll is "rolled" again.
     await send(store, { type: 'roll', player: 'black', dice: [5, 3] });
     expect(said()).toContain('Bob rolled 5-3.');
@@ -340,8 +339,8 @@ describe('<GameScreen /> a chosen double with no move passes (#205)', () => {
     await show(store, { seats: youVsBot });
     await whitePlaysAceDeuce(store, ['24/23', '24/22']);
     await press('choose-double-6');
-    const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText('Διάλεξες 6-6 και δεν έχεις κίνηση.')).toBeOnTheScreen();
+    const card = within(screen.getByTestId('pass-inlay'));
+    expect(card.getByText(/^Διάλεξες 6-6 · Σειρά: /)).toBeOnTheScreen();
   });
 
   it('a rolled pass still says "rolled"', async () => {
@@ -350,7 +349,7 @@ describe('<GameScreen /> a chosen double with no move passes (#205)', () => {
     // 6-6 rolled: no move either, but it was rolled.
     await send(store, { type: 'roll', player: 'white', dice: [6, 6] });
     expect(
-      within(screen.getByTestId('pass-card')).getByText('Ann rolled 6-6. No checker can move.'),
+      within(screen.getByTestId('pass-inlay')).getByText('Ann rolled 6-6 · Bob’s turn'),
     ).toBeOnTheScreen();
   });
 });

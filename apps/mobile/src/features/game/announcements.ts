@@ -19,7 +19,7 @@
  *   #207): "Maria starts." (or "You start.").
  *
  * Other parts read themselves, so nothing here says it twice: the opening
- * card (who starts), the pass card (the roll and why nothing moved), the
+ * card (who starts), the pass inlay (the roll and why nothing moved), the
  * mother question, the game-end sheet and the match-end screen.
  */
 import { isDouble, matchPhase, type GameFlow, type MatchFlow, type PlayerId } from '@tavli/engine';
@@ -111,7 +111,9 @@ export function turnAnnouncement(
   // An Asodio extra roll keeps the same player: then there is no "next".
   const next = game.state.toMove;
   if (next !== last.player) {
-    lines.push(isYou(next) ? t('game.pass.next_you') : t('game.pass.next', { name: nameOf(next) }));
+    lines.push(
+      isYou(next) ? t('game.announce.next_you') : t('game.announce.next', { name: nameOf(next) }),
+    );
   }
   return { key: `${key}:played`, text: lines.join(' ') };
 }
@@ -138,8 +140,8 @@ export function onlinePassLine(
   if (last === null || last.moves.length > 0) return null;
   const dice = last.dice.join('-');
   return isYou(last.player)
-    ? t('game.pass.body_you', { dice })
-    : t('game.pass.body', { name: nameOf(last.player), dice });
+    ? t('game.announce.passed_you', { dice })
+    : t('game.announce.passed', { name: nameOf(last.player), dice });
 }
 
 /**
@@ -153,7 +155,7 @@ export function onlinePassLine(
  *   screen reads it as a local roll (`turnAnnouncement`).
  * - The opening (#379): the opening card reads each die and who starts, so
  *   the first turn on the opening dice reads nothing here.
- * - A roll with no legal move has its pass card, which reads itself.
+ * - A roll with no legal move has its pass inlay, which reads itself.
  * - A question (Plakoto's mother, the Acey-Deucey double) reads the turn
  *   before it.
  * Your own moves on the phone are not read again: the text goes once you
@@ -180,7 +182,7 @@ export function onlineTurnAnnouncement(
   if (game.phase === 'awaiting-roll') {
     if (pass !== null) return null;
     played();
-    if (isYou(game.state.toMove)) lines.push(t('game.pass.next_you'));
+    if (isYou(game.state.toMove)) lines.push(t('game.announce.next_you'));
     return lines.length > 0 ? lines.join(' ') : null;
   }
   // The other player's draft used every die (#374): their moves are read

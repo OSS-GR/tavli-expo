@@ -128,9 +128,9 @@ async function playToTheEnd(store: GameStore) {
     const view = turnView(flow);
     if (view.matchPhase !== 'playing') break;
     const card = (testID: string) => screen.queryByTestId(testID) !== null;
-    if (passNotice(flow) && card('pass-ok-button')) {
-      if (screen.queryByText('Board locked') !== null) seen.lockedPasses++;
-      await press('pass-ok-button');
+    if (passNotice(flow) && card('pass-inlay-cover')) {
+      if (screen.queryByText(/^The board opens only with/) !== null) seen.lockedPasses++;
+      await press('pass-inlay-cover');
     } else if (view.phase === 'opening-roll') await pressOpeningRoll();
     else if (openingStatus(view.game) && card('opening-overlay')) await press('opening-overlay');
     else if (view.phase === 'awaiting-roll') {
@@ -215,19 +215,17 @@ describe('<GameScreen /> plays Asodio with taps only', () => {
 });
 
 describe('<GameScreen /> Asodio loading lock and entering', () => {
-  it('asodio.md #14: an opening 5-3 is locked: the turn passes with a clear card', async () => {
+  it('asodio.md #14: an opening 5-3 is locked: the turn passes with a clear inlay', async () => {
     const store = newStore(3, 3);
     storeRef.current = store;
     await show(store);
     await send(store, { type: 'rollOpening', player: 'white', die: 5 });
     await send(store, { type: 'rollOpening', player: 'black', die: 3 });
-    const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText('Board locked')).toBeOnTheScreen();
-    expect(
-      card.getByText('Ann rolled 5-3. The board opens only with a 1-2 or a double.'),
-    ).toBeOnTheScreen();
-    expect(card.getByText('The turn passes to Bob.')).toBeOnTheScreen();
-    await press('pass-ok-button');
+    const card = within(screen.getByTestId('pass-inlay'));
+    expect(card.getByText('No moves')).toBeOnTheScreen();
+    expect(card.getByText('Ann rolled 5-3 · Bob’s turn')).toBeOnTheScreen();
+    expect(card.getByText('The board opens only with a 1-2 or a double')).toBeOnTheScreen();
+    await press('pass-inlay-cover');
     // The pass was the opening turn: the opening card does not come back.
     expect(screen.queryByTestId('opening-overlay')).toBeNull();
 
@@ -263,7 +261,7 @@ describe('<GameScreen /> Asodio loading lock and entering', () => {
     await send(store, { type: 'rollOpening', player: 'white', die: 2 });
     await send(store, { type: 'rollOpening', player: 'black', die: 1 });
     await press('opening-overlay');
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     const [stack] = sourcesNow(store);
     expect(stack?.key).toBe('bar:player');
     expect(stack?.targets.map((t) => t.key).sort()).toEqual(['p23', 'p24']);
@@ -289,11 +287,9 @@ describe('<GameScreen /> Asodio frozen army (A6)', () => {
     expect(within(screen.getByTestId('strip-bottom')).getByText(/Army frozen/)).toBeOnTheScreen();
 
     await send(store, { type: 'roll', player: 'white', dice: [6, 5] });
-    const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText('Army frozen')).toBeOnTheScreen();
-    expect(
-      card.getByText('Ann rolled 6-5. Their last checker is pinned, so no checker can move.'),
-    ).toBeOnTheScreen();
+    const card = within(screen.getByTestId('pass-inlay'));
+    expect(card.getByText('Ann rolled 6-5 · Bob’s turn')).toBeOnTheScreen();
+    expect(card.getByText('Their last checker is pinned')).toBeOnTheScreen();
     expect(store.getState().flow.game.state.toMove).toBe('black');
   });
 });

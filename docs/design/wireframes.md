@@ -323,9 +323,8 @@ Route `app/tutorial.tsx`, pushed from the Home card, Settings → Help or the Po
 <img src="wireframes/11-board-no-moves.png" width="300" alt="Board: no legal moves">
 
 - The dice still show (faded) and are recorded (`tavli-match.md`, edge case 13).
-- A card explains why in plain words: "You rolled 6-6. Your checker on the bar cannot enter: point 19 is blocked. Your turn passes."
-- **OK** closes it. Your own pass waits for OK, so there is time to read why (#178). The image still shows the old "Closes by itself after 3 s." line.
-- When the bot cannot move: "Bot cannot move. Your turn." It closes by itself after 3.5 s; OK closes it sooner.
+- The wireframe shows the first pass card. Since #613 an inlay on the bar takes its place (Figma "27 v2 · No legal moves, inlay on the bar"): no scrim and no OK. It says "No moves for you" and "You rolled 6-6 · Bot’s turn", and in Asodio the reason. The dice get the slash.
+- Every pass closes after a flat 2 s, with a gold countdown line; a tap on the board closes it sooner. With a screen reader on, it waits for its Close action. See "No legal moves" in `docs/architecture/board-screen.md`.
 
 ### Board: other states
 

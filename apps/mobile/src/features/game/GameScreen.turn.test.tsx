@@ -28,7 +28,7 @@ import {
   turnNoteKey,
 } from './confirmHint';
 import { createGameStore, type GameStore } from './gameStore';
-import { BOT_PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
+import { PASS_NOTICE_MS, GameScreen, MATCH_END_DELAY_MS, type BotSeat } from './GameScreen';
 import type { Seat } from './seats';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -88,7 +88,7 @@ async function annMoves61(store = newStore()) {
 const button = (name: RegExp | string) => screen.getByRole('button', { name });
 const phase = (store: GameStore) => store.getState().flow.game.phase;
 
-// The opening result, the pass card and the match end run on timers.
+// The opening result, the pass inlay and the match end run on timers.
 runOnFakeTimers();
 
 beforeEach(async () => {
@@ -396,7 +396,7 @@ const closedBoard = createBoard(
 describe('<GameScreen /> no legal moves', () => {
   const closed = closedBoard;
 
-  it('explains the pass, keeps the faded dice and closes on OK', async () => {
+  it('shows the inlay on the bar, slashes the dice and closes on a tap (#613)', async () => {
     const user = setupUser();
     const store = newStore();
     setPosition(store, closed);
@@ -405,45 +405,75 @@ describe('<GameScreen /> no legal moves', () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
     });
     expect(store.getState().flow.game.state.toMove).toBe('black');
-    expect(screen.getByText('No legal moves')).toBeOnTheScreen();
-    expect(screen.getByText('Ann rolled 6-6. No checker can move.')).toBeOnTheScreen();
-    // The faded dice stay on the board, under the card (it says the roll).
+    const inlay = within(screen.getByTestId('pass-inlay'));
+    expect(inlay.getByText('No moves')).toBeOnTheScreen();
+    expect(inlay.getByText('Ann rolled 6-6 · Bob’s turn')).toBeOnTheScreen();
+    expect(screen.getByTestId('pass-inlay')).toHaveProp(
+      'accessibilityLabel',
+      'No moves. Ann rolled 6-6. Bob’s turn',
+    );
+    // The dice of the pass stay on the board, all slashed: none can be played.
     expect(
-      screen.getByLabelText('Dice 6-6-6-6, 0 left to play', { includeHiddenElements: true }),
+      screen.getByLabelText(/^Dice 6-6-6-6, 0 left to play\. 4 dice can't be played/),
     ).toBeOnTheScreen();
-    // The board stays with Ann until the card closes.
+    // No scrim: the board stays in view, also for screen readers.
+    expect(screen.getByTestId('game-board')).toBeOnTheScreen();
+    // The board stays with Ann until the inlay closes.
     expect(within(screen.getByTestId('strip-bottom')).getByText('Ann')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Roll dice, or swipe the board' })).toBeNull();
 
-    await user.press(button('OK'));
-    expect(screen.queryByText('No legal moves')).toBeNull();
+    await user.press(screen.getByTestId('pass-inlay-cover'));
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     expect(within(screen.getByTestId('strip-bottom')).getByText('Bob')).toBeOnTheScreen();
     expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
-  it('your own pass waits for OK: it does not close by itself (#178)', async () => {
-    const user = setupUser();
+  it('your own pass closes by itself after 2 s too (#613)', async () => {
     const store = newStore();
     setPosition(store, closed);
     await show(store);
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
     });
-    // A settings change draws the screen again meanwhile.
     await act(async () => {
-      jest.advanceTimersByTime(30_000);
+      jest.advanceTimersByTime(PASS_NOTICE_MS / 2);
     });
+    // A settings change draws the screen again meanwhile: the time does not start again.
     await act(async () => {
       settingsStore.setState({ showHints: false });
     });
     await act(async () => {
-      jest.advanceTimersByTime(30_000);
+      jest.advanceTimersByTime(PASS_NOTICE_MS / 2 - 100);
     });
-    const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText('Ann rolled 5-2. No checker can move.')).toBeOnTheScreen();
-    expect(card.queryByText(/Closes by itself/)).toBeNull();
-    await user.press(button('OK'));
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(
+      within(screen.getByTestId('pass-inlay')).getByText('Ann rolled 5-2 · Bob’s turn'),
+    ).toBeOnTheScreen();
+    await act(async () => {
+      jest.advanceTimersByTime(110);
+    });
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
+  });
+
+  it('with a screen reader on, the inlay waits for its Close action (#613)', async () => {
+    const reader = jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+    const store = newStore();
+    setPosition(store, closed);
+    await show(store);
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'white', dice: [5, 2] });
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(PASS_NOTICE_MS * 10);
+    });
+    const inlay = screen.getByTestId('pass-inlay');
+    expect(inlay).toHaveProp('accessibilityActions', [{ name: 'activate', label: 'Close' }]);
+    await act(async () => {
+      fireEvent(inlay, 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
+    });
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
+    // Back to the RN mock's answer (no screen reader): mockRestore would
+    // leave a mock that returns undefined.
+    reader.mockResolvedValue(false);
   });
 });
 
@@ -479,29 +509,28 @@ describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
     await show(store, { seats, bot });
     await tick(0);
     expect(store.getState().flow.game.state.toMove).toBe('white');
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
     if (paused) await screen.rerender(<GameScreen store={store} seats={seats} bot={bot} paused />);
     return store;
   }
 
-  it('your pass waits for OK; then the bot plays its turn', async () => {
-    const user = setupUser();
+  it('your pass closes after 2 s; then the bot plays its turn', async () => {
     const store = newStore();
     setPosition(store, closedBoard);
     await show(store, { seats, bot });
     await act(async () => {
       store.getState().dispatch({ type: 'roll', player: 'white', dice: [6, 6] });
     });
-    expect(screen.getByText('You rolled 6-6. No checker can move.')).toBeOnTheScreen();
-    expect(screen.getByText('The turn passes to Bot.')).toBeOnTheScreen();
-    // The bot waits while the card shows: it has not rolled.
-    await tick(30_000);
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    const inlay = within(screen.getByTestId('pass-inlay'));
+    expect(inlay.getByText('No moves for you')).toBeOnTheScreen();
+    expect(inlay.getByText('You rolled 6-6 · Bot’s turn')).toBeOnTheScreen();
+    // The bot waits while the inlay shows: it has not rolled.
+    await tick(PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
     expect(store.getState().flow.game.state.dice).toBeNull();
-    expect(screen.queryByText(/Closes by itself/)).toBeNull();
 
-    await user.press(button('OK'));
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    await tick(110);
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     // A whole bot turn at Normal speed (#172) takes a few seconds of fake time.
     await waitFor(() => expect(store.getState().flow.game.state.toMove).toBe('white'), {
       timeout: 30_000,
@@ -510,38 +539,37 @@ describe('<GameScreen /> no legal moves vs the bot (#178)', () => {
     expect(rolls.length).toBeGreaterThan(1);
   });
 
-  it('the bot’s pass shows 3.5 s, then you can roll', async () => {
+  it('the bot’s pass shows 2 s, then you can roll', async () => {
     await botPasses();
-    const card = within(screen.getByTestId('pass-card'));
-    expect(card.getByText(/^Bot rolled \d-\d\. No checker can move\.$/)).toBeOnTheScreen();
-    expect(card.getByText('Your turn.')).toBeOnTheScreen();
-    expect(card.getByText('Closes by itself after 3.5 s.')).toBeOnTheScreen();
+    const inlay = within(screen.getByTestId('pass-inlay'));
+    expect(inlay.getByText('No moves')).toBeOnTheScreen();
+    expect(inlay.getByText(/^Bot rolled \d-\d · Your turn$/)).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Roll dice, or swipe the board' })).toBeNull();
-    await tick(BOT_PASS_NOTICE_MS - 100);
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await tick(PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
     await tick(110);
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
-  it('OK closes the bot’s pass sooner', async () => {
+  it('a tap closes the bot’s pass sooner', async () => {
     const user = setupUser();
     await botPasses();
-    await user.press(button('OK'));
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    await user.press(screen.getByTestId('pass-inlay-cover'));
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
     expect(button('Roll dice, or swipe the board')).toBeOnTheScreen();
   });
 
   it('the bot’s pass does not close while the screen is paused (menu open)', async () => {
     const store = await botPasses(true);
-    await tick(BOT_PASS_NOTICE_MS * 3);
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
-    // Back from the menu: the card shows its full time again.
+    await tick(PASS_NOTICE_MS * 3);
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
+    // Back from the menu: the inlay shows its full time again.
     await screen.rerender(<GameScreen store={store} seats={seats} bot={bot} />);
-    await tick(BOT_PASS_NOTICE_MS - 100);
-    expect(screen.getByTestId('pass-card')).toBeOnTheScreen();
+    await tick(PASS_NOTICE_MS - 100);
+    expect(screen.getByTestId('pass-inlay')).toBeOnTheScreen();
     await tick(110);
-    expect(screen.queryByTestId('pass-card')).toBeNull();
+    expect(screen.queryByTestId('pass-inlay')).toBeNull();
   });
 });
 
