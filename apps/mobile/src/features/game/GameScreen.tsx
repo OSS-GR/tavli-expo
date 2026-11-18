@@ -87,6 +87,7 @@ import type { BotRunner, Difficulty } from '@tavli/contracts';
 import {
   applyMoveToBoard,
   currentPrompt,
+  sameMove,
   diceMoves,
   isRace,
   STANDARD_VARIANT_IDS,
@@ -179,7 +180,7 @@ import { PassInlay } from './PassInlay';
 import { GameEndSheet } from './GameEndSheet';
 import { isHumanWin, storeEvents, useGameFeedback } from './gameFeedback';
 import { diceView, turnView, useGameStore, type BoardStore, type DieView } from './gameStore';
-import { addGroup, dropTop, undoSize, type MoveGroup } from './moveGroups';
+import { addGroup, dropTop, takeBackMoves, undoSize, type MoveGroup } from './moveGroups';
 import { isChoosingStarter, nextOpeningRoller, openingDiceInPlay, openingStatus } from './opening';
 import { OpeningCard } from './OpeningCard';
 import { PlayerStrip, type SeatClock } from './PlayerStrip';
@@ -669,7 +670,14 @@ export function GameScreen({
   // One checker with several dice (#180): the "2+3" targets, from the engine.
   const paths = useMemo(() => (othersTurn ? [] : flowPaths(game)), [game, othersTurn]);
   // The combined moves of this turn, so one Undo takes back each one whole.
+  // The handlers read the ref (it is current right after a dispatch); the
+  // render reads the copy in state, for the board's take-back (#626).
   const groups = useRef<readonly MoveGroup[]>([]);
+  const [shownGroups, setShownGroups] = useState<readonly MoveGroup[]>([]);
+  const setGroups = (next: readonly MoveGroup[]) => {
+    groups.current = next;
+    setShownGroups(next);
+  };
 
   // The Hint (#209): only on a person's turn with rolled dice, no question
   // open (Plakoto's mother, the Acey-Deucey double), and more than one end
@@ -970,7 +978,7 @@ export function GameScreen({
     }
     const next = store.getState().flow.game;
     const turnEnded = next.state.toMove !== mover || next.phase === 'awaiting-roll';
-    if (!turnEnded) groups.current = addGroup(groups.current, next, steps.length);
+    if (!turnEnded) setGroups(addGroup(groups.current, next, steps.length));
     if (geo === null || (turnEnded && flipMode === 'flip')) {
       setFlights([]);
       return true;
@@ -1009,15 +1017,17 @@ export function GameScreen({
 
   /**
    * Takes back the last move, or the whole combined move on top (#180):
-   * one engine `undo` per step, and one flight back along the path.
+   * one engine `undo` per step, and one flight back along the path. `from`:
+   * the checker was dragged back and dropped there (#626), so it flies on
+   * from that point.
    */
-  const undo = (): boolean => {
+  const undo = (from?: { x: number; y: number }): boolean => {
     const now = store.getState().flow;
     const size = undoSize(groups.current, now.game);
     const taken = now.game.played.slice(now.game.played.length - size);
     const mover = now.game.state.toMove;
     const before = turnView(now).board;
-    groups.current = dropTop(groups.current, now.game);
+    setGroups(dropTop(groups.current, now.game));
     let done = 0;
     while (done < size && dispatch({ type: 'undo', player: mover })) done += 1;
     const [last] = taken.slice(-1);
@@ -1028,11 +1038,50 @@ export function GameScreen({
     const id = `u${store.getState().flow.log.length}`;
     const back =
       taken.length > 1 && done === taken.length
-        ? pathFlights(geo, boardView, mover, taken, after, { id, undo: true, direction })
-        : moveFlights(geo, boardView, mover, last, before, after, { id, undo: true });
+        ? pathFlights(geo, boardView, mover, taken, after, {
+            id,
+            undo: true,
+            direction,
+            ...(from ? { from } : {}),
+          })
+        : moveFlights(geo, boardView, mover, last, before, after, {
+            id,
+            undo: true,
+            ...(from ? { from } : {}),
+          });
     setFlights(back);
     return true;
   };
+
+  /**
+   * The board's take-back (#626): the checker of the last move group was
+   * dragged, or tapped and then tapped, back where the group started. It is
+   * the Undo button, so it takes back the same moves. If the turn changed
+   * since the board drew the target (other moves), nothing happens and the
+   * checker flies back.
+   */
+  const onTakeBack = (
+    moves: readonly Move[],
+    _geo: BoardGeometry,
+    from: { x: number; y: number } | null,
+  ): boolean => {
+    if (othersTurn || blocked || showPass || passWaits) return false;
+    const now = store.getState().flow.game;
+    const expected = takeBackMoves(groups.current, now);
+    const same =
+      expected.length === moves.length &&
+      expected.every((move, i) => {
+        const other = moves[i];
+        return other !== undefined && sameMove(move, other);
+      });
+    if (!same) return false;
+    return undo(from ?? undefined);
+  };
+  // Only while the Undo button could take it back, on your own turn.
+  const takeBackNow =
+    view.canUndo && !blocked && !othersTurn && !showPass && !passWaits
+      ? takeBackMoves(shownGroups, game)
+      : [];
 
   const confirm = (): boolean => {
     const mover = store.getState().flow.game.state.toMove;
@@ -1470,7 +1519,7 @@ export function GameScreen({
         size={sideSize}
         circleBox={circleBox}
         disabled={!view.canUndo || showPass || passWaits}
-        onPress={undo}
+        onPress={() => undo()}
       />
     );
     mainButton = (
@@ -2144,6 +2193,7 @@ export function GameScreen({
         onMove={onMove}
         paths={blocked || othersTurn ? [] : paths}
         onSteps={onSteps}
+        {...(takeBackNow.length > 0 ? { takeBack: { moves: takeBackNow, onTakeBack } } : {})}
         onGeometry={onGeometry}
         onBoardTap={(at) => roll({ x: at.x, y: at.y })}
         onBoardSwipe={roll}

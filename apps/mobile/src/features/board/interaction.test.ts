@@ -15,7 +15,7 @@ import {
 import { getLayout, getTheme } from '@tavli/themes';
 
 import { boardLayout, portraitLayout } from './BoardCanvas';
-import { layoutBoard, type BoardView } from './boardModel';
+import { layoutBoard, slotOfDestination, slotOfOrigin, type BoardView } from './boardModel';
 import { flowPaths } from './combined';
 import {
   FLIGHT_MS,
@@ -34,6 +34,7 @@ import {
 import {
   fitBoard,
   fitBoardWithShadow,
+  slotKey,
   slotRect,
   stackPosition,
   type BoardGeometry,
@@ -51,6 +52,7 @@ import {
   pickTarget,
   resolveDrop,
   resolveTap,
+  withTakeBack,
   type MovableSource,
 } from './interaction';
 import { flightPose } from './skia/MovingCheckers';
@@ -74,7 +76,7 @@ function sourcesFor(flow: GameFlow, view = WHITE): MovableSource[] {
   return buildSources(geo, currentBoard(flow), view, 'white', legalNextMoves(flow));
 }
 
-const source = (sources: MovableSource[], key: string) => {
+const source = (sources: readonly MovableSource[], key: string) => {
   const s = sources.find((q) => q.key === key);
   if (!s) throw new Error(`no source ${key}`);
   return s;
@@ -846,4 +848,117 @@ describe('classic board (#184)', () => {
       expect(victim!.hide?.startsWith('bar:')).toBe(true);
     },
   );
+});
+
+describe('withTakeBack (#626)', () => {
+  const keyOfPoint = (n: number) => slotKey(slotOfOrigin(n, 'white', WHITE));
+  const play = (flow: GameFlow, ...moves: Move[]) =>
+    moves.reduce<GameFlow>(
+      (f, move) => applyGameAction(f, { type: 'move', player: 'white', move }),
+      flow,
+    );
+  const takeBackOn = (flow: GameFlow, moves: readonly Move[]) =>
+    withTakeBack(geo, currentBoard(flow), WHITE, 'white', sourcesFor(flow), moves);
+  const takeBackTargets = (sources: readonly MovableSource[]) =>
+    sources.flatMap((s) => s.targets.filter((t) => t.undo).map((t) => ({ at: s.key, t })));
+
+  it('adds the origin to the moved checker when it may move on', () => {
+    const move: Move = { from: 13, to: 8, die: 5, capture: 'none' };
+    const flow = play(whiteToMove([5, 3]), move);
+    const before = sourcesFor(flow);
+    const after = takeBackOn(flow, [move]);
+    // Same sources, in the same order: the indexes of a selection stay right.
+    expect(after.map((s) => s.key)).toEqual(before.map((s) => s.key));
+    const found = takeBackTargets(after);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.at).toBe(keyOfPoint(8));
+    expect(found[0]?.t.key).toBe(keyOfPoint(13));
+    expect(found[0]?.t.moves).toEqual([move]);
+    // It comes after the legal targets, so a legal one is never pushed out.
+    const at8 = source(after, keyOfPoint(8));
+    expect(at8.targets[at8.targets.length - 1]?.undo).toBe(true);
+    expect(at8.targets.slice(0, -1).every((t) => t.undo !== true)).toBe(true);
+  });
+
+  it('makes a source of the moved checker when nothing can move any more', () => {
+    const a: Move = { from: 13, to: 8, die: 5, capture: 'none' };
+    const b: Move = { from: 13, to: 10, die: 3, capture: 'none' };
+    const flow = play(whiteToMove([5, 3]), a, b);
+    expect(sourcesFor(flow)).toEqual([]);
+    const after = takeBackOn(flow, [b]);
+    expect(after).toHaveLength(1);
+    expect(after[0]?.key).toBe(keyOfPoint(10));
+    expect(after[0]?.targets.map((t) => [t.key, t.undo])).toEqual([[keyOfPoint(13), true]]);
+    // Drop or tap on 13: the take-back. Dropping on 8 means nothing.
+    const at13 = center(slotRect(geo, slotOfOrigin(13, 'white', WHITE)));
+    expect(resolveDrop(after, 0, at13.x, at13.y)).toEqual({ kind: 'move', target: 0 });
+    expect(resolveTap(after, 0, at13.x, at13.y)).toEqual({ kind: 'move', source: 0, target: 0 });
+    const at8 = center(slotRect(geo, slotOfDestination(8, 'white', WHITE)));
+    expect(resolveDrop(after, 0, at8.x, at8.y).kind).toBe('illegal');
+  });
+
+  it('puts a combined move back where its first step started', () => {
+    const steps: Move[] = [
+      { from: 13, to: 8, die: 5, capture: 'none' },
+      { from: 8, to: 5, die: 3, capture: 'none' },
+    ];
+    const flow = play(whiteToMove([5, 3]), ...steps);
+    const found = takeBackTargets(takeBackOn(flow, steps));
+    expect(found.map((f) => [f.at, f.t.key])).toEqual([[keyOfPoint(5), keyOfPoint(13)]]);
+    expect(found[0]?.t.moves).toEqual(steps);
+  });
+
+  it('adds nothing for a checker borne off, or with no moves', () => {
+    const board = createBoard(
+      { white: { points: { 6: 2, 5: 13 } }, black: { points: { 24: 15 } } },
+      'contrary',
+    );
+    const off: Move = { from: 6, to: 'off', die: 6, capture: 'none' };
+    const flow = play(whiteToMove([6, 1], board), off);
+    const before = sourcesFor(flow);
+    expect(takeBackOn(flow, [off])).toEqual(before);
+    expect(takeBackTargets(takeBackOn(flow, [off]))).toEqual([]);
+    expect(takeBackTargets(takeBackOn(flow, []))).toEqual([]);
+  });
+
+  it('a hit: the checker goes back, and lands on its own point', () => {
+    const board = createBoard(
+      { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+      'contrary',
+    );
+    const hit: Move = { from: 13, to: 8, die: 5, capture: 'hit' };
+    const flow = play(whiteToMove([5, 3], board), hit);
+    const [found] = takeBackTargets(takeBackOn(flow, [hit]));
+    expect(found?.at).toBe(keyOfPoint(8));
+    // One white checker is left on 13: the ghost sits as the second one.
+    const home = slotOfOrigin(13, 'white', WHITE);
+    expect(found?.t.landing).toEqual(stackPosition(geo, home, 2, 1));
+  });
+
+  it('Plakoto: a checker that left a pinned blot lands on top of it again', () => {
+    const rules = resolveRules('plakoto', { match: { rotation: ['plakoto'] } });
+    const start = plakoto.initialState({ startingPlayer: 'white', rules });
+    const board = createBoard(
+      { white: { points: { 13: 2, 6: 13 } }, black: { points: { 17: 1, 24: 14 } } },
+      'contrary',
+    );
+    let flow: GameFlow = createGameFlow({ state: { ...start, board }, starter: 'white' });
+    flow = applyGameAction(flow, { type: 'roll', player: 'white', dice: [5, 3] });
+    const pin: Move = { from: 13, to: 8, die: 5, capture: 'pin' };
+    const on: Move = { from: 8, to: 5, die: 3, capture: 'none' };
+    flow = play(flow, pin, on);
+    const after = withTakeBack(
+      geo,
+      currentBoard(flow),
+      WHITE,
+      'white',
+      buildSources(geo, currentBoard(flow), WHITE, 'white', legalNextMoves(flow)),
+      [on],
+    );
+    const [found] = takeBackTargets(after);
+    expect(found?.t.key).toBe(keyOfPoint(8));
+    expect(found?.t.landing).toEqual(
+      stackPosition(geo, slotOfOrigin(8, 'white', WHITE), 1, 0, true),
+    );
+  });
 });

@@ -12,6 +12,7 @@ import type { BoardState, Move, PlayerId, SourceMoves } from '@tavli/engine';
 import type { MovePath } from './combined';
 
 import {
+  absoluteOfLayout,
   countIn,
   pinnedIn,
   slotOfDestination,
@@ -86,6 +87,11 @@ export interface MoveTarget {
    * for one checker moved with several dice (#180, `combined.ts`).
    */
   readonly moves: readonly Move[];
+  /**
+   * Takes `moves` back (#626): the target is where the last move group of
+   * the turn came from, on the checker it moved. Never a legal move.
+   */
+  readonly undo?: boolean;
 }
 
 /** A checker the player may move now: the top checker of a point or the bar. */
@@ -204,6 +210,75 @@ export function buildSources(
     });
   }
   return sources;
+}
+
+/**
+ * Adds the take-back target (#626): the checker the last move group of the
+ * turn moved (`moves`, in the order played) may go back to where the group
+ * started. It is the Undo button on the board: the screen takes the group
+ * back with the engine's `undo`, so nothing here is a rule.
+ *
+ * The checker is the top one of the group's last point (it was put there
+ * last, and a hit or a pin leaves it on top). If that point is a source
+ * already (the checker may move on), the target joins its targets, after
+ * the legal ones. Otherwise it is a new source with only this target. A
+ * group that bore a checker off adds nothing: a checker in the tray is
+ * never touched.
+ */
+export function withTakeBack(
+  geo: BoardGeometry,
+  board: BoardState,
+  view: BoardView,
+  mover: PlayerId,
+  sources: readonly MovableSource[],
+  moves: readonly Move[],
+): readonly MovableSource[] {
+  const first = moves[0];
+  const last = moves[moves.length - 1];
+  if (first === undefined || last === undefined || last.to === 'off') return sources;
+  const at = slotOfDestination(last.to, mover, view);
+  const home = slotOfOrigin(first.from, mover, view);
+  const homeKey = slotKey(home);
+  const atKey = slotKey(at);
+  if (homeKey === atKey) return sources;
+  const homeCount = countIn(board, home, view);
+  // In Plakoto and Asodio the checker may have pinned a blot where it came
+  // from: back there, it pins the blot again, so it lands on top of it.
+  const repin =
+    home.kind === 'point' &&
+    homeCount > 0 &&
+    (board.points[absoluteOfLayout(home.index, view) - 1]?.[mover] ?? 0) === 0;
+  const target: MoveTarget = {
+    key: homeKey,
+    slot: home,
+    rect: slotRect(geo, home),
+    landing: landingOn(geo, home, homeCount, pinnedIn(board, home, view), repin ? 'pin' : 'none'),
+    r: checkerRadius(geo),
+    move: first,
+    moves,
+    undo: true,
+  };
+  const index = sources.findIndex((s) => s.key === atKey);
+  const source = sources[index];
+  if (source !== undefined) {
+    // A legal move there wins (it never happens: no checker moves backwards).
+    if (source.targets.some((t) => t.key === homeKey)) return sources;
+    return sources.map((s, i) => (i === index ? { ...s, targets: [...s.targets, target] } : s));
+  }
+  const count = countIn(board, at, view);
+  const top = slotTop(geo, at, count, pinnedIn(board, at, view));
+  const checkerKey = topCheckerKey(geo, at, count);
+  if (top === null || checkerKey === null) return sources;
+  return [
+    ...sources,
+    {
+      key: atKey,
+      slot: at,
+      rect: slotRect(geo, at),
+      checker: { key: checkerKey, ...top },
+      targets: [target],
+    },
+  ];
 }
 
 // ---------------------------------------------------------------------------
