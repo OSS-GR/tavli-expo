@@ -34,14 +34,19 @@ Facts from the code on 2026-11-19:
 
 ## Owner decisions
 
-Decide these before phase 1. Each has a recommendation.
+Decided by the owner on 2026-11-19:
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Where does the web app live? | `play.tavlaki.com`. Its own Worker and its own headers; the legal site and the iOS link file stay untouched |
+| 2 | Phone browsers too, or desktop only? | Both. Phone browsers must work |
+| 3 | Which sign-ins on the web? | The same as in the app: guest, email code and Apple, so one account works everywhere (ADR-0008) |
+| 4 | What does an invite link do? | It opens the iPhone app when the app is on the phone (as today). With no app, the page `tavlaki.com/i/<code>` offers two buttons: **Get Tavlaki** and **Continue in the browser**. The friend link page (`/add/`) does the same |
+
+Still open. Decide these before phase 3 and phase 4:
 
 | # | Question | Recommendation | Why |
 |---|----------|----------------|-----|
-| 1 | Where does the web app live? | `play.tavlaki.com` | Its own Worker and its own headers; the legal site and the iOS link file stay untouched. `tavlaki.com/play` is possible but mixes two deploys on one address |
-| 2 | Phone browsers too, or desktop only? | Both | An invite link is mostly opened on a phone. The layouts already fit a phone |
-| 3 | Which sign-ins on the web? | Guest, email code and Apple | The same three as on iPhone, so one account works everywhere (ADR-0008) |
-| 4 | Does an invite link open the web app? | Yes, as a second button | `tavlaki.com/i/<code>` keeps opening the iPhone app. Its page gets **Play in the browser** next to **Get Tavlaki** |
 | 5 | Is the web app public from day one? | No: a closed test first | The link is not shown on the homepage until phase 4 ends |
 | 6 | Pushes on the web? | Not in the first version | Web push is a separate system and Safari on iPhone allows it only for an installed web app. The tab title and a sound tell you it is your turn |
 
@@ -104,7 +109,7 @@ The same account, friends, invites and ranked play as on the phone.
 - **Server:** add the web address to `trustedOrigins` and allow its browser calls (CORS) on the HTTP routes. Nothing else changes: no public function takes a player id, and every rule of ADR-0008 holds.
 - **Session:** the way 0.7 chose. The web twin of `createSecureSessionStorage` and of the Better Auth client passes `authProviderContract` and `betterAuthClient.test.ts`.
 - **Sign-in choices on the web:** guest, email code, and Apple through Apple's web flow (the Services ID the server already has). The same `SignInChoices`; the Apple button is the web twin of `@tavli/apple-sign-in-expo`. Still no account at start: only when the person opens online play.
-- **Invites:** `play…/invite/<code>` opens the invite in the browser. The fallback pages `tavlaki.com/i/` and `/add/` get **Play in the browser** (decision 4). The friend link and its QR code stay the same.
+- **Invites:** `play…/invite/<code>` opens the invite in the browser. The fallback pages `tavlaki.com/i/` and `/add/` get **Continue in the browser** next to **Get Tavlaki** (decision 4); on a computer, where there is no app, the same page shows. The friend link and its QR code stay the same.
 - **Your turn without a push:** the tab title and a sound, only while the tab is open. The async-invite screens say that the browser sends no notification.
 - **Play ranked, friends, leaderboards, block and report, usernames:** the same screens. Check each on the web.
 - **Download my data:** saves a file in place of the share sheet. **Delete my account** and **Sign out of all phones** work the same.
@@ -122,7 +127,7 @@ Done when: a web player and an iPhone player finish a friend match and a ranked 
 - **Delete pages and store answers:** update `docs/legal/site/delete/`; the store forms do not change (the web app is not in a store).
 - **Crash reports and analytics:** a `platform` value of `web`; source maps for the web build go to Sentry. Still no ids, names or ratings.
 - **Supported browsers:** the last two versions of Chrome, Safari, Firefox and Edge, and Safari on iOS 17 or newer. An older browser gets a plain page that says so.
-- **Release:** a closed test with the link shared by hand, then the **Play in the browser** buttons on both homepages and the invite pages, and a What's new entry.
+- **Release:** a closed test with the link shared by hand, then a **Play in the browser** button on both homepages and **Continue in the browser** on the invite pages, and a What's new entry.
 
 Done when: the owner plays on the public address, the legal pages are live, and the browser tests run against the dev site after each deploy.
 

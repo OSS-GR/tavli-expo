@@ -42,7 +42,7 @@ Proposed: **A**, in the phases of `docs/architecture/web-app.md`.
 5. The web app is a static site on Cloudflare, next to the legal site.
 6. The first public web version has no push notifications.
 
-The owner decides the open points in "Owner decisions" of the plan before phase 1 starts. This ADR moves to **Accepted** after phase 0, with its numbers.
+The owner decided the address (`play.tavlaki.com`), phone browsers, the sign-ins and the invite link on 2026-11-19; two points are still open (see "Owner decisions" in the plan). This ADR moves to **Accepted** after phase 0, with its numbers.
 
 ## Consequences
 
