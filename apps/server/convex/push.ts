@@ -495,14 +495,19 @@ export const sendFriendInvitePush = internalAction({
 // Friend requests (#631)
 
 /** Which friend push (`FriendPushKind`). */
-const friendPushKind = v.union(v.literal('friendRequest'), v.literal('friendAccepted'));
+const friendPushKind = v.union(
+  v.literal('friendRequest'),
+  v.literal('friendAccepted'),
+  v.literal('friendAdded'),
+);
 
 /**
  * Called by the friend functions (`friends.ts`) in their transaction:
  * schedules `sendFriendPush` to `toId` about `fromId` when `toId` has a
  * push token. `friendRequest`: `fromId` asked `toId`. `friendAccepted`:
  * `fromId` accepted the request of `toId` (or asked back, which makes them
- * friends). It sends nothing itself, so a failed push can never undo the
+ * friends). `friendAdded`: `fromId` opened the friend link of `toId`
+ * (#638), so they are friends. It sends nothing itself, so a failed push can never undo the
  * request.
  */
 export async function scheduleFriendPush(
@@ -546,8 +551,9 @@ export const friendPushTokens = internalQuery({
 });
 
 /**
- * Sends a friend push (`friendMessages`: "<name> wants to be your friend"
- * or "<name> accepted your friend request", in each phone's language) to
+ * Sends a friend push (`friendMessages`: "<name> wants to be your friend",
+ * "<name> accepted your friend request" or "<name> added you as a
+ * friend", in each phone's language) to
  * the phones of `toId`; a tap opens Friends. Removes the dead tokens and
  * tries the failed ones once more after `PUSH_RETRY_MS`, as
  * `sendTurnPush` does.

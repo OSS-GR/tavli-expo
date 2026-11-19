@@ -65,8 +65,13 @@ async function savedPlayers(
   return ids;
 }
 
-/** `from` asks `to` by `to`'s link. */
+/** `from` asks `to` by username (`markNamed`: `U_<id>`). A friend link adds at once (#638). */
 async function ask(server: MemoryGameServer, from: string, to: string) {
+  return await server.friendsFor(from).requestByUsername(`U_${to}`);
+}
+
+/** `from` opens `to`'s friend link. */
+async function addByLink(server: MemoryGameServer, from: string, to: string) {
   const token = await server.friendsFor(to).myFriendLink();
   return await server.friendsFor(from).requestByLink(token);
 }
@@ -111,6 +116,13 @@ describe('friends on the in-memory server', () => {
     // `me` cannot ask, and cannot be asked.
     await expect(ask(server, 'me', 'late')).rejects.toMatchObject({ code: 'TOO_MANY_FRIENDS' });
     await expect(ask(server, 'late', 'me')).rejects.toMatchObject({ code: 'TRY_LATER' });
+    // A friend link checks the cap on both sides too (#638).
+    await expect(addByLink(server, 'late', 'me')).rejects.toMatchObject({
+      code: 'TOO_MANY_FRIENDS',
+    });
+    await expect(addByLink(server, 'me', 'late')).rejects.toMatchObject({
+      code: 'TOO_MANY_FRIENDS',
+    });
     // A request sent before the cap cannot be accepted past it.
     await server.friendsFor('p0').removeFriend('me');
     await ask(server, 'late', 'me');

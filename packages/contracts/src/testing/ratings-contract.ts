@@ -289,9 +289,9 @@ export function ratingsContract(): readonly RatingsContractCheck[] {
         // Friend calls need a username (#599).
         await setUsername(subject, 'alice', 'AliceFriend');
         await setUsername(subject, 'bob', 'BobFriend');
+        // A friend link adds at once (#638).
         const token = await subject.friendsFor('bob').myFriendLink();
         await subject.friendsFor('alice').requestByLink(token);
-        await subject.friendsFor('bob').acceptRequest(subject.idOf('alice'));
         await win(subject, 'bob', 'alice');
         await win(subject, 'carol', 'alice');
         const board = await subject.ratingsFor('alice').friendsBoard();

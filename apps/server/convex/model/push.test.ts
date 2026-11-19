@@ -423,4 +423,15 @@ describe('friendMessages (#631)', () => {
       'A player accepted your friend request.',
     );
   });
+
+  it('says a friend link added you, in both languages (#638)', () => {
+    expect(friendMessages('friendAdded', en('t1'), named)[0]).toMatchObject({
+      title: 'New friend',
+      body: 'nikos added you as a friend. You are friends now.',
+      data: { screen: 'friends' },
+    });
+    expect(friendMessages('friendAdded', [{ token: 't2', locale: 'el' }], named)[0]?.body).toBe(
+      'nikos σε πρόσθεσε στους φίλους. Είστε πλέον φίλοι.',
+    );
+  });
 });

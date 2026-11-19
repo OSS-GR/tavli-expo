@@ -33,7 +33,8 @@ export type PushTextKind =
   | 'matchEnd'
   | 'friendInvite'
   | 'friendRequest'
-  | 'friendAccepted';
+  | 'friendAccepted'
+  | 'friendAdded';
 
 /** The text of one kind of push: the body names the other player when the server has a name. */
 interface PushTextForms {
@@ -86,6 +87,11 @@ export const PUSH_TEXTS: Readonly<
       named: (name) => `${name} accepted your friend request.`,
       unnamed: 'A player accepted your friend request.',
     },
+    friendAdded: {
+      title: 'New friend',
+      named: (name) => `${name} added you as a friend. You are friends now.`,
+      unnamed: 'A player added you as a friend. You are friends now.',
+    },
   },
   el: {
     turn: {
@@ -122,6 +128,11 @@ export const PUSH_TEXTS: Readonly<
       title: 'Νέα φιλία',
       named: (name) => `${name} αποδέχτηκε το αίτημα φιλίας σου.`,
       unnamed: 'Ένας παίκτης αποδέχτηκε το αίτημα φιλίας σου.',
+    },
+    friendAdded: {
+      title: 'Νέα φιλία',
+      named: (name) => `${name} σε πρόσθεσε στους φίλους. Είστε πλέον φίλοι.`,
+      unnamed: 'Ένας παίκτης σε πρόσθεσε στους φίλους. Είστε πλέον φίλοι.',
     },
   },
 };
@@ -437,8 +448,11 @@ export function friendInviteMessages(
   }));
 }
 
-/** The friend pushes (#631): a friend request, and a request accepted. */
-export type FriendPushKind = 'friendRequest' | 'friendAccepted';
+/**
+ * The friend pushes (#631): a friend request, a request accepted, and a
+ * friend added from your friend link or QR code (#638).
+ */
+export type FriendPushKind = 'friendRequest' | 'friendAccepted' | 'friendAdded';
 
 /**
  * How long the push service keeps a friend push, in seconds: one day,

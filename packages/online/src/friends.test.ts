@@ -27,7 +27,7 @@ import type { PlanRequestInput } from './friends';
 const NOW = Date.UTC(2026, 10, 9, 12, 0, 0);
 
 const BASE: PlanRequestInput = {
-  route: 'link',
+  route: 'username',
   self: false,
   savedTarget: true,
   met: true,
@@ -100,6 +100,21 @@ describe('planRequest', () => {
     });
     expect(codeOf({ theirs: OPEN, callerFriends: MAX_FRIENDS })).toBe('TOO_MANY_FRIENDS');
     expect(codeOf({ theirs: OPEN, targetFriends: MAX_FRIENDS })).toBe('TOO_MANY_FRIENDS');
+  });
+
+  it('adds at once by friend link, inside the friend caps (#638)', () => {
+    const link = { ...BASE, route: 'link' } as const;
+    expect(planRequest(link)).toEqual({ kind: 'add' });
+    const declined = { status: 'declined', createdAt: NOW, declinedAt: NOW } as const;
+    expect(planRequest({ ...link, mine: declined })).toEqual({ kind: 'add' });
+    expect(planRequest({ ...link, mine: OPEN, openSent: MAX_OPEN_FRIEND_REQUESTS })).toEqual({
+      kind: 'add',
+    });
+    expect(planRequest({ ...link, theirs: OPEN })).toEqual({ kind: 'accept' });
+    expect(planRequest({ ...link, friends: true })).toEqual({ kind: 'status', status: 'friends' });
+    expect(codeOf({ route: 'link', callerFriends: MAX_FRIENDS })).toBe('TOO_MANY_FRIENDS');
+    expect(codeOf({ route: 'link', targetFriends: MAX_FRIENDS })).toBe('TOO_MANY_FRIENDS');
+    expect(codeOf({ route: 'link', targetBlocks: true })).toBe('NOT_FOUND');
   });
 
   it('waits FRIEND_REQUEST_WAIT_MS after a decline', () => {

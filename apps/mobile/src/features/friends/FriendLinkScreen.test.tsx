@@ -1,6 +1,6 @@
 /**
  * A friend link (#406), on the Jest online fake: whose link it is, and
- * "Ask to be friends".
+ * the Yes/No prompt that adds both at once (#638).
  */
 import { act, render, screen } from '@testing-library/react-native';
 
@@ -50,28 +50,46 @@ async function show(token: string | null) {
 const annName = () => `U_${ANN}`;
 
 describe('<FriendLinkScreen />', () => {
-  it('shows whose link it is; Ask sends the request', async () => {
+  it('asks before it adds; Yes makes us friends both ways at once (#638)', async () => {
     const token = await annLink();
     onlineFake.authStore.session = { id: ME, isGuest: false };
     await markNamed(onlineFake.server(), ME);
-    await show(token);
+    const props = await show(token);
     expect(screen.getByText(`This is the friend link of ${annName()}.`)).toBeOnTheScreen();
-    await setupUser().press(screen.getByRole('button', { name: 'Ask to be friends' }));
+    expect(screen.getByTestId('friend-link-confirm')).toHaveTextContent(
+      `You are about to add ${annName()} as your friend.`,
+    );
+    await setupUser().press(screen.getByRole('button', { name: 'Yes, add' }));
     await flush();
     expect(screen.getByTestId('friend-link-status')).toHaveTextContent(
-      'You asked. They have not answered yet.',
+      `You and ${annName()} are friends.`,
     );
-    const { incoming } = await onlineFake.server().friendsFor(ANN).listRequests();
-    expect(incoming.map((r) => r.playerId)).toEqual([ME]);
+    const annFriends = await onlineFake.server().friendsFor(ANN).listFriends();
+    expect(annFriends.map((f) => f.playerId)).toEqual([ME]);
+    expect(await onlineFake.server().friendsFor(ANN).listRequests()).toEqual({
+      incoming: [],
+      outgoing: [],
+    });
+    expect(props.onBack).not.toHaveBeenCalled();
   });
 
-  it('when the owner asked me first, Accept makes us friends', async () => {
+  it('No goes back and adds nobody (#638)', async () => {
+    const token = await annLink();
+    onlineFake.authStore.session = { id: ME, isGuest: false };
+    await markNamed(onlineFake.server(), ME);
+    const props = await show(token);
+    await setupUser().press(screen.getByRole('button', { name: 'No' }));
+    expect(props.onBack).toHaveBeenCalled();
+    expect(await onlineFake.server().friendsFor(ANN).listFriends()).toEqual([]);
+  });
+
+  it('when the owner asked me first, Yes makes us friends', async () => {
     const token = await annLink();
     onlineFake.authStore.session = { id: ME, isGuest: false };
     await markNamed(onlineFake.server(), ME);
     await onlineFake.server().friendsFor(ANN).sendRequest(ME);
     const props = await show(token);
-    await setupUser().press(screen.getByRole('button', { name: 'Accept' }));
+    await setupUser().press(screen.getByRole('button', { name: 'Yes, add' }));
     await flush();
     expect(screen.getByTestId('friend-link-status')).toHaveTextContent(
       `You and ${annName()} are friends.`,
@@ -80,13 +98,13 @@ describe('<FriendLinkScreen />', () => {
     expect(props.onFriends).toHaveBeenCalled();
   });
 
-  it('a saved account with no username picks one first, then Ask works (#599)', async () => {
+  it('a saved account with no username picks one first, then Yes works (#599)', async () => {
     const token = await annLink();
     onlineFake.authStore.session = { id: ME, isGuest: false };
     onlineFake.server().markSaved(ME);
     await show(token);
     expect(screen.getByTestId('friend-link-username-gate')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Ask to be friends' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Yes, add' })).toBeNull();
     const user = setupUser();
     await user.type(screen.getByTestId('username-input'), 'Orestis');
     await user.press(screen.getByTestId('username-terms'));
@@ -94,10 +112,10 @@ describe('<FriendLinkScreen />', () => {
     await user.press(screen.getByTestId('username-save'));
     await flush();
     expect(screen.queryByTestId('friend-link-username-gate')).toBeNull();
-    await user.press(screen.getByRole('button', { name: 'Ask to be friends' }));
+    await user.press(screen.getByRole('button', { name: 'Yes, add' }));
     await flush();
     expect(screen.getByTestId('friend-link-status')).toHaveTextContent(
-      'You asked. They have not answered yet.',
+      `You and ${annName()} are friends.`,
     );
   });
 
@@ -107,7 +125,7 @@ describe('<FriendLinkScreen />', () => {
     const props = await show(token);
     expect(screen.getByTestId('friend-link-guest')).toBeOnTheScreen();
     expect(screen.getByTestId('friend-link-benefits')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Ask to be friends' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Yes, add' })).toBeNull();
     await setupUser().press(screen.getByRole('button', { name: 'Save my account' }));
     expect(props.onAccount).toHaveBeenCalled();
   });
