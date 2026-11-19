@@ -243,9 +243,10 @@ export interface Friends {
    */
   openFriendLink(token: string): Promise<FoundPlayer | null>;
   /**
-   * Asks the owner of the link. Resolves with the new status: `sent`, or
-   * `friends` when the owner had asked the caller, or was a friend
-   * already. `NOT_FOUND` where `openFriendLink` gives `null`.
+   * Adds the owner of the link as a friend, both ways, at once (#638: the
+   * owner shared the link, so no request). Resolves with `friends`.
+   * `NOT_FOUND` where `openFriendLink` gives `null`; `TOO_MANY_FRIENDS`
+   * when either player has no room.
    */
   requestByLink(token: string): Promise<FriendStatus>;
   /** Like `requestByLink`, by exact username. Counts as one search. */

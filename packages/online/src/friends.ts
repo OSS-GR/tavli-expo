@@ -166,11 +166,15 @@ export interface PlanRequestInput {
  * - `send`: save an open request from the caller (a new row, or the old
  *   declined one sent again).
  * - `accept`: the other player asked first: they become friends.
+ * - `add`: the caller opened the other player's friend link (a QR code or
+ *   a shared link, #638): they become friends at once. Sharing the link is
+ *   the owner's yes, so no request and no wait after a decline.
  */
 export type RequestPlan =
   | { readonly kind: 'status'; readonly status: FriendStatus }
   | { readonly kind: 'send' }
-  | { readonly kind: 'accept' };
+  | { readonly kind: 'accept' }
+  | { readonly kind: 'add' };
 
 /** The friend cap: both players must have room. */
 export function checkFriendCaps(callerFriends: number, targetFriends: number): void {
@@ -196,6 +200,10 @@ export function planRequest(input: PlanRequestInput): RequestPlan {
   if (input.theirs?.status === 'open') {
     checkFriendCaps(input.callerFriends, input.targetFriends);
     return { kind: 'accept' };
+  }
+  if (input.route === 'link') {
+    checkFriendCaps(input.callerFriends, input.targetFriends);
+    return { kind: 'add' };
   }
   if (input.mine?.status === 'open') return { kind: 'status', status: 'sent' };
   if (

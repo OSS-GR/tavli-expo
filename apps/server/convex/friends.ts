@@ -389,6 +389,12 @@ async function askFriend(
     await scheduleFriendPush(ctx, 'friendAccepted', playerId, callerId);
     return 'friends';
   }
+  if (plan.kind === 'add') {
+    // The caller opened the other player's friend link (#638).
+    await makeFriends(ctx, callerId, playerId);
+    await scheduleFriendPush(ctx, 'friendAdded', playerId, callerId);
+    return 'friends';
+  }
   // Sent again after a decline: the same row, open again.
   const row = { status: 'open' as const, createdAt: now, declinedAt: null };
   if (mine === null)
@@ -544,7 +550,10 @@ export const openFriendLink = query({
   },
 });
 
-/** Asks the owner of the link. `NOT_FOUND` where `openFriendLink` gives `null`. */
+/**
+ * Adds the owner of the link as a friend, both ways, at once (#638): the
+ * owner shared it. `NOT_FOUND` where `openFriendLink` gives `null`.
+ */
 export const requestByLink = mutation({
   args: { token: v.string() },
   returns: friendStatus,

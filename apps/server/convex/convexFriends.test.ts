@@ -128,8 +128,25 @@ async function nameFor(t: SchemaTester, viewer: string, player: string) {
   return await t.run((ctx) => nameSeenBy(ctx, viewer, player));
 }
 
-/** `from` asks `to` by `to`'s friend link. */
-async function ask(t: Tester, from: string, to: string) {
+/**
+ * `from` asks `to` by username: a request `to` answers (a friend link adds
+ * at once, #638). A refusal rejects like the other calls (`data.code`).
+ */
+async function ask(t: SchemaTester, from: string, to: string) {
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query('playerNames')
+      .withIndex('by_player', (q) => q.eq('playerId', to))
+      .first(),
+  );
+  const username = row?.username ?? `no_name_${to}`;
+  const result = await as(t, from).mutation(api.friends.requestByUsername, { username });
+  if (!result.ok) throw { data: { code: result.code, message: result.message } };
+  return result.status;
+}
+
+/** `from` opens `to`'s friend link (#638). */
+async function addByLink(t: Tester, from: string, to: string) {
   const token = await as(t, to).mutation(api.friends.myFriendLink, {});
   return await as(t, from).mutation(api.friends.requestByLink, { token });
 }
@@ -301,6 +318,47 @@ describe('friends on the Convex server', () => {
     ]);
   });
 
+  it('a friend link adds both at once and pushes the owner, in their language (#638)', async () => {
+    const t = await setup();
+    await as(t, ALICE).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[alice]',
+      platform: 'ios',
+      locale: 'el',
+    });
+    await expect(addByLink(t, BOB, ALICE)).resolves.toBe('friends');
+    const rows = await friendRows(t);
+    expect(rows.friends.map((row) => [row.playerId, row.friendId]).sort()).toEqual(
+      [
+        [ALICE, BOB],
+        [BOB, ALICE],
+      ].sort(),
+    );
+    expect(rows.requests).toEqual([]);
+    await runScheduled(t);
+    expect(push.sent).toEqual([
+      {
+        to: 'ExponentPushToken[alice]',
+        ...pushText('friendAdded', 'el', await nameFor(t, ALICE, BOB)),
+        data: { screen: 'friends' },
+        priority: 'normal',
+        ttlSeconds: FRIEND_PUSH_TTL_SECONDS,
+      },
+    ]);
+  });
+
+  it('a friendship ended before the "added you" push goes out sends nothing (#638)', async () => {
+    const t = await setup();
+    await as(t, ALICE).mutation(api.push.registerPushToken, {
+      token: 'ExponentPushToken[alice]',
+      platform: 'ios',
+      locale: 'en',
+    });
+    await addByLink(t, BOB, ALICE);
+    await as(t, ALICE).mutation(api.friends.removeFriend, { playerId: BOB });
+    await runScheduled(t);
+    expect(push.sent).toEqual([]);
+  });
+
   it('asking a player who asked you first accepts, and pushes them "New friend" (#631)', async () => {
     const t = await setup();
     await as(t, ALICE).mutation(api.push.registerPushToken, {
@@ -401,7 +459,8 @@ describe('friends on the Convex server', () => {
     await runScheduled(t);
     const left = await friendRows(t);
     expect(left.requests).toEqual([]);
-    expect(left.searches).toEqual([]);
+    // Bob's searches go; the others' stay (their asks by username count).
+    expect(left.searches.filter((row) => row.playerId === BOB)).toEqual([]);
     expect(left.links.map((row) => row.playerId)).toEqual([ALICE]);
     expect(left.invites.filter((invite) => invite.to === BOB)).toEqual([]);
   });

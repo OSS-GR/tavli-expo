@@ -1,7 +1,9 @@
 /**
  * A friend link (#406): what `https://tavlaki.com/add/<token>` (a shared link or a
  * scanned QR code) and a pasted link open. It shows whose link it is and
- * offers "Ask to be friends" (`requestByLink`).
+ * asks "You are about to add NAME as your friend." with Yes and No (#638).
+ * Yes adds both at once (`requestByLink`): the owner shared the link, so
+ * there is no request to accept, and the owner gets a push. No goes back.
  *
  * - The screen makes no account. With nobody signed in it says so. A
  *   guest sees whose link it is (`openFriendLink` answers a guest) and a
@@ -9,7 +11,7 @@
  * - A link that does not work (a wrong or reset token, a deleted
  *   account, or a block) reads the same.
  * - A saved account with no username sees the username gate in place of
- *   Ask (#599): the server answers `USERNAME_NEEDED` to the ask.
+ *   Yes (#599): the server answers `USERNAME_NEEDED` to the add.
  * - Focus moves to the title. Large fonts scroll.
  *
  * Navigation stays in the route (`app/add/[token].tsx`).
@@ -124,7 +126,7 @@ export function FriendLinkScreen({
   // Read each time it shows (iOS VoiceOver does not read `accessibilityRole="alert"`).
   useAnnouncement(problemText);
 
-  const ask = () => {
+  const add = () => {
     if (busy || token === null || state.kind !== 'found') return;
     setBusy(true);
     setProblem(null);
@@ -232,15 +234,21 @@ export function FriendLinkScreen({
                 {state.player.status === 'received' ? (
                   <Text style={styles.line}>{t('friends.status.received')}</Text>
                 ) : null}
+                <Text testID="friend-link-confirm" style={styles.line}>
+                  {t('friends.link.confirm', { name })}
+                </Text>
                 <ActionButton
-                  testID="friend-link-ask"
+                  testID="friend-link-yes"
                   disabled={busy}
-                  label={
-                    state.player.status === 'received'
-                      ? t('friends.link.accept')
-                      : t('friends.link.ask')
-                  }
-                  onPress={ask}
+                  label={t('friends.link.yes')}
+                  onPress={add}
+                />
+                <ActionButton
+                  testID="friend-link-no"
+                  kind="secondary"
+                  disabled={busy}
+                  label={t('friends.link.no')}
+                  onPress={onBack}
                 />
               </>
             ) : (

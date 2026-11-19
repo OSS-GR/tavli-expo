@@ -1593,7 +1593,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       now: now(),
     });
     if (plan.kind === 'status') return plan.status;
-    if (plan.kind === 'accept') {
+    if (plan.kind === 'accept' || plan.kind === 'add') {
       makeFriends(callerId, playerId);
       return 'friends';
     }

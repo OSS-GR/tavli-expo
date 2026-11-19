@@ -863,8 +863,9 @@
       "notFound": "This link does not work. Ask your friend for a new one.",
       "whose": "This is the friend link of {{name}}.",
       "self": "This is your own link. Send it to a friend.",
-      "ask": "Ask to be friends",
-      "accept": "Accept",
+      "confirm": "You are about to add {{name}} as your friend.",
+      "yes": "Yes, add",
+      "no": "No",
       "friends": "You and {{name}} are friends.",
       "openFriends": "See your friends"
     },
@@ -1236,6 +1237,11 @@
         "title": "Better notifications",
         "body": "Notifications now name the other player and come in the app language. You also hear when a game starts, when a player asks to be your friend and when they accept.",
         "where": "Settings › Notifications"
+      },
+      "quickFriends": {
+        "title": "Friends in one tap",
+        "body": "Open a friend's link or scan their QR code, then tap Yes. You are friends at once, with no request to accept, and they get a notification.",
+        "where": "Home › Friends › Add a friend"
       }
     }
   },

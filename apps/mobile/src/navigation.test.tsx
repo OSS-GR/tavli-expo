@@ -1702,7 +1702,7 @@ describe('friends (#406)', () => {
     const token = await server.friendsFor('ann').myFriendLink();
     onlineFake.authStore.session = { id: 'me', isGuest: false };
     await renderRouter('./src/app', { initialUrl: `/add/${token.toLowerCase()}` });
-    expect(await screen.findByRole('button', { name: 'Ask to be friends' })).toBeOnTheScreen();
+    expect(await screen.findByRole('button', { name: 'Yes, add' })).toBeOnTheScreen();
   });
 });
 

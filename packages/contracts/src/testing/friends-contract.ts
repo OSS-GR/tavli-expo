@@ -17,7 +17,7 @@
  * many players or a clock, so each server tests them on its own.
  */
 import { isFriendsErrorData } from '../friends';
-import type { Friends, FriendsErrorCode } from '../friends';
+import type { FriendStatus, Friends, FriendsErrorCode } from '../friends';
 import type { GameTransport } from '../game-transport';
 import { isInviteErrorData } from '../invite';
 import type { InviteErrorCode, Invites, NewInvite } from '../invite';
@@ -116,11 +116,19 @@ async function playGame(
 async function befriend(
   subject: FriendsContractSubject,
   from: FriendsContractPlayer,
-  to: FriendsContractPlayer,
+  to: Named,
 ): Promise<void> {
-  const token = await subject.friendsFor(to).myFriendLink();
-  same(await subject.friendsFor(from).requestByLink(token), 'sent', `${from} asks ${to}`);
+  same(await ask(subject, from, to), 'sent', `${from} asks ${to}`);
   await subject.friendsFor(to).acceptRequest(subject.idOf(from));
+}
+
+/** `from` asks `to` by username: a request `to` answers (a friend link adds at once, #638). */
+async function ask(
+  subject: FriendsContractSubject,
+  from: FriendsContractPlayer,
+  to: Named,
+): Promise<FriendStatus> {
+  return await subject.friendsFor(from).requestByUsername(USERNAMES[to]);
 }
 
 /** The ids of `player`'s friends. */
@@ -208,7 +216,7 @@ function checks(): readonly CheckSpec[] {
 
         // After a pick, the same calls work.
         await setUsername(subject, 'alice', USERNAMES.alice);
-        same(await alice.requestByLink(token), 'sent', 'alice asks bob after her pick');
+        same(await alice.requestByLink(token), 'friends', 'alice adds bob after her pick');
       },
     },
     {
@@ -284,9 +292,12 @@ function checks(): readonly CheckSpec[] {
         check(seen !== null, 'bob opens the link in small letters');
         same(seen?.status, 'none', 'the status bob sees');
         same(await bob.openFriendLink('not-a-token'), null, 'text that is no token');
-        same(await bob.requestByLink(token), 'sent', 'bob asks by link');
-        same(await bob.requestByLink(token), 'sent', 'bob asks again');
-        same((await bob.openFriendLink(token))?.status, 'sent', 'the status after the request');
+        // The link adds at once, both ways: no request (#638).
+        same(await bob.requestByLink(token), 'friends', 'bob adds alice by link');
+        same(await bob.requestByLink(token), 'friends', 'bob opens it again');
+        same((await bob.openFriendLink(token))?.status, 'friends', 'the status after the add');
+        same(await friendIds(subject, 'alice'), [subject.idOf('bob')], "alice's friends");
+        same(await alice.listRequests(), { incoming: [], outgoing: [] }, 'no request');
 
         const fresh = await alice.resetFriendLink();
         check(fresh !== token, 'a reset makes a new token');
@@ -299,14 +310,41 @@ function checks(): readonly CheckSpec[] {
         );
         same(
           await subject.friendsFor('carol').requestByLink(fresh),
-          'sent',
-          'a request by the new link',
+          'friends',
+          'an add by the new link',
         );
-        // The request from before the reset stays.
+        // The friendship from before the reset stays.
         same(
-          (await alice.listRequests()).incoming.map((row) => row.playerId).sort(),
+          (await friendIds(subject, 'alice')).sort(),
           [subject.idOf('bob'), subject.idOf('carol')].sort(),
-          "alice's incoming requests",
+          "alice's friends",
+        );
+      },
+    },
+    {
+      name: 'a friend link adds also after a decline, and ends the open requests (#638)',
+      run: async (subject) => {
+        const alice = subject.friendsFor('alice');
+        const aliceId = subject.idOf('alice');
+        const bobId = subject.idOf('bob');
+        // Alice declined bob, then shows him her QR code: the link adds.
+        await ask(subject, 'bob', 'alice');
+        await alice.declineRequest(bobId);
+        same(
+          await subject.friendsFor('bob').requestByLink(await alice.myFriendLink()),
+          'friends',
+          'bob adds alice',
+        );
+        same(await friendIds(subject, 'bob'), [aliceId], "bob's friends");
+        // Carol asked alice; alice opens carol's link: friends, no request left.
+        same(await ask(subject, 'carol', 'alice'), 'sent', 'carol asks alice');
+        const carolToken = await subject.friendsFor('carol').myFriendLink();
+        same(await alice.requestByLink(carolToken), 'friends', 'alice adds carol');
+        same(await alice.listRequests(), { incoming: [], outgoing: [] }, "alice's requests");
+        same(
+          await subject.friendsFor('carol').listRequests(),
+          { incoming: [], outgoing: [] },
+          "carol's requests",
         );
       },
     },
@@ -319,7 +357,7 @@ function checks(): readonly CheckSpec[] {
         const bobId = subject.idOf('bob');
         await failsWith(alice.acceptRequest(bobId), 'NOT_FOUND', 'accept with no request');
 
-        same(await bob.requestByLink(await alice.myFriendLink()), 'sent', 'bob asks alice');
+        same(await ask(subject, 'bob', 'alice'), 'sent', 'bob asks alice');
         const incoming = (await alice.listRequests()).incoming;
         same(incoming.length, 1, "alice's incoming requests");
         same(incoming[0]?.playerId, bobId, 'the request is from bob');
@@ -350,8 +388,8 @@ function checks(): readonly CheckSpec[] {
         await failsWith(alice.sendRequest(bobId), 'NOT_FOUND', 'alice asks bob by id');
         same(
           await alice.requestByLink(await bob.myFriendLink()),
-          'sent',
-          'alice asks bob by link after remove',
+          'friends',
+          'alice adds bob by link after remove',
         );
       },
     },
@@ -362,17 +400,13 @@ function checks(): readonly CheckSpec[] {
         const bob = subject.friendsFor('bob');
         const aliceId = subject.idOf('alice');
         const bobId = subject.idOf('bob');
-        await bob.requestByLink(await alice.myFriendLink());
+        await ask(subject, 'bob', 'alice');
         await alice.declineRequest(bobId);
         await alice.declineRequest(bobId);
         same(await alice.listRequests(), { incoming: [], outgoing: [] }, 'after the decline');
         same(await bob.listRequests(), { incoming: [], outgoing: [] }, "bob's view");
         await failsWith(bob.sendRequest(aliceId), 'TRY_LATER', 'bob asks again');
-        await failsWith(
-          bob.requestByLink(await alice.myFriendLink()),
-          'TRY_LATER',
-          'bob asks again by link',
-        );
+        await failsWith(ask(subject, 'bob', 'alice'), 'TRY_LATER', 'bob asks again by name');
 
         same(await alice.sendRequest(bobId), 'sent', 'alice asks bob');
         same(
@@ -603,7 +637,7 @@ function checks(): readonly CheckSpec[] {
       run: async (subject) => {
         await befriend(subject, 'alice', 'bob');
         const aliceToken = await subject.friendsFor('alice').myFriendLink();
-        await subject.friendsFor('carol').requestByLink(aliceToken);
+        same(await ask(subject, 'carol', 'alice'), 'sent', 'carol asks alice');
         await subject.friendsFor('alice').inviteFriend(subject.idOf('bob'), GAME);
         await subject.onlineDataFor('alice').deleteMyData();
         await subject.settle();
