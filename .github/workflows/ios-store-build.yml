@@ -59,10 +59,12 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # npm installs EAS CLI: pnpm 12 stops on its unapproved build scripts
+      # (ERR_PNPM_IGNORED_BUILDS). The app's packages still use pnpm.
       - uses: expo/expo-github-action@v9
         with:
           eas-version: latest
-          packager: pnpm
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       # EAS CLI reads the app config, so the app's packages must be installed.
