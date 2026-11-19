@@ -84,6 +84,12 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo export --clear --platform web --output-dir web-dist
 
+      # The site answers a missing file with the app page, so a missing
+      # CanvasKit would only show as a broken board in the browser.
+      - name: Check the build
+        working-directory: apps/mobile
+        run: test -s web-dist/index.html && test -s web-dist/canvaskit.wasm
+
       - uses: actions/upload-artifact@v7
         with:
           name: web-dist
@@ -100,9 +106,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-          sparse-checkout: |
-            apps/mobile/web
-            .nvmrc
+          # Folders only. Files at the repo root (.nvmrc) always come too.
+          sparse-checkout: apps/mobile/web
 
       - uses: actions/setup-node@v7
         with:
