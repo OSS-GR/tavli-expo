@@ -28,7 +28,7 @@
 
 import { createClient } from '@convex-dev/better-auth';
 import type { GenericCtx } from '@convex-dev/better-auth';
-import { convex } from '@convex-dev/better-auth/plugins';
+import { convex, crossDomain } from '@convex-dev/better-auth/plugins';
 import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth/minimal';
 import { anonymous } from 'better-auth/plugins';
@@ -51,7 +51,7 @@ import { checkKeyNonce } from './model/keyNonce';
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 /** The app's URL scheme (`app.json`), so a sign-in can return to the app. */
-const APP_ORIGINS = ['tavlaki://'];
+const APP_ORIGINS = ['tavlaki://', 'http://localhost:8099']; // SPIKE (#637)
 
 /** The app's bundle ids, one per variant (`app.config.ts`): Apple's audience on iPhone. */
 export const APPLE_BUNDLE_IDS = ['com.tavlaki', 'com.tavlaki.dev', 'com.tavlaki.preview'];
@@ -245,6 +245,8 @@ export function createAuth(ctx: AuthCtx) {
     },
     plugins: [
       expo(),
+      // SPIKE (#637): a browser on another site keeps the session in web storage.
+      crossDomain({ siteUrl: 'http://localhost:8099' }),
       // A guest is never deleted by a later sign-in: only `deleteMyAccount` deletes.
       anonymous({ disableDeleteAnonymousUser: true }),
       // The Convex token holds the user id (`sub`) and the session id only.

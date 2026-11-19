@@ -1,0 +1,10 @@
+const {chromium}=require('playwright');
+(async()=>{const b=await chromium.launch();const pg=await b.newPage({viewport:{width:+(process.argv[3]||390),height:+(process.argv[4]||844)}});
+const errs=[];pg.on('console',m=>{if(m.type()==='error'||m.type()==='warning')errs.push(m.type()+': '+m.text().slice(0,400))});
+pg.on('pageerror',e=>errs.push('PAGEERROR: '+String(e.stack||e).slice(0,900)));
+pg.on('requestfailed',r=>errs.push('REQFAIL: '+r.url().slice(0,150)));
+pg.on('response',r=>{if(r.status()>=400)errs.push('HTTP '+r.status()+' '+r.url().slice(0,150))});
+await pg.goto('http://localhost:8099'+(process.argv[5]||'/'),{waitUntil:'load'});await pg.waitForTimeout(6000);
+await pg.screenshot({path:process.argv[2]});
+console.log('TEXT:',(await pg.evaluate(()=>document.body.innerText)).slice(0,600).replace(/\n+/g,' | '));
+console.log([...new Set(errs)].slice(0,25).join('\n'));await b.close();})();

@@ -10,7 +10,7 @@
     "updates": {
       "url": "https://u.expo.dev/ab412a0d-e0c2-4f38-878d-57249f4db757"
     },
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
     "orientation": "default",
     "icon": "./assets/icon/icon.png",
     "backgroundColor": "#3B2A1D",

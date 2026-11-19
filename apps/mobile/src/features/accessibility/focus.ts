@@ -23,7 +23,8 @@ export function useFocusOnShow(active = true) {
   useEffect(() => {
     if (!active || done.current || ref.current === null) return;
     done.current = true;
-    AccessibilityInfo.sendAccessibilityEvent(ref.current, 'focus');
+    // SPIKE (#637): react-native-web has no sendAccessibilityEvent.
+    AccessibilityInfo.sendAccessibilityEvent?.(ref.current, 'focus');
   });
   return ref;
 }

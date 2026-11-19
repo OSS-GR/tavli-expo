@@ -38,6 +38,7 @@ import type * as playerNames from "../playerNames.js";
 import type * as push from "../push.js";
 import type * as ratings from "../ratings.js";
 import type * as safety from "../safety.js";
+import type * as spikeWebPush from "../spikeWebPush.js";
 import type * as usernames from "../usernames.js";
 
 import type {
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   push: typeof push;
   ratings: typeof ratings;
   safety: typeof safety;
+  spikeWebPush: typeof spikeWebPush;
   usernames: typeof usernames;
 }>;
 
