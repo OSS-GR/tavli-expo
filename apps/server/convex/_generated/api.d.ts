@@ -8,39 +8,43 @@
  * @module
  */
 
-import type * as account from '../account.js';
-import type * as appUpdate from '../appUpdate.js';
-import type * as appleTokens from '../appleTokens.js';
-import type * as auth from '../auth.js';
-import type * as authKeys from '../authKeys.js';
-import type * as caller from '../caller.js';
-import type * as emailCodes from '../emailCodes.js';
-import type * as friendEdges from '../friendEdges.js';
-import type * as friends from '../friends.js';
-import type * as games from '../games.js';
-import type * as guestMove from '../guestMove.js';
-import type * as http from '../http.js';
-import type * as invites from '../invites.js';
-import type * as keyPlugin from '../keyPlugin.js';
-import type * as mail from '../mail.js';
-import type * as matchmaking from '../matchmaking.js';
-import type * as model_account from '../model/account.js';
-import type * as model_appUpdate from '../model/appUpdate.js';
-import type * as model_appleIdToken from '../model/appleIdToken.js';
-import type * as model_appleTokens from '../model/appleTokens.js';
-import type * as model_cryptoRng from '../model/cryptoRng.js';
-import type * as model_emailCode from '../model/emailCode.js';
-import type * as model_keyNonce from '../model/keyNonce.js';
-import type * as model_moveTicket from '../model/moveTicket.js';
-import type * as model_push from '../model/push.js';
-import type * as myData from '../myData.js';
-import type * as playerNames from '../playerNames.js';
-import type * as push from '../push.js';
-import type * as ratings from '../ratings.js';
-import type * as safety from '../safety.js';
-import type * as usernames from '../usernames.js';
+import type * as account from "../account.js";
+import type * as appUpdate from "../appUpdate.js";
+import type * as appleTokens from "../appleTokens.js";
+import type * as auth from "../auth.js";
+import type * as authKeys from "../authKeys.js";
+import type * as caller from "../caller.js";
+import type * as emailCodes from "../emailCodes.js";
+import type * as friendEdges from "../friendEdges.js";
+import type * as friends from "../friends.js";
+import type * as games from "../games.js";
+import type * as guestMove from "../guestMove.js";
+import type * as http from "../http.js";
+import type * as invites from "../invites.js";
+import type * as keyPlugin from "../keyPlugin.js";
+import type * as mail from "../mail.js";
+import type * as matchmaking from "../matchmaking.js";
+import type * as model_account from "../model/account.js";
+import type * as model_appUpdate from "../model/appUpdate.js";
+import type * as model_appleIdToken from "../model/appleIdToken.js";
+import type * as model_appleTokens from "../model/appleTokens.js";
+import type * as model_cryptoRng from "../model/cryptoRng.js";
+import type * as model_emailCode from "../model/emailCode.js";
+import type * as model_keyNonce from "../model/keyNonce.js";
+import type * as model_moveTicket from "../model/moveTicket.js";
+import type * as model_push from "../model/push.js";
+import type * as myData from "../myData.js";
+import type * as playerNames from "../playerNames.js";
+import type * as push from "../push.js";
+import type * as ratings from "../ratings.js";
+import type * as safety from "../safety.js";
+import type * as usernames from "../usernames.js";
 
-import type { ApiFromModules, FilterApi, FunctionReference } from 'convex/server';
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 
 declare const fullApi: ApiFromModules<{
   account: typeof account;
@@ -59,15 +63,15 @@ declare const fullApi: ApiFromModules<{
   keyPlugin: typeof keyPlugin;
   mail: typeof mail;
   matchmaking: typeof matchmaking;
-  'model/account': typeof model_account;
-  'model/appUpdate': typeof model_appUpdate;
-  'model/appleIdToken': typeof model_appleIdToken;
-  'model/appleTokens': typeof model_appleTokens;
-  'model/cryptoRng': typeof model_cryptoRng;
-  'model/emailCode': typeof model_emailCode;
-  'model/keyNonce': typeof model_keyNonce;
-  'model/moveTicket': typeof model_moveTicket;
-  'model/push': typeof model_push;
+  "model/account": typeof model_account;
+  "model/appUpdate": typeof model_appUpdate;
+  "model/appleIdToken": typeof model_appleIdToken;
+  "model/appleTokens": typeof model_appleTokens;
+  "model/cryptoRng": typeof model_cryptoRng;
+  "model/emailCode": typeof model_emailCode;
+  "model/keyNonce": typeof model_keyNonce;
+  "model/moveTicket": typeof model_moveTicket;
+  "model/push": typeof model_push;
   myData: typeof myData;
   playerNames: typeof playerNames;
   push: typeof push;
@@ -84,7 +88,10 @@ declare const fullApi: ApiFromModules<{
  * const myFunctionReference = api.myModule.myFunction;
  * ```
  */
-export declare const api: FilterApi<typeof fullApi, FunctionReference<any, 'public'>>;
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
 
 /**
  * A utility for referencing Convex functions in your app's internal API.
@@ -94,8 +101,11 @@ export declare const api: FilterApi<typeof fullApi, FunctionReference<any, 'publ
  * const myFunctionReference = internal.myModule.myFunction;
  * ```
  */
-export declare const internal: FilterApi<typeof fullApi, FunctionReference<any, 'internal'>>;
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
 
 export declare const components: {
-  betterAuth: import('@convex-dev/better-auth/_generated/component.js').ComponentApi<'betterAuth'>;
+  betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
 };
