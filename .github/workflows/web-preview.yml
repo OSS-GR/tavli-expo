@@ -4,7 +4,9 @@ name: Web preview
 # site (#637, ADR-0010), so the owner can test it on a real phone and in
 # Safari. Manual only ("Run workflow").
 #
-# Two jobs, so the branch's code never runs next to the Cloudflare token:
+# Three jobs, so the branch's code never runs next to the Cloudflare token:
+# - check: stops at once when the run is not on main or a secret is missing.
+#   Runs no repo code.
 # - build: checks out the branch, builds, uploads the files. No secrets.
 # - deploy: takes the files and runs wrangler from main. Has the token.
 #
@@ -30,7 +32,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: development
+    steps:
+      # The wrangler config and the header rules come from main only.
+      - name: Check the branch and the secrets
+        env:
+          REF: ${{ github.ref }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow on main. Type the branch to build in the 'ref' box."
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to the environment 'development' (see docs/process/running-the-app.md, \"Web preview\")."
+            exit 1
+          fi
+
   build:
+    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -47,7 +71,12 @@ jobs:
         run: |
           mkdir -p public
           if [ ! -f public/canvaskit.wasm ]; then
-            cp "$(node -e "console.log(require.resolve('canvaskit-wasm/bin/full/canvaskit.wasm', { paths: [require.resolve('@shopify/react-native-skia/package.json')] }))")" public/canvaskit.wasm
+            wasm="$(node -e "
+              const path = require('path');
+              const skia = path.dirname(require.resolve('@shopify/react-native-skia/package.json'));
+              console.log(require.resolve('canvaskit-wasm/bin/full/canvaskit.wasm', { paths: [skia] }));
+            ")" || { echo "::error::canvaskit.wasm was not found next to @shopify/react-native-skia."; exit 1; }
+            cp "$wasm" public/canvaskit.wasm
           fi
 
       # `--clear`: Metro keeps EXPO_PUBLIC_* values in its cache.
@@ -64,22 +93,10 @@ jobs:
 
   deploy:
     needs: build
-    # The wrangler config and the header rules come from main only.
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: development
     steps:
-      - name: Check the secrets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to the environment 'development' (see docs/process/running-the-app.md, \"Web preview\")."
-            exit 1
-          fi
-
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
@@ -96,8 +113,13 @@ jobs:
           name: web-dist
           path: apps/mobile/web/dist
 
-      - name: Add the header rules
-        run: cp apps/mobile/web/_headers apps/mobile/web/dist/_headers
+      # The build comes from a branch. Cloudflare reads these files as rules
+      # (redirects, code, what to serve), so only main may set them.
+      - name: Keep only main's rules
+        working-directory: apps/mobile/web
+        run: |
+          rm -rf dist/_redirects dist/_headers dist/_routes.json dist/_worker.js dist/.assetsignore
+          cp _headers dist/_headers
 
       - name: Deploy
         working-directory: apps/mobile/web
