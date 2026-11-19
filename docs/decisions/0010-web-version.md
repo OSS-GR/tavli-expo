@@ -44,6 +44,8 @@ Proposed: **A**, in the phases of `docs/architecture/web-app.md`.
 
 The owner decided the address (`play.tavlaki.com`), phone browsers, the sign-ins, the invite link and web push on 2026-11-19; one point is still open (see "Owner decisions" in the plan). This ADR moves to **Accepted** after phase 0, with its numbers.
 
+Phase 0 ran in Chromium on 2026-11-19 ("Findings" in the plan): the app starts and plays in a browser, online play works with the cross-domain session plugin, and the first load is 4.6 MB with Brotli. The speed on real phones and the Safari and Firefox checks are still open, so the status stays Proposed.
+
 ## Consequences
 
 - A friend can play from an invite link with no install.
