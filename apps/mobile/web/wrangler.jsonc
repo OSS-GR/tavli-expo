@@ -1,0 +1,14 @@
+// The dev site of the web version (#637, ADR-0010): a Cloudflare Worker that
+// only serves the files of a web build (no code). The workflow
+// `.github/workflows/web-preview.yml` puts the build in `dist/` next to this
+// file and runs `wrangler deploy`. A path with no file gets `index.html`,
+// so a reload on any route opens the app.
+{
+  "$schema": "https://unpkg.com/wrangler@4.160.0/config-schema.json",
+  "name": "tavlaki-play-dev",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+}

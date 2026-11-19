@@ -58,7 +58,7 @@ No dates (see the roadmap). Sizes are S, M, L.
 
 Find out if the plan holds, before we build. The work lives on a spike branch and is **not merged**. The result is a findings section in this file and ADR-0010 set to Accepted, or a new ADR if the answer is no.
 
-**Status (2026-11-19):** done in Chromium, see [Findings](#findings). Still to do on real devices: 0.2 (speed) and every check in Safari and Firefox.
+**Status (2026-11-19):** done in Chromium, see [Findings](#findings). Still to do on real devices: 0.2 (speed) and every check in Safari and Firefox (#640). The **Web preview** workflow puts the spike on a dev site for that (`docs/process/running-the-app.md`, "Web preview").
 
 | # | Question | How we test | Pass when |
 |---|----------|-------------|-----------|
@@ -133,7 +133,7 @@ Done when: a web player and an iPhone player finish a friend match and a ranked 
 
 ### Phase 4: legal, hosting and release (size M)
 
-- **Hosting:** a second Cloudflare Worker with static assets for the web app (decision 1). A deploy workflow like `deploy-server.yml`: the dev site on each `main` push, the public site only by hand. Never a `pull_request` trigger.
+- **Hosting:** a second Cloudflare Worker with static assets for the web app (decision 1). The dev Worker `tavlaki-play-dev` and the manual **Web preview** workflow exist since phase 0 (`apps/mobile/web/`); this phase adds the public Worker at `play.tavlaki.com`. A deploy workflow like `deploy-server.yml`: the dev site on each `main` push, the public site only by hand. Never a `pull_request` trigger.
 - **Headers:** a content security policy, no framing, and long caching for files with a hash in the name. The app pages are `noindex`; the homepage stays the page search engines see.
 - **Server per site:** the dev site talks to the dev Convex, the public site to prod, through `convexServer()` as today.
 - **Privacy and terms:** all four privacy files and all four terms files name the browser, what the browser stores (settings, the saved game, the session) and the browser's push subscription on the server. The consent screen is the same; with no consent the web app stores only what it needs to work.
