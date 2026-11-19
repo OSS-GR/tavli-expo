@@ -40,9 +40,9 @@ Proposed: **A**, in the phases of `docs/architecture/web-app.md`.
 3. The board stays on Skia (ADR-0005). If phase 0 shows CanvasKit is too slow or too large, we stop and write a new ADR before any other work.
 4. The server stays the same. The web is one more client of the same Convex functions, with the same sign-in rules (ADR-0008).
 5. The web app is a static site on Cloudflare, next to the legal site.
-6. The first public web version has no push notifications.
+6. The first public web version sends web push notifications (owner, 2026-11-19): the browser's own push system, behind the same `PushNotifications` and `PushProvider` ports.
 
-The owner decided the address (`play.tavlaki.com`), phone browsers, the sign-ins and the invite link on 2026-11-19; two points are still open (see "Owner decisions" in the plan). This ADR moves to **Accepted** after phase 0, with its numbers.
+The owner decided the address (`play.tavlaki.com`), phone browsers, the sign-ins, the invite link and web push on 2026-11-19; one point is still open (see "Owner decisions" in the plan). This ADR moves to **Accepted** after phase 0, with its numbers.
 
 ## Consequences
 

@@ -6,7 +6,7 @@
 
 A person opens a link in a browser and plays Tavlaki: against the bot, with a friend on one screen, and online with the same account, friends and rating as on the phone. No install.
 
-Not a goal of the first web version: push notifications, an installed web app (PWA), a different design for desktop.
+Not a goal of the first web version: a different design for desktop, offline play in an installed web app.
 
 ## What we know today
 
@@ -24,7 +24,7 @@ Facts from the code on 2026-11-19:
 | Email code, guest | Our own routes (`keyPlugin.ts`) | Should work; the server must trust the web address |
 | Server trust | `trustedOrigins: ['tavlaki://']` | Add the web address; allow browser calls from it (CORS) |
 | Online games | Convex client over a web socket | Convex is made for browsers too |
-| Pushes | `expo-notifications`, Expo push | None in the first web version |
+| Pushes | `expo-notifications`, Expo push | Web push: the browser's own system (a service worker, the Push API, VAPID keys). A second sender on the server |
 | Haptics | `expo-haptics` | None. An adapter that does nothing |
 | Sound | `expo-audio` | Ships web files. Browsers play no sound before the first click |
 | Crash reports, analytics | Sentry, PostHog (React Native SDKs) | Both ship web files. **Not tested** |
@@ -42,13 +42,13 @@ Decided by the owner on 2026-11-19:
 | 2 | Phone browsers too, or desktop only? | Both. Phone browsers must work |
 | 3 | Which sign-ins on the web? | The same as in the app: guest, email code and Apple, so one account works everywhere (ADR-0008) |
 | 4 | What does an invite link do? | It opens the iPhone app when the app is on the phone (as today). With no app, the page `tavlaki.com/i/<code>` offers two buttons: **Get Tavlaki** and **Continue in the browser**. The friend link page (`/add/`) does the same |
+| 6 | Pushes on the web? | Yes, in the first version: web push for the same notifications as the app (your turn, match start, game over, friend request and accept) |
 
-Still open. Decide these before phase 3 and phase 4:
+Still open. Decide it before phase 4:
 
 | # | Question | Recommendation | Why |
 |---|----------|----------------|-----|
 | 5 | Is the web app public from day one? | No: a closed test first | The link is not shown on the homepage until phase 4 ends |
-| 6 | Pushes on the web? | Not in the first version | Web push is a separate system and Safari on iPhone allows it only for an installed web app. The tab title and a sound tell you it is your turn |
 
 ## Phases
 
@@ -68,6 +68,7 @@ Find out if the plan holds, before we build. The work lives on a spike branch an
 | 0.6 | Is the bot fast enough? | Time a 2-ply hint and a bot turn in each browser | No slower than twice the phone's time. If slower: a Web Worker goes into phase 2 |
 | 0.7 | How do we keep a session? | Sign in as a guest from a local web build against the dev server, with the two ways Better Auth offers (cookies, or its cross-domain plugin with web storage) | One way works in Safari too (Safari blocks cookies from another site) and passes `authProviderContract` |
 | 0.8 | Which adapters work as they are? | Run storage, sound, Sentry and PostHog in the browser | A table: works, needs a twin, or off |
+| 0.9 | Can we send a web push from Convex? | Sign and encrypt one Web Push message with Web Crypto in a Convex action, to a test subscription from Chrome and from Firefox | The browser shows the notification; no Node-only library is needed |
 
 **Stop rule:** if 0.2 or 0.3 fails and has no fix, we do not start phase 1. We write a new ADR about the board on the web.
 
@@ -110,7 +111,12 @@ The same account, friends, invites and ranked play as on the phone.
 - **Session:** the way 0.7 chose. The web twin of `createSecureSessionStorage` and of the Better Auth client passes `authProviderContract` and `betterAuthClient.test.ts`.
 - **Sign-in choices on the web:** guest, email code, and Apple through Apple's web flow (the Services ID the server already has). The same `SignInChoices`; the Apple button is the web twin of `@tavli/apple-sign-in-expo`. Still no account at start: only when the person opens online play.
 - **Invites:** `play…/invite/<code>` opens the invite in the browser. The fallback pages `tavlaki.com/i/` and `/add/` get **Continue in the browser** next to **Get Tavlaki** (decision 4); on a computer, where there is no app, the same page shows. The friend link and its QR code stay the same.
-- **Your turn without a push:** the tab title and a sound, only while the tab is open. The async-invite screens say that the browser sends no notification.
+- **Web push (decision 6):** the same notifications as the app, through the browser's own push system.
+  - **App side:** a web twin of `@tavli/notifications-expo` behind the same `PushNotifications` port: a service worker shows the notification and opens `game/<id>`, `/invite/<code>` or `/friends` on a click; the token is the browser's push subscription. The same offer flow (`turnPushes`): never at start, only after an async invite or a ranked search, and only after the in-app **Turn on**.
+  - **Server side:** a second `PushProvider` adapter that sends by the Web Push standard (VAPID keys, `fetch` only), run by `pushProviderContract`. A `pushTokens` row says which sender it needs. The texts, the names, the language and the "still due" checks stay in `convex/model/push.ts`.
+  - **Safari on iPhone** allows web push only for a site added to the Home Screen. So the web app gets a web manifest (name, icons), and on iPhone the offer explains "Add to Home Screen" or points to the app.
+  - **While the tab is open:** no system notification (like the app in the foreground); the tab title and a sound say it is your turn.
+  - **Clean-up:** sign-out, account delete, the guest move and Download my data handle the browser's subscription like a phone token. A subscription the browser reports as gone is deleted.
 - **Play ranked, friends, leaderboards, block and report, usernames:** the same screens. Check each on the web.
 - **Download my data:** saves a file in place of the share sheet. **Delete my account** and **Sign out of all phones** work the same.
 - **Update needed:** a web build that is too old shows "Reload" in place of the store button. `updatePolicy` gets a `web` platform.
@@ -123,7 +129,7 @@ Done when: a web player and an iPhone player finish a friend match and a ranked 
 - **Hosting:** a second Cloudflare Worker with static assets for the web app (decision 1). A deploy workflow like `deploy-server.yml`: the dev site on each `main` push, the public site only by hand. Never a `pull_request` trigger.
 - **Headers:** a content security policy, no framing, and long caching for files with a hash in the name. The app pages are `noindex`; the homepage stays the page search engines see.
 - **Server per site:** the dev site talks to the dev Convex, the public site to prod, through `convexServer()` as today.
-- **Privacy and terms:** all four privacy files and all four terms files name the browser, what the browser stores (settings, the saved game, the session) and that the web sends no pushes. The consent screen is the same; with no consent the web app stores only what it needs to work.
+- **Privacy and terms:** all four privacy files and all four terms files name the browser, what the browser stores (settings, the saved game, the session) and the browser's push subscription on the server. The consent screen is the same; with no consent the web app stores only what it needs to work.
 - **Delete pages and store answers:** update `docs/legal/site/delete/`; the store forms do not change (the web app is not in a store).
 - **Crash reports and analytics:** a `platform` value of `web`; source maps for the web build go to Sentry. Still no ids, names or ratings.
 - **Supported browsers:** the last two versions of Chrome, Safari, Firefox and Edge, and Safari on iOS 17 or newer. An older browser gets a plain page that says so.
@@ -133,8 +139,7 @@ Done when: the owner plays on the public address, the legal pages are live, and 
 
 ### Phase 5: later (not planned in detail)
 
-- Web push for "your turn", where browsers allow it.
-- An installed web app (PWA) with an icon and offline play vs the bot.
+- Offline play vs the bot in the installed web app.
 - A layout made for large screens (the move list and the score next to the board).
 
 ## Rules for all phases
@@ -166,6 +171,7 @@ Done when: the owner plays on the public address, the legal pages are live, and 
 | The web twin of a library lags behind its native version | Medium | Keep twins small and behind ports; the contract checks catch a break |
 | Phone layouts look wrong in a wide window | Certain | Phase 2 is for this |
 | Each new feature now costs more (three platforms) | Certain | CI builds the web on every PR, so a break shows at once |
+| Web push reaches few iPhone visitors (Home Screen only) | Certain | The offer on iPhone says so and points to the app |
 | Abuse is easier from a browser (scripts, many guest accounts) | Medium | The server already checks every move and caps invites, requests and searches. Review the caps in phase 3 |
 
 ## Findings
