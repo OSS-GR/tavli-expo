@@ -7,6 +7,7 @@
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
 | Q32 | **`tavlaki.com/privacy` is not live yet.** The consent screen and Settings link to it. Please publish the privacy policy there (the text is in `docs/legal/`). | Testers and the stores need a working privacy link | `docs/legal/README.md`, #61 |
+| Q33 | **Web version (#637): six decisions** before the build starts: the address, phone browsers, the sign-ins, invite links, a closed test first, pushes. Each has a recommendation in the plan. | Phase 1 cannot start without them | `docs/architecture/web-app.md` → "Owner decisions", ADR-0010 |
 
 ## Answered
 
