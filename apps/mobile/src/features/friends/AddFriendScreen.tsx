@@ -1,7 +1,7 @@
 /**
  * Add a friend (#406). Four ways, and none reads the contacts:
  *
- * - **Your friend link** (`tavlaki://add/<token>`) and its QR code. A
+ * - **Your friend link** (`https://tavlaki.com/add/<token>`, #629) and its QR code. A
  *   friend scans the code with the phone's own camera, which opens the
  *   app: the app has no scanner and never asks for the camera. Share
  *   opens the share sheet; Text message opens the Messages app with the
@@ -401,7 +401,7 @@ export function AddFriendScreen({
                         setPasteBad(null);
                       }}
                       onSubmitEditing={openPasted}
-                      placeholder="tavlaki://add/…"
+                      placeholder="https://tavlaki.com/add/…"
                       placeholderTextColor={theme.colors.textFaint}
                       accessibilityLabel={t('friends.add.pasteLabel')}
                       autoCapitalize="none"

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tavlaki friend link · Σύνδεσμος φιλίας στο Ταβλάκι</title>
+<link rel="icon" href="data:,">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#4A3423">
+<meta name="color-scheme" content="dark">
+<style>
+/* Site base (#591): the app's Walnut Kafeneio colors
+   (packages/ui/src/themes/walnut-kafeneio.ts) and its Home look: the lamp
+   to floor gradient, the tiles, the main button and the Settings trays.
+   Every page has the same base block: change it on all of them. No
+   JavaScript, no fonts or images from other sites, no cookies. */
+:root {
+  --lamp: #4A3423; --bg: #3B2A1D; --floor: #1A110A;
+  --surface: #2E1F15; --selected: #4A3423; --raised: #3A2819; --sunken: #1A110A; --deep: #120C07;
+  --border: #6A4E35; --sep: #4E3927;
+  --text: #F1E6CF; --dim: #BFA987; --faint: #8C7A62;
+  --accent: #C89B45; --accent-light: #E0B867; --on-accent: #22160C;
+  --accent-line: #83632F; --accent-wash: #503A20; --brass: #F3D58A;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; background: var(--floor); }
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, var(--lamp) 0, var(--bg) 32rem, var(--bg) 60%, var(--floor) 100%); color: var(--text); font: 17px/1.6 var(--sans); }
+a { color: var(--accent-light); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--text); }
+a:focus-visible { outline: 3px solid var(--accent-light); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 400; color: var(--text); text-wrap: balance; }
+p { margin: 0 0 1rem; text-wrap: pretty; }
+img { display: block; max-width: 100%; height: auto; }
+svg { flex: none; }
+.wrap { max-width: 72rem; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+@media (min-width: 40rem) { .wrap { padding-left: 2rem; padding-right: 2rem; } }
+
+/* Header: the icon and name, then a round language button. */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.25rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.brand { display: flex; align-items: center; gap: 0.65rem; color: var(--text); text-decoration: none; font: 1.35rem/1 var(--serif); }
+.brand img { width: 40px; height: 40px; border-radius: 11px; }
+.brand:hover { color: var(--text); }
+.nav { display: flex; align-items: center; gap: 0.5rem 1.5rem; }
+.nav .wide-only { display: none; color: var(--dim); text-decoration: none; }
+.nav .wide-only:hover { color: var(--text); }
+@media (min-width: 56rem) { .nav .wide-only { display: inline; } }
+.pill { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 44px; padding: 0 1rem; border: 1px solid var(--border); border-radius: 22px; background: var(--raised); color: var(--text); font-size: 0.95rem; text-decoration: none; }
+.pill:hover { border-color: var(--accent-line); color: var(--text); }
+
+/* The main button: the app's ActionButton (radius 14, gold gradient, a
+   light top edge). The second button: raised wood with a gold line. */
+.btn { display: flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 54px; padding: 0 1.75rem; border-radius: 14px; font-weight: 600; font-size: 1.1rem; text-decoration: none; text-align: center; }
+.primary { background: linear-gradient(160deg, var(--accent-light) 0%, var(--accent) 70%); color: var(--on-accent); box-shadow: inset 0 1px 0 var(--brass), 0 8px 18px rgba(0, 0, 0, 0.45); }
+.primary:hover { background: var(--accent-light); color: var(--on-accent); }
+.secondary { min-height: 48px; font-size: 1rem; background: var(--raised); border: 1px solid var(--accent-line); color: var(--accent-light); }
+.secondary:hover { border-color: var(--accent); color: var(--text); }
+.btn.small { min-height: 44px; padding: 0 1.1rem; font-size: 0.95rem; }
+.note { color: var(--dim); font-size: 0.9rem; line-height: 1.5; }
+
+/* Tiles: the Home tiles (radius 20, raised gradient). */
+.tile { border: 1px solid var(--border); border-radius: 20px; background: linear-gradient(160deg, var(--selected) 0%, var(--surface) 70%); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.eyebrow { margin: 0 0 0.6rem; color: var(--accent-light); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* Footer */
+footer { margin-top: 3rem; }
+footer .wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; border-top: 1px solid var(--sep); color: var(--dim); font-size: 0.9rem; text-align: center; }
+footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; margin-bottom: 0.75rem; font-size: 0.95rem; }
+/* The invite page. It shows no picture at all (link.test.ts). */
+main.wrap { max-width: 40rem; }
+.head { padding: 1rem 0.25rem 1.25rem; }
+h1 { font-size: clamp(1.9rem, 6vw, 2.5rem); line-height: 1.15; margin: 0 0 0.6rem; }
+.lead { color: var(--dim); font-size: 1.1rem; margin: 0; }
+.step { margin-bottom: 0.75rem; padding: 1.1rem 1.1rem 1.2rem; }
+.step-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.75rem; }
+.step h2, .step h3 { margin: 0; font-size: 1.3rem; }
+.num { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: linear-gradient(160deg, var(--accent-light), var(--accent)); color: var(--on-accent); font-weight: 700; font-size: 0.95rem; }
+.step p { color: var(--dim); }
+.step .note { margin: 0.75rem 0 0; }
+.step .btn { width: 100%; }
+code { font: 0.95em ui-monospace, Menlo, Consolas, monospace; }
+.addr { display: flex; flex-wrap: wrap; align-items: center; margin: 0 0 0.5rem; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: 12px; background: var(--sunken); color: var(--faint); font: 1rem ui-monospace, Menlo, Consolas, monospace; }
+.code { padding: 0.15rem 0.4rem; border-radius: 6px; background: var(--accent-wash); color: var(--brass); font-weight: 700; letter-spacing: 0.08em; }
+.steps { list-style: none; margin: 1rem 0 0; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); counter-reset: step; }
+.steps li { display: flex; align-items: center; gap: 0.8rem; min-height: 56px; padding: 0.7rem 1rem; color: var(--text); counter-increment: step; }
+.steps li + li { border-top: 1px solid var(--sep); }
+.steps li::before { content: counter(step); display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: none; border-radius: 50%; background: var(--deep); color: var(--accent-light); font-weight: 700; font-size: 0.85rem; }
+.steps strong { font-weight: 600; }
+.lang { margin: 0 0.25rem 0.25rem; font-size: 0.95rem; }
+section + section { margin-top: 2.75rem; padding-top: 2rem; border-top: 1px solid var(--sep); }
+</style>
+</head>
+<body>
+<!--
+  The fallback page of a friend link (#629). The host serves this page for
+  every https://tavlaki.com/add/<token> (see _redirects). On an iPhone with
+  Tavlaki, iOS opens the link in the app instead (apple-app-site-association).
+  No JavaScript: "Paste a friend link" in the app takes the whole address.
+  Both languages are on this one page.
+-->
+<header class="wrap top">
+  <span class="brand">Tavlaki</span>
+  <a class="pill" href="#el" lang="el">Ελληνικά</a>
+</header>
+<main class="wrap">
+<section lang="en">
+<div class="head">
+  <p class="eyebrow">Friend link</p>
+  <h1>A friend wants to play tavli with you</h1>
+  <p class="lead">This is a friend link from Tavlaki, a Greek backgammon (tavli) app for iPhone. Open it in the app to ask to be friends.</p>
+</div>
+<div class="tile step">
+  <div class="step-head"><span class="num" aria-hidden="true">1</span><h2>Get Tavlaki</h2></div>
+  <!-- After the App Store launch, link https://apps.apple.com/app/id6828172932 in both buttons (and on the homepages), and drop the beta notes. -->
+  <a class="btn primary" href="https://testflight.apple.com/join/RTCQhMCc">Get Tavlaki</a>
+  <p class="note">Tavlaki is in beta on TestFlight, Apple's app for test versions. The link asks you to get TestFlight first, if you do not have it. Android comes later.</p>
+</div>
+<div class="tile step">
+  <div class="step-head"><span class="num" aria-hidden="true">2</span><h2>Open the link in the app</h2></div>
+  <p>Copy this page's address. Then:</p>
+  <ol class="steps">
+    <li>Open Tavlaki.</li>
+    <li><span>On Home, tap <strong>Friends</strong>, then <strong>Add a friend</strong>.</span></li>
+    <li><span>Tap <strong>Paste a friend link</strong>, paste the address and tap <strong>Open the link</strong>.</span></li>
+  </ol>
+  <p class="note">Friends need a saved account. The app helps you save one.</p>
+</div>
+<div class="tile step">
+  <h3>Have Tavlaki already?</h3>
+  <p class="note">Go back to the message and tap the link again, or scan the QR code again with the camera: it opens in the app. If this page opens again, touch and hold the link, then pick <strong>Open in “Tavlaki”</strong>. Or paste the address as above.</p>
+</div>
+</section>
+<section lang="el" id="el">
+<div class="head">
+  <p class="eyebrow">Σύνδεσμος φιλίας</p>
+  <h1>Ένας φίλος θέλει να παίξετε τάβλι</h1>
+  <p class="lead">Αυτός είναι ένας σύνδεσμος φιλίας από το Ταβλάκι, μια εφαρμογή για τάβλι στο iPhone. Άνοιξέ τον στην εφαρμογή για να στείλεις αίτημα φιλίας.</p>
+</div>
+<div class="tile step">
+  <div class="step-head"><span class="num" aria-hidden="true">1</span><h2>Κατέβασε το Ταβλάκι</h2></div>
+  <a class="btn primary" href="https://testflight.apple.com/join/RTCQhMCc">Κατέβασε το Ταβλάκι</a>
+  <p class="note">Το Ταβλάκι είναι σε δοκιμαστική έκδοση στο TestFlight, την εφαρμογή της Apple για δοκιμαστικές εκδόσεις. Αν δεν έχεις το TestFlight, ο σύνδεσμος σου ζητά να το κατεβάσεις πρώτα. Το Android έρχεται αργότερα.</p>
+</div>
+<div class="tile step">
+  <div class="step-head"><span class="num" aria-hidden="true">2</span><h2>Άνοιξε τον σύνδεσμο στην εφαρμογή</h2></div>
+  <p>Αντίγραψε τη διεύθυνση αυτής της σελίδας. Μετά:</p>
+  <ol class="steps">
+    <li>Άνοιξε το Ταβλάκι.</li>
+    <li><span>Στην Αρχική, πάτα <strong>Φίλοι</strong> και μετά <strong>Πρόσθεσε φίλο</strong>.</span></li>
+    <li><span>Πάτα <strong>Επικόλλησε σύνδεσμο φιλίας</strong>, επικόλλησε τη διεύθυνση και πάτα <strong>Άνοιξε τον σύνδεσμο</strong>.</span></li>
+  </ol>
+  <p class="note">Για τους φίλους χρειάζεσαι αποθηκευμένο λογαριασμό. Η εφαρμογή σε βοηθά να τον αποθηκεύσεις.</p>
+</div>
+<div class="tile step">
+  <h3>Έχεις ήδη το Ταβλάκι;</h3>
+  <p class="note">Γύρισε στο μήνυμα και πάτα ξανά τον σύνδεσμο, ή σκάναρε ξανά τον κωδικό QR με την κάμερα: ανοίγει στην εφαρμογή. Αν ανοίξει ξανά αυτή η σελίδα, κράτησε πατημένο τον σύνδεσμο και διάλεξε <strong>Άνοιγμα στο «Tavlaki»</strong>. Ή επικόλλησε τη διεύθυνση όπως πιο πάνω.</p>
+</div>
+</section>
+</main>
+<footer lang="en">
+  <div class="wrap">
+    <nav aria-label="Pages">
+      <a href="https://tavlaki.com/">Tavlaki</a>
+      <a href="https://tavlaki.com/privacy/">Privacy policy</a>
+      <a href="https://tavlaki.com/el/privacy/" lang="el">Πολιτική απορρήτου</a>
+    </nav>
+    <p>This page sets no cookies, runs no scripts and loads nothing from other sites.</p>
+  </div>
+</footer>
+</body>
+</html>

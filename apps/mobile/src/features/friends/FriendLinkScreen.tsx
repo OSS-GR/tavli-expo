@@ -1,5 +1,5 @@
 /**
- * A friend link (#406): what `tavlaki://add/<token>` (a shared link or a
+ * A friend link (#406): what `https://tavlaki.com/add/<token>` (a shared link or a
  * scanned QR code) and a pasted link open. It shows whose link it is and
  * offers "Ask to be friends" (`requestByLink`).
  *
