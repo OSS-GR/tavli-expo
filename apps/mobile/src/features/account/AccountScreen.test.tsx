@@ -621,7 +621,7 @@ describe('<AccountScreen /> as a guest', () => {
     for (const line of [
       'Games in progress end now. You resign them, so you lose them.',
       'Your open invites are cancelled.',
-      'Turn notifications stop.',
+      'Notifications stop.',
       'Your guest name is deleted.',
       'Finished games stay for the other players, with no name. Your games and history on this phone stay too. You cannot undo it.',
     ]) {

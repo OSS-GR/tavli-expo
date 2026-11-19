@@ -47,8 +47,8 @@ Decision: [ADR-0004](../decisions/0004-backend-auth.md) (Convex). Layout: [ADR-0
 | `packages/online/src/invites.ts` | The invite checks and codes, shared by both servers. Pure: `now` and the `Rng` are arguments (moved from `apps/server/convex/model/` in #256) |
 | `apps/server/convex/model/cryptoRng.ts` | The dice RNG: `crypto.getRandomValues` |
 | `apps/server/convex/invites.ts` | The invite functions ([Invites](#invites)) |
-| `apps/server/convex/push.ts` | Push tokens, "your turn" and "game over" pushes ([Push](#push)): `registerPushToken`, `removePushToken`, `scheduleTurnPush` and the action `sendTurnPush` |
-| `apps/server/convex/model/push.ts` | The pure push parts: who gets a push (`turnWait`, `turnPushSide`, `matchEndPushSides`), the text (`TURN_PUSH_TEXT`, `MATCH_END_PUSH_TEXT`), the retry (`retryTokens`, `pushStillDue`), the token cap |
+| `apps/server/convex/push.ts` | Push tokens, "your turn", "game over" and friend pushes ([Push](#push)): `registerPushToken`, `removePushToken`, `scheduleTurnPush`, `scheduleFriendPush` and the actions `sendTurnPush`, `sendFriendInvitePush` and `sendFriendPush` |
+| `apps/server/convex/model/push.ts` | The pure push parts: who gets a push (`turnWait`, `turnPushSide`, `matchEndPushSides`, `isNewMatch`), the text in each language (`PUSH_TEXTS`, `pushText`), the messages, the retry (`retryTokens`, `pushStillDue`), the token cap |
 | `packages/contracts/src/push.ts` | The `PushProvider` port, the push error codes and the recording provider |
 | `packages/adapters/push-expo` | `PushProvider` on the Expo Push Service, with `fetch` only, and `isExpoPushToken` (its `README.md`) |
 | `packages/contracts/src/invite.ts` | The `Invites` port, `InviteView`, the statuses, the error codes, the code alphabet and `INVITE_TIME_MS` |
@@ -702,6 +702,7 @@ ADR-0004 point 7: the server tells a player "your turn" in an **online** game, t
 | `playerId` | string | The owner (the sign-in subject) |
 | `token` | string | `ExponentPushToken[…]` or `ExpoPushToken[…]` (`isExpoPushToken` in `@tavli/push-expo`). One player at a time. |
 | `platform` | `ios` · `android` | |
+| `locale` | `en` · `el`, optional | The language of the pushes (#631): the app language, sent with each register. A row from before #631 has none and reads as `en`. |
 | `updatedAt` | number | Epoch ms (server clock) of the last register |
 
 Indexes: `by_player` (on `[playerId, updatedAt]`, oldest first) and `by_token`.
@@ -710,9 +711,9 @@ Indexes: `by_player` (on `[playerId, updatedAt]`, oldest first) and `by_token`.
 
 | Call | Who may call | What it does |
 |---|---|---|
-| `registerPushToken(token, platform)` | anyone signed in | Saves the token for the caller, or marks it fresh. A token of another player moves to the caller (the phone signed in to another account). Keeps at most `MAX_PUSH_TOKENS_PER_PLAYER` (5) per player: a new one drops the oldest, but never the token just registered (`tokensOverCap`), even on a tie of `updatedAt` or when another call's clock was ahead. A bad token shape is `BAD_REQUEST`. |
+| `registerPushToken(token, platform, locale?)` | anyone signed in | Saves the token and its language for the caller, or marks it fresh (a new `locale` replaces the old one; a call with none keeps it). A token of another player moves to the caller (the phone signed in to another account). Keeps at most `MAX_PUSH_TOKENS_PER_PLAYER` (5) per player: a new one drops the oldest, but never the token just registered (`tokensOverCap`), even on a tie of `updatedAt` or when another call's clock was ahead. A bad token shape is `BAD_REQUEST`. |
 | `removePushToken(token)` | anyone signed in | Removes the token if it is the caller's (for example on sign-out). Another player's token stays, and the call does not say so. A bad token shape is `BAD_REQUEST`. |
-| `turnPushTokens`, `removeDeadTokens`, `sendTurnPush` | internal | The send, below |
+| `turnPushTokens`, `friendInvitePushTokens`, `friendPushTokens`, `removeDeadTokens`, `sendTurnPush`, `sendFriendInvitePush`, `sendFriendPush` | internal | The send, below |
 
 Neither public call takes a player id: both use `signedInPlayer(ctx)`. `registerPushToken` uses `existingPlayer(ctx)`, so a deleted account's token cannot save a token that nothing would remove (#306).
 
@@ -723,6 +724,8 @@ Every save in `games.ts` (`save`, and `insertGame` for a new game) calls `schedu
 - only when the wait **moved to the other side**, or a **new game** of the match started. A time out ends a game, and the next game may wait for the same side again (with `nextGameStarter: "alternate"` or `"openingRoll"`); that player still gets a push. When the same side waits again in the same game (an Asodio extra roll, or White plays on after the mother question), there is no push;
 - in the opening of a new match (#379) the wait follows `waitingFor`: a new match tells White to roll when Black made it (Black accepted an invite, or the internal `createGame` named Black). Black's die first leaves White waiting: no push. White's die first moves the wait to Black: Black gets one push. When the opening ends, the starter gets a push unless the starter rolled last. A tie after White's roll leaves White waiting again: no push;
 - never when the match is over (that is a ["game over"](#game-over) push).
+
+The first push of a new match (`before` is nobody, `isNewMatch`) has `kind: 'matchStart'` (#631): it says the game started ("New game"), or "Match found" for Play ranked. A ranked game starts from `matchSeeks` with the newer seek (Black) as the caller, so White, who may have left the app, gets it. A friend invite starts from `acceptInvite` with the accepter (Black) as the caller, so the inviter gets it. It is a turn push in every other way (`pushStillDue` treats it like `turn`).
 
 If that player has a token, the mutation schedules `sendTurnPush({ gameId, version, playerId })` with `runAfter(0)`. The action runs after the save is committed, so a push problem never fails or undoes a move. It reads the player's tokens and the turn deadline (`turnPushTokens`, newest first; no tokens when the game is no longer at `version`, so a late push is dropped), sends one message per token, and removes the tokens the push service calls dead (`DeviceNotRegistered`, `removeDeadTokens`). A player with no token costs no action.
 
@@ -745,7 +748,11 @@ It uses the same action, `sendTurnPush`, with `kind: 'matchEnd'` (`kind` may be 
 
 ### The text
 
-`TURN_PUSH_TEXT` and `MATCH_END_PUSH_TEXT` in `convex/model/push.ts`, the one place: "your turn" is title "Your turn", body "An online game is waiting for your move."; "game over" is title "Tavlaki", body "Your game is over. See the result." (it does not say who won). English only for now: the server does not know the player's language. A later issue adds a locale field (on the token or the player) and picks the text by it. No names and no emails. `data` holds only `gameId`, so the app can open the game.
+`PUSH_TEXTS` in `convex/model/push.ts` is the one place (#631): each kind of push (`turn`, `matchStart`, `rankedStart`, `matchEnd`, `friendInvite`, `friendRequest`, `friendAccepted`) in English and Greek, with a title, a body that names the other player and a body with no name. `pushText(kind, locale, name)` picks one. Each phone gets its own language (`pushTokens.locale`, `en` when missing). The name is read at send time, as the receiver sees it (`nameSeenBy`): a player the receiver blocked is never named, and a player with no name row gets the plain body. `pushNameText` writes a guest as "Guest 4821" / "Επισκέπτης 4821", like the app. Greek follows `docs/design/greek-copy.md`: the name goes first, with no article. A push never holds an email, a move or who won. `data` holds only `gameId`, an `inviteCode`, or `screen: 'friends'`, so a tap opens the game, the invite or Friends. `TURN_PUSH_TEXT`, `MATCH_END_PUSH_TEXT` and `FRIEND_INVITE_PUSH_TEXT` are the English text with no name.
+
+### Friend pushes
+
+Issue #631. `askFriend` and `acceptFriendRequest` (`friends.ts`) call `scheduleFriendPush(ctx, kind, toId, fromId)`: a new request tells the asked player "Friend request"; an accept (also a request to a player who asked you first) tells the asker "New friend". The action `sendFriendPush` reads the tokens and the name in `friendPushTokens`, and checks that the push is still due: a request must still be open (`requestRow`), a friendship must still exist (`friendRow`); else it sends nothing. The message (`friendMessages`) has `priority: 'normal'`, a time to live of one day (`FRIEND_PUSH_TTL_SECONDS`) and `data: { screen: 'friends' }`. The retry and the dead-token cleanup work as for the other pushes.
 
 ### The port and the adapter
 
@@ -760,8 +767,8 @@ It uses the same action, `sendTurnPush`, with `kind: 'matchEnd'` (`kind` may be 
 ### Notes and open points
 
 - **Sign-out:** `removePushToken` needs a live session (`signedInPlayer`). The app must call it **before** it signs out; after sign-out the call gets `NOT_SIGNED_IN` and the token stays with the old player until another player registers it, the push service calls it dead, or the cap drops it.
-- **A token moves to the newest caller on purpose:** `registerPushToken` with a token another player holds moves it to the caller. One phone has one token, and it now belongs to the user signed in on it. So a token is treated as a **secret of the phone**: the app never shows it, never logs it and never sends it anywhere but `registerPushToken` and `removePushToken`. Someone who knows another phone's token could move it to their own account: that phone would then stop getting its owner's pushes. A push holds only a fixed text and a game id, so nothing else leaks.
-- **Language:** the push text is English only (see [The text](#the-text)). A locale field comes later.
+- **A token moves to the newest caller on purpose:** `registerPushToken` with a token another player holds moves it to the caller. One phone has one token, and it now belongs to the user signed in on it. So a token is treated as a **secret of the phone**: the app never shows it, never logs it and never sends it anywhere but `registerPushToken` and `removePushToken`. Someone who knows another phone's token could move it to their own account: that phone would then stop getting its owner's pushes. A push holds only its text (with the other player's name), and a game id, an invite code or a screen, so nothing else leaks.
+- **Language:** each token keeps the app language it was registered with (see [The text](#the-text)). The app registers again when the language changes.
 - **No expiry job yet:** a player keeps at most 5 tokens (`MAX_PUSH_TOKENS_PER_PLAYER`), and a token is dropped when the push service answers `DeviceNotRegistered`. Nothing removes a token that only went quiet. A scheduled job that removes tokens by an old `updatedAt` is a follow-up.
 
 ## Delete an account

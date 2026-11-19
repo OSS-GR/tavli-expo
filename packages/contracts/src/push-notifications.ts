@@ -27,6 +27,8 @@
  * notifications" in `docs/architecture/app-shell.md`.
  */
 import type { GameTransportErrorData } from './game-transport';
+import { PUSH_SCREENS } from './push';
+import type { PushScreen } from './push';
 
 /**
  * What the phone allows:
@@ -48,6 +50,14 @@ export const PUSH_PLATFORMS = ['ios', 'android'] as const;
 
 export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 
+/**
+ * The language of a phone's pushes (#631), as the server keeps it with the
+ * token: the app's language. A token saved with none gets English.
+ */
+export const PUSH_LOCALES = ['en', 'el'] as const;
+
+export type PushLocale = (typeof PUSH_LOCALES)[number];
+
 /** A tap on a push. Plain JSON. */
 export interface PushTap {
   /** The id of the push. The same tap reported twice has the same id. */
@@ -59,6 +69,8 @@ export interface PushTap {
    * none (or it is not a string).
    */
   readonly inviteCode: string | null;
+  /** `data.screen` of a push that opens a screen (#631), or `null`. */
+  readonly screen: PushScreen | null;
 }
 
 export interface PushNotifications {
@@ -97,10 +109,12 @@ export interface PushNotifications {
 export interface PushTokens {
   /**
    * Saves `token` for the signed-in user (again is fine: it marks it
-   * fresh). Rejects with `GameTransportErrorData`: `NOT_SIGNED_IN` with
-   * nobody signed in, `BAD_REQUEST` for a token that is not an Expo push token.
+   * fresh), with the language of its pushes (#631; again with another
+   * language changes it). Rejects with `GameTransportErrorData`:
+   * `NOT_SIGNED_IN` with nobody signed in, `BAD_REQUEST` for a token that
+   * is not an Expo push token.
    */
-  register(token: string, platform: PushPlatform): Promise<void>;
+  register(token: string, platform: PushPlatform, locale: PushLocale): Promise<void>;
   /**
    * Removes `token` of the signed-in user. A token that is not theirs, or
    * not saved, stays as it is. Rejects like `register`. Call it before
@@ -126,6 +140,13 @@ export function inviteCodeOfPush(data: unknown): string | null {
   if (typeof data !== 'object' || data === null) return null;
   const code = (data as { inviteCode?: unknown }).inviteCode;
   return typeof code === 'string' && code !== '' ? code : null;
+}
+
+/** The data of a push that opens a screen (#631): `screen` when it is one of `PUSH_SCREENS`. */
+export function screenOfPush(data: unknown): PushScreen | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const screen = (data as { screen?: unknown }).screen;
+  return (PUSH_SCREENS as readonly unknown[]).includes(screen) ? (screen as PushScreen) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,6 +268,7 @@ export function createMemoryPushNotifications(
         id: `tap-${taps}`,
         gameId: gameIdOfPush(data),
         inviteCode: inviteCodeOfPush(data),
+        screen: screenOfPush(data),
       };
       if (options.opensApp === true) opening = tap;
       else tell(tapListeners, tap);
@@ -273,6 +295,7 @@ export interface SavedPushToken {
   readonly playerId: string;
   readonly token: string;
   readonly platform: PushPlatform;
+  readonly locale: PushLocale;
 }
 
 /** One call to `createMemoryPushTokens`, with the user signed in at that moment. */
@@ -282,6 +305,7 @@ export type PushTokenCall =
       readonly playerId: string | null;
       readonly token: string;
       readonly platform: PushPlatform;
+      readonly locale: PushLocale;
     }
   | { readonly kind: 'remove'; readonly playerId: string | null; readonly token: string };
 
@@ -323,10 +347,13 @@ export function createMemoryPushTokens(currentUser: () => string | null): Memory
   }
 
   return {
-    async register(token, platform) {
-      calls = [...calls, { kind: 'register', playerId: currentUser(), token, platform }];
+    async register(token, platform, locale) {
+      calls = [...calls, { kind: 'register', playerId: currentUser(), token, platform, locale }];
       const playerId = await caller(token);
-      saved = [...saved.filter((row) => row.token !== token), { playerId, token, platform }];
+      saved = [
+        ...saved.filter((row) => row.token !== token),
+        { playerId, token, platform, locale },
+      ];
     },
     async remove(token) {
       calls = [...calls, { kind: 'remove', playerId: currentUser(), token }];

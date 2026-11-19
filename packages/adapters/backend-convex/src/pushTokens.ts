@@ -33,8 +33,8 @@ export function createConvexPushTokens(options: ConvexPushTokensOptions): PushTo
   const { client } = options;
   return {
     // Only the fields the server takes: it checks its arguments strictly.
-    register: (token, platform) =>
-      run(() => client.mutation(PUSH_FUNCTIONS.registerPushToken, { token, platform })),
+    register: (token, platform, locale) =>
+      run(() => client.mutation(PUSH_FUNCTIONS.registerPushToken, { token, platform, locale })),
     remove: (token) => run(() => client.mutation(PUSH_FUNCTIONS.removePushToken, { token })),
   };
 }

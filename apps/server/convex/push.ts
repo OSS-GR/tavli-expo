@@ -36,13 +36,15 @@ import { createExpoPushProvider, isExpoPushToken } from '@tavli/push-expo';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalAction, internalMutation, internalQuery, mutation } from './_generated/server';
-import type { MutationCtx } from './_generated/server';
+import type { MutationCtx, QueryCtx } from './_generated/server';
 import { existingPlayer, signedInPlayer } from './caller';
 import {
   MAX_PUSH_RETRIES,
   PUSH_RETRY_MS,
   deadTokens,
   friendInviteMessages,
+  friendMessages,
+  isNewMatch,
   matchEndPushSides,
   pushMessages,
   pushStillDue,
@@ -50,8 +52,10 @@ import {
   tokensOverCap,
   turnPushSide,
 } from './model/push';
-import type { PushKind, TurnWait } from './model/push';
-import { pushPlatform } from './schema';
+import type { FriendPushKind, PushKind, PushTarget, TurnWait } from './model/push';
+import { friendRow, requestRow } from './friendEdges';
+import { nameSeenBy } from './safety';
+import { pushLocale, pushPlatform } from './schema';
 
 // ---------------------------------------------------------------------------
 // The sender
@@ -105,9 +109,11 @@ function checkToken(token: string): void {
  * deleted account (`NOT_SIGNED_IN`).
  */
 export const registerPushToken = mutation({
-  args: { token: v.string(), platform: pushPlatform },
+  // `locale` (#631): the language of the phone's pushes. An older build
+  // sends none: the row keeps the one it has (English with none).
+  args: { token: v.string(), platform: pushPlatform, locale: v.optional(pushLocale) },
   returns: v.null(),
-  handler: async (ctx, { token, platform }) => {
+  handler: async (ctx, { token, platform, locale }) => {
     const playerId = await existingPlayer(ctx);
     checkToken(token);
     const updatedAt = Date.now();
@@ -118,13 +124,25 @@ export const registerPushToken = mutation({
     let saved = false;
     for (const row of rows) {
       if (row.playerId === playerId && !saved) {
-        await ctx.db.patch(row._id, { platform, updatedAt });
+        await ctx.db.patch(row._id, {
+          platform,
+          updatedAt,
+          ...(locale === undefined ? {} : { locale }),
+        });
         saved = true;
       } else {
         await ctx.db.delete(row._id);
       }
     }
-    if (!saved) await ctx.db.insert('pushTokens', { playerId, token, platform, updatedAt });
+    if (!saved) {
+      await ctx.db.insert('pushTokens', {
+        playerId,
+        token,
+        platform,
+        updatedAt,
+        ...(locale === undefined ? {} : { locale }),
+      });
+    }
     const mine = await ctx.db
       .query('pushTokens')
       .withIndex('by_player', (q) => q.eq('playerId', playerId))
@@ -161,8 +179,37 @@ export const removePushToken = mutation({
 // ---------------------------------------------------------------------------
 // "Your turn" and "game over"
 
-/** Which push (`PushKind`): "your turn" or "game over". */
-const pushKind = v.union(v.literal('turn'), v.literal('matchEnd'));
+/** Which push (`PushKind`): "your turn", a new match (#631) or "game over". */
+const pushKind = v.union(v.literal('turn'), v.literal('matchStart'), v.literal('matchEnd'));
+
+/** A player's name (`PlayerName`, contracts), as in `matchmaking.ts`. */
+const playerName = v.union(
+  v.object({ kind: v.literal('guest'), number: v.string() }),
+  v.object({ kind: v.literal('username'), name: v.string() }),
+);
+
+/** One phone of a push, as the queries hand it to the actions. */
+const pushTarget = v.object({ token: v.string(), locale: pushLocale });
+
+/**
+ * The phones of `playerId`, newest first, in the language each saved
+ * (English for a row from before #631), or only those in `only` (a retry).
+ */
+async function targetsOf(
+  ctx: QueryCtx,
+  playerId: string,
+  only: readonly string[] | undefined,
+): Promise<PushTarget[]> {
+  const rows = await ctx.db
+    .query('pushTokens')
+    .withIndex('by_player', (q) => q.eq('playerId', playerId))
+    .order('desc')
+    .collect();
+  const wanted = only === undefined ? null : new Set(only);
+  return rows
+    .filter((row) => wanted === null || wanted.has(row.token))
+    .map((row) => ({ token: row.token, locale: row.locale ?? 'en' }));
+}
 
 /** The game fields `scheduleTurnPush` reads. */
 export interface PushGame {
@@ -191,7 +238,10 @@ export async function scheduleTurnPush(
 ): Promise<void> {
   const caller = sideOf(game.players, callerId);
   const turnSide = turnPushSide(before, after, caller);
-  if (turnSide !== null) await schedulePush(ctx, game, version, 'turn', turnSide);
+  if (turnSide !== null) {
+    const kind = isNewMatch(before) ? 'matchStart' : 'turn';
+    await schedulePush(ctx, game, version, kind, turnSide);
+  }
   for (const side of matchEndPushSides(before, after, caller)) {
     await schedulePush(ctx, game, version, 'matchEnd', side);
   }
@@ -221,12 +271,14 @@ async function schedulePush(
 }
 
 /**
- * The tokens to send a push of `kind` to, newest first: all of the
- * player's, or only those in `only` (a retry), and the game's turn
- * deadline (for the time to live of "your turn"). No tokens when the push
- * is no longer due (`pushStillDue`): "your turn" after the player has
- * played or the match is over, "game over" for a match that is not over,
- * or a game that is gone.
+ * The phones to send a push of `kind` to, newest first, each with its
+ * language: all of the player's, or only those in `only` (a retry), and
+ * the game's turn deadline (for the time to live of "your turn"), the
+ * other player's name as this player sees it (`nameSeenBy`: `null` when
+ * they block them, #631) and whether the game is ranked. No phones when
+ * the push is no longer due (`pushStillDue`): "your turn" after the
+ * player has played or the match is over, "game over" for a match that is
+ * not over, or a game that is gone.
  */
 export const turnPushTokens = internalQuery({
   args: {
@@ -239,23 +291,20 @@ export const turnPushTokens = internalQuery({
     only: v.optional(v.array(v.string())),
   },
   returns: v.object({
-    tokens: v.array(v.string()),
+    targets: v.array(pushTarget),
     turnDeadline: v.union(v.number(), v.null()),
+    name: v.union(playerName, v.null()),
+    ranked: v.boolean(),
   }),
   handler: async (ctx, { gameId, version, playerId, kind = 'turn', only }) => {
     const game = await ctx.db.get(gameId);
     if (game === null || !pushStillDue(kind, game, version)) {
-      return { tokens: [], turnDeadline: null };
+      return { targets: [], turnDeadline: null, name: null, ranked: false };
     }
-    const rows = await ctx.db
-      .query('pushTokens')
-      .withIndex('by_player', (q) => q.eq('playerId', playerId))
-      .order('desc')
-      .collect();
-    const all = rows.map((row) => row.token);
-    const wanted = only === undefined ? null : new Set(only);
-    const tokens = wanted === null ? all : all.filter((token) => wanted.has(token));
-    return { tokens, turnDeadline: game.turnDeadline };
+    const targets = await targetsOf(ctx, playerId, only);
+    const other = game.players.white === playerId ? game.players.black : game.players.white;
+    const name = targets.length === 0 ? null : await nameSeenBy(ctx, playerId, other);
+    return { targets, turnDeadline: game.turnDeadline, name, ranked: game.ranked === true };
   },
 });
 
@@ -309,15 +358,18 @@ export const sendTurnPush = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     const { gameId, version, playerId, kind = 'turn', attempt = 0, tokens: only } = args;
-    const { tokens, turnDeadline } = await ctx.runQuery(internal.push.turnPushTokens, {
+    const due = await ctx.runQuery(internal.push.turnPushTokens, {
       gameId,
       version,
       playerId,
       kind,
       ...(only === undefined ? {} : { only }),
     });
-    if (tokens.length === 0) return null;
-    const messages = pushMessages(kind, tokens, gameId, turnDeadline, Date.now());
+    if (due.targets.length === 0) return null;
+    const messages = pushMessages(kind, due.targets, gameId, due.turnDeadline, Date.now(), {
+      name: due.name,
+      ranked: due.ranked,
+    });
     if (messages.length === 0) return null;
     const results = await pushProvider().send(messages);
     const dead = deadTokens(messages, results);
@@ -361,9 +413,10 @@ export async function scheduleFriendInvitePush(
 }
 
 /**
- * The friend's tokens for a friend invite push, newest first (or only
- * those in `only`, a retry), with the code and the end of the invite. No
- * tokens when the invite is gone or no longer open.
+ * The friend's phones for a friend invite push, newest first (or only
+ * those in `only`, a retry), with the code, the end of the invite and the
+ * inviter's name as the friend sees it (#631). No phones when the invite
+ * is gone or no longer open.
  */
 export const friendInvitePushTokens = internalQuery({
   args: { inviteId: v.id('invites'), only: v.optional(v.array(v.string())) },
@@ -372,7 +425,8 @@ export const friendInvitePushTokens = internalQuery({
       playerId: v.string(),
       code: v.string(),
       expiresAt: v.number(),
-      tokens: v.array(v.string()),
+      targets: v.array(pushTarget),
+      name: v.union(playerName, v.null()),
     }),
     v.null(),
   ),
@@ -380,22 +434,15 @@ export const friendInvitePushTokens = internalQuery({
     const invite = await ctx.db.get(inviteId);
     if (invite?.status !== 'open' || invite.to === undefined) return null;
     const playerId = invite.to;
-    const rows = await ctx.db
-      .query('pushTokens')
-      .withIndex('by_player', (q) => q.eq('playerId', playerId))
-      .order('desc')
-      .collect();
-    const wanted = only === undefined ? null : new Set(only);
-    const tokens = rows
-      .map((row) => row.token)
-      .filter((token) => wanted === null || wanted.has(token));
-    return { playerId, code: invite.code, expiresAt: invite.expiresAt, tokens };
+    const targets = await targetsOf(ctx, playerId, only);
+    const name = targets.length === 0 ? null : await nameSeenBy(ctx, playerId, invite.from);
+    return { playerId, code: invite.code, expiresAt: invite.expiresAt, targets, name };
   },
 });
 
 /**
- * Sends "A friend invites you to a game" to the friend's phones
- * (`FRIEND_INVITE_PUSH_TEXT`, no names), with the invite code in the data
+ * Sends "<name> invites you to a game" to the friend's phones
+ * (`friendInviteMessages`, in each phone's language, #631), with the invite code in the data
  * and a time to live up to the invite's end. Removes the dead tokens and
  * tries the failed ones once more after `PUSH_RETRY_MS`, as
  * `sendTurnPush` does. An invite that was answered, cancelled or expired
@@ -415,8 +462,14 @@ export const sendFriendInvitePush = internalAction({
       inviteId,
       ...(only === undefined ? {} : { only }),
     });
-    if (due === null || due.tokens.length === 0) return null;
-    const messages = friendInviteMessages(due.tokens, due.code, due.expiresAt, Date.now());
+    if (due === null || due.targets.length === 0) return null;
+    const messages = friendInviteMessages(
+      due.targets,
+      due.code,
+      due.expiresAt,
+      Date.now(),
+      due.name,
+    );
     if (messages.length === 0) return null;
     const results = await pushProvider().send(messages);
     const dead = deadTokens(messages, results);
@@ -430,6 +483,106 @@ export const sendFriendInvitePush = internalAction({
     if (retry.length > 0 && attempt < MAX_PUSH_RETRIES) {
       await ctx.scheduler.runAfter(PUSH_RETRY_MS, internal.push.sendFriendInvitePush, {
         inviteId,
+        attempt: attempt + 1,
+        tokens: retry,
+      });
+    }
+    return null;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Friend requests (#631)
+
+/** Which friend push (`FriendPushKind`). */
+const friendPushKind = v.union(v.literal('friendRequest'), v.literal('friendAccepted'));
+
+/**
+ * Called by the friend functions (`friends.ts`) in their transaction:
+ * schedules `sendFriendPush` to `toId` about `fromId` when `toId` has a
+ * push token. `friendRequest`: `fromId` asked `toId`. `friendAccepted`:
+ * `fromId` accepted the request of `toId` (or asked back, which makes them
+ * friends). It sends nothing itself, so a failed push can never undo the
+ * request.
+ */
+export async function scheduleFriendPush(
+  ctx: MutationCtx,
+  kind: FriendPushKind,
+  toId: string,
+  fromId: string,
+): Promise<void> {
+  const token = await ctx.db
+    .query('pushTokens')
+    .withIndex('by_player', (q) => q.eq('playerId', toId))
+    .first();
+  if (token === null) return;
+  await ctx.scheduler.runAfter(0, internal.push.sendFriendPush, { kind, toId, fromId });
+}
+
+/**
+ * The phones of `toId` for a friend push (or only those in `only`, a
+ * retry), with the name of `fromId` as `toId` sees it. No phones when the
+ * push is no longer due: the request was answered, taken back or
+ * declined, or the two are no longer friends (a block ends both).
+ */
+export const friendPushTokens = internalQuery({
+  args: {
+    kind: friendPushKind,
+    toId: v.string(),
+    fromId: v.string(),
+    only: v.optional(v.array(v.string())),
+  },
+  returns: v.object({ targets: v.array(pushTarget), name: v.union(playerName, v.null()) }),
+  handler: async (ctx, { kind, toId, fromId, only }) => {
+    const due =
+      kind === 'friendRequest'
+        ? (await requestRow(ctx, fromId, toId))?.status === 'open'
+        : (await friendRow(ctx, toId, fromId)) !== null;
+    if (!due) return { targets: [], name: null };
+    const targets = await targetsOf(ctx, toId, only);
+    const name = targets.length === 0 ? null : await nameSeenBy(ctx, toId, fromId);
+    return { targets, name };
+  },
+});
+
+/**
+ * Sends a friend push (`friendMessages`: "<name> wants to be your friend"
+ * or "<name> accepted your friend request", in each phone's language) to
+ * the phones of `toId`; a tap opens Friends. Removes the dead tokens and
+ * tries the failed ones once more after `PUSH_RETRY_MS`, as
+ * `sendTurnPush` does.
+ */
+export const sendFriendPush = internalAction({
+  args: {
+    kind: friendPushKind,
+    toId: v.string(),
+    fromId: v.string(),
+    /** 0 (or missing) for the first send, 1 for the retry. */
+    attempt: v.optional(v.number()),
+    /** A retry: only these tokens. */
+    tokens: v.optional(v.array(v.string())),
+  },
+  returns: v.null(),
+  handler: async (ctx, { kind, toId, fromId, attempt = 0, tokens: only }) => {
+    const due = await ctx.runQuery(internal.push.friendPushTokens, {
+      kind,
+      toId,
+      fromId,
+      ...(only === undefined ? {} : { only }),
+    });
+    if (due.targets.length === 0) return null;
+    const messages = friendMessages(kind, due.targets, due.name);
+    const results = await pushProvider().send(messages);
+    const dead = deadTokens(messages, results);
+    if (dead.length > 0) {
+      await ctx.runMutation(internal.push.removeDeadTokens, { playerId: toId, tokens: dead });
+    }
+    const retry = retryTokens(messages, results);
+    if (retry.length > 0 && attempt < MAX_PUSH_RETRIES) {
+      await ctx.scheduler.runAfter(PUSH_RETRY_MS, internal.push.sendFriendPush, {
+        kind,
+        toId,
+        fromId,
         attempt: attempt + 1,
         tokens: retry,
       });

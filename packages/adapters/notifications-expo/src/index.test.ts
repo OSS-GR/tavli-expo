@@ -343,11 +343,18 @@ describe('tapOf', () => {
       id: expect.stringMatching(/^push-/),
       gameId: 'k57',
       inviteCode: null,
+      screen: null,
     });
     expect(tapOf(response({ inviteCode: 'ABCD2345' }) as never)).toEqual({
       id: expect.stringMatching(/^push-/),
       gameId: null,
       inviteCode: 'ABCD2345',
+      screen: null,
+    });
+    expect(tapOf(response({ screen: 'friends' }) as never)).toMatchObject({
+      gameId: null,
+      inviteCode: null,
+      screen: 'friends',
     });
     expect(tapOf(null)).toBeNull();
   });

@@ -270,7 +270,7 @@ describe('createOnlineServices', () => {
     await expect(online.notifications.requestPermission()).resolves.toBe('granted');
     const token = await online.notifications.getToken();
     expect(token).toBe(phone.token);
-    await online.pushTokens.register(token!, 'android');
+    await online.pushTokens.register(token!, 'android', 'en');
     await online.pushTokens.remove(token!);
     expect(made).toEqual([
       `auth ${SERVER.siteUrl}`,
@@ -287,12 +287,13 @@ describe('createOnlineServices', () => {
     phone.rollToken();
     phone.tap({ gameId: 'g2' }, { opensApp: true });
     await settle();
-    expect(taps).toEqual([{ id: 'tap-1', gameId: 'g1', inviteCode: null }]);
+    expect(taps).toEqual([{ id: 'tap-1', gameId: 'g1', inviteCode: null, screen: null }]);
     expect(tokens).toEqual(['ExponentPushToken[memory-2]']);
     await expect(online.notifications.lastTap()).resolves.toEqual({
       id: 'tap-2',
       gameId: 'g2',
       inviteCode: null,
+      screen: null,
     });
     stopTaps();
     stopTokens();
@@ -423,12 +424,14 @@ describe('the Jest fake of @/services', () => {
 
   it('saves push tokens as the signed-in guest, and refuses them while nobody is signed in', async () => {
     const token = onlineFake.notifications.token;
-    await expect(onlineFake.pushTokens.register(token, 'ios')).rejects.toMatchObject({
+    await expect(onlineFake.pushTokens.register(token, 'ios', 'en')).rejects.toMatchObject({
       code: 'NOT_SIGNED_IN',
     });
     await onlineFake.auth.signInAsGuest();
-    await onlineFake.pushTokens.register(token, 'ios');
-    expect(onlineFake.pushTokens.saved).toEqual([{ playerId: 'guest-1', token, platform: 'ios' }]);
+    await onlineFake.pushTokens.register(token, 'ios', 'el');
+    expect(onlineFake.pushTokens.saved).toEqual([
+      { playerId: 'guest-1', token, platform: 'ios', locale: 'el' },
+    ]);
   });
 
   it('starts each test with notifications not asked and no saved token', async () => {

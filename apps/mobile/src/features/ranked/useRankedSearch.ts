@@ -74,11 +74,12 @@ export interface RankedSearch {
   readonly problem: RankedProblem | null;
   /** The last search ended on the server with nobody found (five minutes). */
   readonly expired: boolean;
-  readonly find: (game: RankedGame) => Promise<void>;
+  /** Starts a search. Resolves to true when the server took it. */
+  readonly find: (game: RankedGame) => Promise<boolean>;
   /** Ends the search; `how` is for analytics (Cancel, Back, the bot). `false` when it failed. */
   readonly cancel: (how: Extract<RankedSearchEnd, 'cancelled' | 'bot'>) => Promise<boolean>;
   /** Looks for `game` instead of the game of the search. */
-  readonly switchGame: (game: RankedGame) => Promise<void>;
+  readonly switchGame: (game: RankedGame) => Promise<boolean>;
   readonly dismissProblem: () => void;
   /** How many look for each game: for "Try another game". */
   readonly lookingCounts: () => Promise<LookingCounts | null>;
@@ -236,15 +237,21 @@ export function useRankedSearch({
       setProblem(null);
       try {
         await call();
-        // The watch brings the new seek too; this one shows it at once.
-        apply(await matchmaking.mySeek());
-        return true;
       } catch (error) {
         setProblem(problemOf(error));
-        return false;
-      } finally {
         setBusy(false);
+        return false;
       }
+      // The call worked: only it decides the result. The watch brings the
+      // new seek too; this read shows it at once, and a failed read waits
+      // for the watch.
+      try {
+        apply(await matchmaking.mySeek());
+      } catch {
+        // The watch shows the seek.
+      }
+      setBusy(false);
+      return true;
     },
     [apply, matchmaking],
   );
@@ -259,6 +266,7 @@ export function useRankedSearch({
       // `apply` ends the old search as `otherGame`.
       const done = await run(() => matchmaking.seek({ game }));
       if (!done) asked.current = null;
+      return done;
     },
     [matchmaking, now, run],
   );

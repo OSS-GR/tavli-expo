@@ -12,6 +12,7 @@ import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import { hasOnlineAccount } from '@/features/online/accountHint';
+import i18n, { currentAppLanguage } from '@/i18n';
 import { auth, notifications, pushTokens, storage } from '@/services';
 
 import { sendPushPermissionAnswered } from './pushAnalytics';
@@ -34,6 +35,12 @@ function make(): TurnPushes | undefined {
     onAnswer: (answer) => sendPushPermissionAnswered(answer),
     // A phone that never used an online account asks the server nothing.
     hasAccount: hasOnlineAccount,
+    // The server writes the pushes in the app language (#631).
+    locale: currentAppLanguage,
+    onLocaleChange: (listener) => {
+      i18n.on('languageChanged', listener);
+      return () => i18n.off('languageChanged', listener);
+    },
   });
 }
 

@@ -50,6 +50,7 @@ async function open() {
     onBack: jest.fn(),
     onGame: jest.fn(),
     onBot: jest.fn(),
+    onSearchStarted: jest.fn(),
   };
   const account = {
     auth: auth!,
@@ -437,7 +438,7 @@ describe('<RankedScreen /> with a saved account', () => {
   it('a seek the server refused starts no search in analytics', async () => {
     const user = setupUser();
     await saved();
-    const { analytics } = await open();
+    const { analytics, onSearchStarted } = await open();
     const seek = jest
       .spyOn(onlineFake.matchmaking, 'seek')
       .mockRejectedValueOnce(new Error('server'));
@@ -446,7 +447,41 @@ describe('<RankedScreen /> with a saved account', () => {
     await flush();
     expect(await screen.findByTestId('ranked-problem')).toBeOnTheScreen();
     expect(tracked(analytics).filter((e) => e.event === 'ranked_search_started')).toEqual([]);
+    // No search: no turn notifications offer (#631).
+    expect(onSearchStarted).not.toHaveBeenCalled();
     seek.mockRestore();
+  });
+
+  it('a seek the server took counts even when the read after it fails (#631)', async () => {
+    const user = setupUser();
+    await saved();
+    const { onSearchStarted } = await open();
+    const read = jest
+      .spyOn(onlineFake.matchmaking, 'mySeek')
+      .mockRejectedValueOnce(new Error('server'));
+    await user.press(await screen.findByTestId('ranked-find'));
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    expect(screen.queryByTestId('ranked-problem')).toBeNull();
+    expect(onSearchStarted).toHaveBeenCalledTimes(1);
+    read.mockRestore();
+  });
+
+  it('a search that starts asks the route to offer turn notifications, once per search (#631)', async () => {
+    const user = setupUser();
+    await saved();
+    const { onSearchStarted } = await open();
+    await user.press(await screen.findByTestId('ranked-find'));
+    expect(onSearchStarted).not.toHaveBeenCalled();
+    await user.press(await screen.findByTestId('ranked-agree'));
+    await flush();
+    expect(await screen.findByTestId('ranked-searching')).toBeOnTheScreen();
+    expect(onSearchStarted).toHaveBeenCalledTimes(1);
+    await user.press(screen.getByTestId('ranked-cancel'));
+    await flush();
+    await user.press(await screen.findByTestId('ranked-find'));
+    await flush();
+    expect(onSearchStarted).toHaveBeenCalledTimes(2);
   });
 
   it('leaving the screen another way (a swipe, Android back) cancels the search', async () => {

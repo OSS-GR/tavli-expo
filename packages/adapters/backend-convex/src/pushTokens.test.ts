@@ -33,13 +33,13 @@ describe('createConvexPushTokens', () => {
     expect(getFunctionName(PUSH_FUNCTIONS.removePushToken)).toBe('push:removePushToken');
   });
 
-  it('sends the token and the platform, and only those', async () => {
+  it('sends the token, the platform and the language (#631), and only those', async () => {
     const { client, calls } = fakeClient();
     const tokens = createConvexPushTokens({ client });
-    await expect(tokens.register(TOKEN, 'android')).resolves.toBeUndefined();
+    await expect(tokens.register(TOKEN, 'android', 'el')).resolves.toBeUndefined();
     await expect(tokens.remove(TOKEN)).resolves.toBeUndefined();
     expect(calls).toEqual([
-      { name: 'push:registerPushToken', args: { token: TOKEN, platform: 'android' } },
+      { name: 'push:registerPushToken', args: { token: TOKEN, platform: 'android', locale: 'el' } },
       { name: 'push:removePushToken', args: { token: TOKEN } },
     ]);
   });
@@ -59,6 +59,8 @@ describe('createConvexPushTokens', () => {
   it('keeps any other error as it is', async () => {
     const network = new Error('offline');
     const { client } = fakeClient(() => Promise.reject(network));
-    await expect(createConvexPushTokens({ client }).register(TOKEN, 'ios')).rejects.toBe(network);
+    await expect(createConvexPushTokens({ client }).register(TOKEN, 'ios', 'en')).rejects.toBe(
+      network,
+    );
   });
 });

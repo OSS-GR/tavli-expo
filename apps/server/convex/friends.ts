@@ -84,7 +84,7 @@ import { endFriendship, friendRow, isFriend, requestRecord, requestRow } from '.
 import { insertInvite, toInviteRecord } from './invites';
 import { createCryptoRng } from './model/cryptoRng';
 import { hasUsername, nameOf } from './playerNames';
-import { scheduleFriendInvitePush } from './push';
+import { scheduleFriendInvitePush, scheduleFriendPush } from './push';
 import { blocks, met } from './safety';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
 
@@ -385,6 +385,8 @@ async function askFriend(
   if (plan.kind === 'status') return plan.status;
   if (plan.kind === 'accept') {
     await makeFriends(ctx, callerId, playerId);
+    // They had asked the caller: asking back accepts (#631).
+    await scheduleFriendPush(ctx, 'friendAccepted', playerId, callerId);
     return 'friends';
   }
   // Sent again after a decline: the same row, open again.
@@ -392,6 +394,7 @@ async function askFriend(
   if (mine === null)
     await ctx.db.insert('friendRequests', { fromId: callerId, toId: playerId, ...row });
   else await ctx.db.patch(mine._id, row);
+  await scheduleFriendPush(ctx, 'friendRequest', playerId, callerId);
   return 'sent';
 }
 
@@ -636,7 +639,10 @@ export const acceptFriendRequest = mutation({
         targetFriends,
         now: Date.now(),
       });
-      if (plan.kind === 'accept') await makeFriends(ctx, playerId, other);
+      if (plan.kind === 'accept') {
+        await makeFriends(ctx, playerId, other);
+        await scheduleFriendPush(ctx, 'friendAccepted', other, playerId);
+      }
     });
     return null;
   },

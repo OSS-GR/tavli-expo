@@ -29,8 +29,11 @@ import {
   MAX_PUSH_TOKENS_PER_PLAYER,
   PUSH_RETRY_MS,
   TURN_PUSH_TEXT,
+  pushText,
 } from './model/push';
+import type { PushTextKind } from './model/push';
 import { setPushProvider } from './push';
+import { nameSeenBy } from './safety';
 import schema from './schema';
 import { authUsers, modules, openGame, pickTurn } from './test.setup';
 
@@ -155,6 +158,15 @@ async function playOneTurn(t: Tester, gameId: Id<'games'>): Promise<PlayerId> {
     moves: pickTurn(v.game, createSeededRng(v.version)),
   });
   return side;
+}
+
+/**
+ * The text a push of `kind` to `side` reads (#631): it names the other
+ * player as `side` sees them, in English (the tests register no language).
+ */
+async function textTo(t: Tester, kind: PushTextKind, side: PlayerId) {
+  const name = await t.run((ctx) => nameSeenBy(ctx, PLAYERS[side], PLAYERS[otherSide(side)]));
+  return pushText(kind, 'en', name);
 }
 
 function otherSide(side: PlayerId): PlayerId {
@@ -295,8 +307,7 @@ describe('"your turn" pushes', () => {
     expect(push.sent).toEqual([
       {
         to: TOKEN_OF[otherSide(played)],
-        title: TURN_PUSH_TEXT.title,
-        body: TURN_PUSH_TEXT.body,
+        ...(await textTo(t, 'turn', otherSide(played))),
         data: { gameId },
         priority: 'high',
         // Kept for the whole turn time, and no longer.
@@ -320,6 +331,70 @@ describe('"your turn" pushes', () => {
     expect(waiting(await view(t, gameId))).toBe(played);
     await flush(t);
     expect(push.sent.map((message) => message.to)).toEqual([TOKEN_OF[played]]);
+  });
+
+  it('the first push of a new match says it started, naming the other player (#631)', async () => {
+    const t = await setup();
+    await registerBoth(t);
+    // Bob (Black) accepts, as an invite does: White, the inviter, rolls first.
+    const gameId = await createGame(t, null, 'portes', BOB, 5, false);
+    await flush(t);
+    expect(push.sent).toEqual([
+      {
+        to: ALICE_TOKEN,
+        ...(await textTo(t, 'matchStart', 'white')),
+        data: { gameId },
+        priority: 'high',
+        ttlSeconds: ASYNC_TURN_TIME_MS / 1000,
+      },
+    ]);
+    expect(push.sent[0]?.title).toBe('New game');
+  });
+
+  it('a ranked match says a match was found (#631)', async () => {
+    const t = await setup();
+    await registerBoth(t);
+    await t.mutation(internal.games.createGame, {
+      callerId: BOB,
+      players: PLAYERS,
+      choice: 'portes',
+      targetPoints: 5,
+      turnTimeMinutes: 2,
+      ranked: true,
+    });
+    await flush(t);
+    expect(push.sent.map(({ to, title }) => [to, title])).toEqual([[ALICE_TOKEN, 'Match found']]);
+  });
+
+  it('writes the push in the language the phone registered (#631)', async () => {
+    const t = await setup();
+    await as(t, ALICE).mutation(api.push.registerPushToken, {
+      token: ALICE_TOKEN,
+      platform: 'ios',
+      locale: 'el',
+    });
+    await createGame(t, null, 'portes', BOB, 5, false);
+    await flush(t);
+    const bob = await t.run((ctx) => nameSeenBy(ctx, ALICE, BOB));
+    expect(push.sent.map(({ title, body }) => ({ title, body }))).toEqual([
+      pushText('matchStart', 'el', bob),
+    ]);
+    expect(push.sent[0]?.title).toBe('Νέο παιχνίδι');
+  });
+
+  it('never names a player the receiver blocked (#631)', async () => {
+    const t = await setup();
+    const gameId = await createGame(t, null);
+    await flush(t);
+    await registerBoth(t);
+    // Both block each other: whoever gets the push has blocked the other.
+    await as(t, ALICE).mutation(api.safety.blockPlayer, { playerId: BOB });
+    await as(t, BOB).mutation(api.safety.blockPlayer, { playerId: ALICE });
+    await playOneTurn(t, gameId);
+    await flush(t);
+    expect(push.sent).toHaveLength(1);
+    expect(push.sent[0]?.body).toBe(TURN_PUSH_TEXT.body);
+    expect(push.sent[0]?.body).not.toMatch(/Guest|User_/);
   });
 
   it('a roll that can be played sends no push; a roll that passes tells the other player (#355)', async () => {
@@ -686,11 +761,11 @@ describe('"game over" pushes (#316)', () => {
     });
   }
 
-  function gameOver(to: string, gameId: Id<'games'>) {
+  async function gameOver(t: Tester, to: string, gameId: Id<'games'>) {
+    const side = to === ALICE_TOKEN ? 'white' : 'black';
     return {
       to,
-      title: MATCH_END_PUSH_TEXT.title,
-      body: MATCH_END_PUSH_TEXT.body,
+      ...(await textTo(t, 'matchEnd', side)),
       data: { gameId },
       priority: 'normal',
       ttlSeconds: MATCH_END_PUSH_TTL_SECONDS,
@@ -714,7 +789,7 @@ describe('"game over" pushes (#316)', () => {
       expect(v.match.winner).toBe(winner);
       expect(push.sent).toEqual([]);
       await flush(t);
-      expect(push.sent).toEqual([gameOver(TOKEN_OF[otherSide(winner)], id)]);
+      expect(push.sent).toEqual([await gameOver(t, TOKEN_OF[otherSide(winner)], id)]);
     }
     // The text holds no player ids.
     for (const message of push.sent) {
@@ -732,7 +807,7 @@ describe('"game over" pushes (#316)', () => {
     push.clear();
     await as(t, BOB).mutation(api.games.resign, { gameId });
     await flush(t);
-    expect(push.sent).toEqual([gameOver(ALICE_TOKEN, gameId)]);
+    expect(push.sent).toEqual([await gameOver(t, ALICE_TOKEN, gameId)]);
   });
 
   it('a time out that ends the match tells both players', async () => {
@@ -748,7 +823,10 @@ describe('"game over" pushes (#316)', () => {
     expect(v.match.winner).toBe(otherSide(late));
     await flush(t);
     expect(push.sent).toEqual(
-      expect.arrayContaining([gameOver(ALICE_TOKEN, gameId), gameOver(BOB_TOKEN, gameId)]),
+      expect.arrayContaining([
+        await gameOver(t, ALICE_TOKEN, gameId),
+        await gameOver(t, BOB_TOKEN, gameId),
+      ]),
     );
     expect(push.sent).toHaveLength(2);
   });
@@ -796,7 +874,7 @@ describe('"game over" pushes (#316)', () => {
     push.clear();
     await as(t, BOB).mutation(api.games.resign, { gameId });
     await flush(t);
-    expect(push.sent).toEqual([gameOver(ALICE_TOKEN, gameId)]);
+    expect(push.sent).toEqual([await gameOver(t, ALICE_TOKEN, gameId)]);
 
     push.clear();
     push.revive(ALICE_TOKEN);
@@ -804,7 +882,7 @@ describe('"game over" pushes (#316)', () => {
     expect(push.sent).toEqual([]);
     await wait(t, 1);
     // The same text and the full day to live: no turn deadline applies.
-    expect(push.sent).toEqual([gameOver(ALICE_TOKEN, gameId)]);
+    expect(push.sent).toEqual([await gameOver(t, ALICE_TOKEN, gameId)]);
 
     // It went out: no third try.
     push.clear();

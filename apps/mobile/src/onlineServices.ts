@@ -154,7 +154,7 @@ export function lazyInvites(get: () => Invites): Invites {
 /** A `PushTokens` port that makes the real one on its first call. */
 export function lazyPushTokens(get: () => PushTokens): PushTokens {
   return {
-    register: (token, platform) => get().register(token, platform),
+    register: (token, platform, locale) => get().register(token, platform, locale),
     remove: (token) => get().remove(token),
   };
 }

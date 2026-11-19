@@ -27,11 +27,27 @@ export function screenBackground(colors: UiColors) {
 export interface ScreenProps {
   children: ReactNode;
   testID?: string;
+  /**
+   * Something covers the screen (the turn notifications offer, #285):
+   * screen readers skip it. `collapsable={false}` keeps its native view
+   * when this changes (#173).
+   */
+  hidden?: boolean;
 }
 
-export function Screen({ children, testID }: ScreenProps) {
+export function Screen({ children, testID, hidden }: ScreenProps) {
+  // Only a screen that can be covered keeps its native view and sets the
+  // props; the others stay a plain view.
+  const cover =
+    hidden === undefined
+      ? {}
+      : {
+          collapsable: false,
+          importantForAccessibility: hidden ? ('no-hide-descendants' as const) : ('auto' as const),
+          accessibilityElementsHidden: hidden,
+        };
   return (
-    <View testID={testID} style={styles.screen}>
+    <View testID={testID} style={styles.screen} {...cover}>
       {children}
     </View>
   );

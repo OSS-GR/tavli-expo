@@ -35,7 +35,7 @@ Tick these seven. Leave every other type empty.
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
-| Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids; the Expo push token on Convex, after the player turns on turn notifications (#285) |
+| Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids; the Expo push token on Convex, after the player turns on notifications (#285, #631) |
 
 Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Personal info except User IDs (name, email, address, phone, and the rest: the guest account has no real name or email), Financial info, Health and fitness, Messages, Photos and videos, Audio files, Files and docs, Calendar, App activity → In-app search (the server keeps only the times of username searches, for the limit, never the text), Installed apps, Other user-generated content (pass-and-play names stay on the phone), Web browsing, App info and performance → Other app performance data.
 
