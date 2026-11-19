@@ -72,6 +72,9 @@ describe('<AddFriendScreen />', () => {
     const link = await myLink();
     expect(screen.getByTestId('add-friend-link')).toHaveTextContent(link);
     expect(screen.getByRole('image', { name: 'QR code of your friend link' })).toBeOnTheScreen();
+    expect(screen.getByTestId('add-friend-link-intro')).toHaveTextContent(
+      'Anyone who scans this QR code or opens this link adds you as a friend, and you become their friend too.',
+    );
   });
 
   it('Share link opens the share sheet, Message the Messages app, with the link', async () => {

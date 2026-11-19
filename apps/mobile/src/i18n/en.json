@@ -764,7 +764,7 @@
     "add": {
       "title": "Add a friend",
       "linkTitle": "Your friend link",
-      "linkIntro": "When a friend opens it, they can ask to be your friend.",
+      "linkIntro": "Anyone who scans this QR code or opens this link adds you as a friend, and you become their friend too.",
       "qrLabel": "QR code of your friend link",
       "qrHint": "Your friend scans it with the phone camera.",
       "checking": "Checking your link…",

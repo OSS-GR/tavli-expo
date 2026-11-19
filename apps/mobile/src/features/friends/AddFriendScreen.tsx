@@ -245,7 +245,9 @@ export function AddFriendScreen({
                 <Text accessibilityRole="header" style={styles.cardTitle}>
                   {t('friends.add.linkTitle')}
                 </Text>
-                <Text style={styles.cardIntro}>{t('friends.add.linkIntro')}</Text>
+                <Text testID="add-friend-link-intro" style={styles.cardIntro}>
+                  {t('friends.add.linkIntro')}
+                </Text>
               </View>
               {/* Until this visit's load answers (or New link sets the
                   link), it may be one reset on another phone: no QR code
