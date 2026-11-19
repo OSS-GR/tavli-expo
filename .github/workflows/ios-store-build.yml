@@ -1,0 +1,96 @@
+name: iOS store build
+
+# Builds the production iOS app on a GitHub Mac runner and sends it to
+# App Store Connect (#633). Use it when EAS has no cloud builds left this
+# month: `eas build --local` builds on this runner, so it uses no EAS build.
+#
+# Manual only ("Run workflow"), from main only.
+# Never add a `pull_request` or `pull_request_target` trigger: PR code must
+# never see the tokens.
+#
+# Needs:
+# - the `EXPO_TOKEN` repo secret (the same one as eas-build.yml). EAS gives
+#   the signing files and the App Store Connect key through it.
+# - optional: a `SENTRY_AUTH_TOKEN` repo secret. The EAS variable with that
+#   name is secret, and a local build cannot read a secret EAS variable.
+#   Without the repo secret the build skips the Sentry upload, so crash
+#   reports of that build do not point to our source.
+# See docs/process/running-the-app.md, part 4.
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: Send the build to App Store Connect
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # A store build comes from main only.
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check EXPO_TOKEN
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add the EXPO_TOKEN repo secret first (see docs/process/running-the-app.md)."
+            exit 1
+          fi
+
+      # No `version` input: the action reads `packageManager` from package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          packager: pnpm
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # EAS CLI reads the app config, so the app's packages must be installed.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Show the tools
+        run: |
+          xcodebuild -version
+          pod --version
+          fastlane --version | tail -n 1
+
+      - name: Build
+        working-directory: apps/mobile
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::No SENTRY_AUTH_TOKEN repo secret: this build skips the Sentry upload."
+            unset SENTRY_AUTH_TOKEN
+            export SENTRY_DISABLE_AUTO_UPLOAD=true
+          fi
+          eas build --profile production --platform ios --local --non-interactive \
+            --output "$RUNNER_TEMP/tavlaki.ipa"
+
+      - name: Submit to App Store Connect
+        if: inputs.submit
+        working-directory: apps/mobile
+        run: |
+          eas submit --profile production --platform ios --non-interactive \
+            --path "$RUNNER_TEMP/tavlaki.ipa"

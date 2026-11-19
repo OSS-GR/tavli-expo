@@ -222,6 +222,10 @@ eas build --profile production --platform ios --auto-submit
 
 **Manual GitHub workflow.** The **EAS build** workflow (`.github/workflows/eas-build.yml`) starts a cloud build from the Actions tab. It only runs when you click **Run workflow**. It needs a repo secret `EXPO_TOKEN`: make a token on expo.dev > **Account settings** > **Access tokens**, then add it in GitHub > **Settings** > **Secrets and variables** > **Actions**. The run does not wait for the build, so it uses about 2 GitHub minutes.
 
+**iOS store build on GitHub.** The **iOS store build** workflow (`.github/workflows/ios-store-build.yml`, #633) builds the `production` iOS app on a GitHub Mac runner (`eas build --local`) and sends it to App Store Connect (`eas submit`). It uses no EAS cloud build, so use it when the month's EAS builds are used up. Start it from the Actions tab with **Run workflow**, on `main` only. It needs the same `EXPO_TOKEN` secret; EAS gives the signing files and the App Store Connect key through it. The build takes a new build number from EAS, like a cloud build.
+
+The Sentry token is a secret EAS variable, and a local build cannot read one. Add a `SENTRY_AUTH_TOKEN` repo secret to get the Sentry upload. Without it the workflow skips the upload (`SENTRY_DISABLE_AUTO_UPLOAD`), and crash reports of that build do not point to our source.
+
 ### Versions and build numbers
 
 - **`version`** in `app.json` (now `1.0.0`) is the version people see in the store. We change it by hand for each store release.
