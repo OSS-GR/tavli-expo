@@ -7,6 +7,7 @@
 | # | Question | Why it matters | Affects |
 |---|----------|----------------|---------|
 | Q32 | **`tavlaki.com/privacy` is not live yet.** The consent screen and Settings link to it. Please publish the privacy policy there (the text is in `docs/legal/`). | Testers and the stores need a working privacy link | `docs/legal/README.md`, #61 |
+| Q33 | **Web version (#637): one decision left** (five were answered on 2026-11-19): a closed test before the public launch? The plan recommends yes. | Phase 4 needs it | `docs/architecture/web-app.md` → "Owner decisions", ADR-0010 |
 
 ## Answered
 

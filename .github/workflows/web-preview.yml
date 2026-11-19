@@ -1,0 +1,134 @@
+name: Web preview
+
+# Builds the web version of the app from a branch and puts it on the dev
+# site (#637, ADR-0010), so the owner can test it on a real phone and in
+# Safari. Manual only ("Run workflow").
+#
+# Three jobs, so the branch's code never runs next to the Cloudflare token:
+# - check: stops at once when the run is not on main or a secret is missing.
+#   Runs no repo code.
+# - build: checks out the branch, builds, uploads the files. No secrets.
+# - deploy: takes the files and runs wrangler from main. Has the token.
+#
+# Never add a `pull_request` or `pull_request_target` trigger: PR code must
+# never see the token.
+#
+# Needs two secrets of the GitHub environment `development`:
+# CLOUDFLARE_API_TOKEN (a token that may edit Workers) and
+# CLOUDFLARE_ACCOUNT_ID. See docs/process/running-the-app.md, "Web preview".
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build
+        type: string
+        default: spike/web-phase0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: development
+    steps:
+      # The wrangler config and the header rules come from main only.
+      - name: Check the branch and the secrets
+        env:
+          REF: ${{ github.ref }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow on main. Type the branch to build in the 'ref' box."
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to the environment 'development' (see docs/process/running-the-app.md, \"Web preview\")."
+            exit 1
+          fi
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      # Skia on the web is CanvasKit. The app loads the file from its root.
+      - name: Copy CanvasKit
+        working-directory: apps/mobile
+        run: |
+          mkdir -p public
+          if [ ! -f public/canvaskit.wasm ]; then
+            wasm="$(node -e "
+              const path = require('path');
+              const skia = path.dirname(require.resolve('@shopify/react-native-skia/package.json'));
+              console.log(require.resolve('canvaskit-wasm/bin/full/canvaskit.wasm', { paths: [skia] }));
+            ")" || { echo "::error::canvaskit.wasm was not found next to @shopify/react-native-skia."; exit 1; }
+            cp "$wasm" public/canvaskit.wasm
+          fi
+
+      # `--clear`: Metro keeps EXPO_PUBLIC_* values in its cache.
+      - name: Build
+        working-directory: apps/mobile
+        run: pnpm exec expo export --clear --platform web --output-dir web-dist
+
+      # The site answers a missing file with the app page, so a missing
+      # CanvasKit would only show as a broken board in the browser.
+      - name: Check the build
+        working-directory: apps/mobile
+        run: test -s web-dist/index.html && test -s web-dist/canvaskit.wasm
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: apps/mobile/web-dist
+          retention-days: 3
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # Folders only. Files at the repo root (.nvmrc) always come too.
+          sparse-checkout: apps/mobile/web
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: apps/mobile/web/dist
+
+      # The build comes from a branch. Cloudflare reads these files as rules
+      # (redirects, code, what to serve), so only main may set them.
+      - name: Keep only main's rules
+        working-directory: apps/mobile/web
+        run: |
+          rm -rf dist/_redirects dist/_headers dist/_routes.json dist/_worker.js dist/.assetsignore
+          cp _headers dist/_headers
+
+      - name: Deploy
+        working-directory: apps/mobile/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.160.0 deploy

@@ -226,6 +226,20 @@ eas build --profile production --platform ios --auto-submit
 
 The Sentry token is a secret EAS variable, and a local build cannot read one. Add a `SENTRY_AUTH_TOKEN` repo secret to get the Sentry upload. Without it the workflow skips the upload (`SENTRY_DISABLE_AUTO_UPLOAD`), and crash reports of that build do not point to our source.
 
+### Web preview
+
+The **Web preview** workflow (`.github/workflows/web-preview.yml`, #637) builds the web version from a branch and puts it on the dev site, the Cloudflare Worker `tavlaki-play-dev` (`apps/mobile/web/wrangler.jsonc`). Use it to test the web version on a real phone and in Safari. The web version is a plan, not a product yet: see [the web plan](../architecture/web-app.md).
+
+Start it from the Actions tab with **Run workflow** on `main`, and type the branch to build (default `spike/web-phase0`). The run prints the site address (`https://tavlaki-play-dev.<your-subdomain>.workers.dev`). Search engines are told not to list the site.
+
+Setup once (owner):
+
+1. Cloudflare dashboard → **My Profile → API Tokens → Create Token** → the template **Edit Cloudflare Workers**. Copy the token.
+2. Copy the **Account ID** (Cloudflare dashboard → **Workers & Pages**, on the right).
+3. GitHub → **Settings → Environments → development** → add the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+
+The build job runs the branch's code with no secrets. The deploy job has the token and runs only `wrangler` from `main`. Online play does not work on the dev site yet: the dev server does not allow calls from it (phase 3 of the plan).
+
 ### Versions and build numbers
 
 - **`version`** in `app.json` (now `1.0.0`) is the version people see in the store. We change it by hand for each store release.

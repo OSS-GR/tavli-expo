@@ -53,6 +53,7 @@
 | [Board screen](architecture/board-screen.md) | How the app draws the board (Skia), board flip, tests and screenshots |
 | [App shell](architecture/app-shell.md) | Home, new game, local matches, the bot turn, in-game menu |
 | [iMessage version](architecture/imessage.md) | How a GamePigeon-style version works |
+| [Web version: the plan](architecture/web-app.md) | Proposed: Tavlaki in the browser, in phases (ADR-0010) |
 | [Analytics events](architecture/analytics-events.md) | Usage events, consent rules (GDPR), PostHog EU setup |
 
 ## Design
@@ -81,5 +82,6 @@
 | [0007](decisions/0007-online-game-turn-timer.md) | `turnTimeMinutes` replaces the live/async pace | Accepted |
 | [0008](decisions/0008-accounts.md) | Sign-in methods and account rules: guests stay, Apple, Google and email code to save | Accepted |
 | [0009](decisions/0009-play-ranked.md) | Play ranked: 2-minute turns, two time outs in a row lose the match | Accepted |
+| [0010](decisions/0010-web-version.md) | Web version: the same Expo app, built for the browser too | Proposed |
 
 New ADRs: copy [0000-template.md](decisions/0000-template.md).

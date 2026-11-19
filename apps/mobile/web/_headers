@@ -1,0 +1,9 @@
+# Rules for the dev site of the web version (#637). The workflow copies this
+# file into the build. Search engines must not list a test site.
+/*
+  X-Robots-Tag: noindex
+  X-Frame-Options: DENY
+
+# Expo names these files by their content, so they never change.
+/_expo/static/*
+  Cache-Control: public, max-age=31536000, immutable
