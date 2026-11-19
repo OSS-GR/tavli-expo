@@ -52,7 +52,7 @@ async function show(friends: Friends = onlineFake.friends) {
 }
 
 async function myLink(): Promise<string> {
-  return `tavlaki://add/${await onlineFake.server().friendsFor(ME).myFriendLink()}`;
+  return `https://tavlaki.com/add/${await onlineFake.server().friendsFor(ME).myFriendLink()}`;
 }
 
 afterEach(() => {

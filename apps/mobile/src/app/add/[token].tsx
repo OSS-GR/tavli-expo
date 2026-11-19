@@ -1,6 +1,7 @@
 /**
- * A friend link (#406): `tavlaki://add/<token>`, from a shared link or a
- * QR code the phone's camera read. A build with no online server goes
+ * A friend link (#406): `https://tavlaki.com/add/<token>` (#629, a universal
+ * link) or `tavlaki://add/<token>`, from a shared link or a QR code the
+ * phone's camera read. A build with no online server goes
  * Home.
  */
 import { Redirect, router, useLocalSearchParams } from 'expo-router';

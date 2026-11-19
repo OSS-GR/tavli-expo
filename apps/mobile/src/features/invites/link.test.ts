@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { friendLinkUrl } from '@/features/friends/friendLink';
+
 import {
   INVITE_LINK_ORIGIN,
   inviteAppUrl,
@@ -10,6 +12,7 @@ import {
 } from './link';
 
 const CODE = 'ABCD2345';
+const FRIEND_TOKEN = 'ABCDEFGH23456789';
 
 describe('inviteCodeFromLink', () => {
   it.each([
@@ -128,11 +131,44 @@ describe('universal links (#332)', () => {
     expect(aasa.applinks.details).toEqual([
       expect.objectContaining({
         appIDs: [`P36P357F6Z.${app.expo.ios.bundleIdentifier}`],
-        components: [expect.objectContaining({ '/': '/i/*' })],
+        components: [
+          expect.objectContaining({ '/': '/i/*' }),
+          expect.objectContaining({ '/': '/add/*' }),
+        ],
       }),
     ]);
-    // The path the app writes is the path the site hands to the app.
+    // The paths the app writes are the paths the site hands to the app.
     expect(new URL(inviteUrl(CODE)).pathname).toBe(`/i/${CODE}`);
+    expect(new URL(friendLinkUrl(FRIEND_TOKEN)).pathname).toBe(`/add/${FRIEND_TOKEN}`);
+  });
+
+  it('the site shows the friend link fallback page, with no script (#629)', () => {
+    expect(read('docs/legal/site/_redirects')).toMatch(/^\/add\/\*\s+\/add\/\s+200$/m);
+    expect(read('docs/legal/site/_headers')).toMatch(/^\/add\/\*\n\s+X-Robots-Tag: noindex$/m);
+    const page = read('docs/legal/site/add/index.html');
+    expect(page).not.toMatch(
+      /<script|<iframe|<img|https?:\/\/(?!tavlaki\.com|testflight\.apple\.com|apps\.apple\.com)/i,
+    );
+    expect(page).toContain('<section lang="en">');
+    expect(page).toContain('<section lang="el" id="el">');
+    // The app's own words for the steps.
+    for (const lang of ['en', 'el'] as const) {
+      const { friends } = JSON.parse(read(`apps/mobile/src/i18n/${lang}.json`)) as {
+        friends: {
+          title: string;
+          addButton: string;
+          add: { pasteTitle: string; openLink: string };
+        };
+      };
+      for (const words of [
+        friends.title,
+        friends.addButton,
+        friends.add.pasteTitle,
+        friends.add.openLink,
+      ]) {
+        expect(page).toContain(`<strong>${words}</strong>`);
+      }
+    }
   });
 
   it('the site shows the fallback page for every share link, with no script', () => {
@@ -196,11 +232,14 @@ describe('the homepage', () => {
     expect(read(file)).toContain(lang === 'el' ? 'href="/el/support/"' : 'href="/support/"');
   });
 
-  it('the invite page links the same TestFlight link in both languages', () => {
-    const page = read('docs/legal/site/i/index.html');
-    expect(page.split(`href="${TESTFLIGHT}"`)).toHaveLength(3);
-    expect(page).not.toContain('OWNER');
-  });
+  it.each(['i', 'add'])(
+    'the %s page links the same TestFlight link in both languages',
+    (folder) => {
+      const page = read(`docs/legal/site/${folder}/index.html`);
+      expect(page.split(`href="${TESTFLIGHT}"`)).toHaveLength(3);
+      expect(page).not.toContain('OWNER');
+    },
+  );
 });
 
 describe('the delete account pages (#447)', () => {

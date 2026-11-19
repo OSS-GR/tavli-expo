@@ -7,3 +7,6 @@
 # folder path, so /i/index.html would redirect to /i/ and loop.
 # Never redirect /.well-known/apple-app-site-association: iOS refuses it.
 /i/*  /i/  200
+# Every friend link https://tavlaki.com/add/<token> (#629) shows add/index.html
+# the same way.
+/add/*  /add/  200
