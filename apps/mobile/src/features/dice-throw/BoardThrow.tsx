@@ -36,6 +36,7 @@ import {
   type SettleTarget,
   type ThrowBar,
   type ThrowPlan,
+  type ThrowTuning,
   type ThrowStart,
 } from './throwPath';
 import { ThrownDie } from './ThrownDie';
@@ -84,6 +85,24 @@ export interface BoardThrowProps {
   onDone: () => void;
 }
 
+/**
+ * SPIKE (#637): the tuning's speeds are in points per second, made for a
+ * phone board. On a large board (a desktop window) the same speed looks
+ * weak: the dice stop early. Scale the speeds with the playing surface.
+ */
+const PHONE_FIELD = 600;
+function tuningFor(box: Box): ThrowTuning {
+  const k = Math.max(1, Math.max(box.right - box.left, box.bottom - box.top) / PHONE_FIELD);
+  return {
+    ...THROW_TUNING,
+    minSpeed: THROW_TUNING.minSpeed * k,
+    maxSpeed: THROW_TUNING.maxSpeed * k,
+    friction: THROW_TUNING.friction * k,
+    quietHit: THROW_TUNING.quietHit * k,
+    hopSpeed: THROW_TUNING.hopSpeed * k,
+  };
+}
+
 /** Button throws alternate their slight sideways angle. */
 let buttonTurns = 0;
 
@@ -99,8 +118,9 @@ function throwStart(
   bar: ThrowBar | undefined,
   nearEnd: 'top' | 'bottom',
   wall: 'top' | 'bottom',
+  tuning: ThrowTuning,
 ): ThrowStart {
-  if (swipe === null) return buttonThrow(box, buttonTurns++, THROW_TUNING, wall);
+  if (swipe === null) return buttonThrow(box, buttonTurns++, tuning, wall);
   if (swipe.dx !== undefined && swipe.dy !== undefined) {
     return swipeToThrow(
       swipe.x === undefined || swipe.y === undefined ? undefined : { x: swipe.x, y: swipe.y },
@@ -109,12 +129,13 @@ function throwStart(
       box,
       dieSize,
       bar,
+      tuning,
     );
   }
   if (swipe.x !== undefined && swipe.y !== undefined) {
-    return tapThrow({ x: swipe.x, y: swipe.y }, box, dieSize, THROW_TUNING, nearEnd);
+    return tapThrow({ x: swipe.x, y: swipe.y }, box, dieSize, tuning, nearEnd);
   }
-  return buttonThrow(box, buttonTurns++);
+  return buttonThrow(box, buttonTurns++, tuning);
 }
 
 export function BoardThrow({
@@ -133,8 +154,17 @@ export function BoardThrow({
     const box = boardThrowBox(geo);
     const dieSize = throwDieSize(geo);
     const bar = throwBar(geo);
-    const start = throwStart(swipe, box, dieSize, bar, nearEnd, wall);
-    const plan = planThrow({ box, bar, start, dieSize, values, tilts: geo.layout.dice.tilt });
+    const tuning = tuningFor(box);
+    const start = throwStart(swipe, box, dieSize, bar, nearEnd, wall, tuning);
+    const plan = planThrow({
+      box,
+      bar,
+      start,
+      dieSize,
+      values,
+      tilts: geo.layout.dice.tilt,
+      tuning,
+    });
     return settle ? settlePlan(plan, settle, dieSize) : plan;
   });
   const clock = useSharedValue(0);

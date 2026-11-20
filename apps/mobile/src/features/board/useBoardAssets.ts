@@ -1,7 +1,14 @@
 /**
  * Loads what the Skia board needs from a theme: its images and the badge font.
  */
-import { Skia, loadData, matchFont, type SkFont, type SkImage } from '@shopify/react-native-skia';
+import {
+  Skia,
+  loadData,
+  matchFont,
+  useFont,
+  type SkFont,
+  type SkImage,
+} from '@shopify/react-native-skia';
 import type { BoardLayout, ThemeManifest } from '@tavli/themes';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
@@ -157,7 +164,18 @@ export function useBoardImages(theme: ThemeManifest, layout: BoardLayout): Board
 /** A bold system font for numbers drawn on the board (count badges). */
 export function useNumberFont(size: number): SkFont | null {
   const rounded = Math.max(6, Math.round(size));
+  // SPIKE (#637): CanvasKit has no system fonts, so the web loads a font file.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const webFont = useFont(WEB ? require('../../../assets/fonts/Piazzolla-Bold.ttf') : null, rounded);
+  const systemFont = useSystemNumberFont(rounded);
+  return WEB ? webFont : systemFont;
+}
+
+const WEB = Platform.OS === 'web';
+
+function useSystemNumberFont(rounded: number): SkFont | null {
   return useMemo(() => {
+    if (WEB) return null;
     try {
       return matchFont({
         fontFamily: Platform.select({ ios: 'Helvetica Neue', default: 'sans-serif' }),
