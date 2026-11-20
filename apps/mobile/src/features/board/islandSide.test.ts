@@ -29,6 +29,12 @@ describe('sideMargins', () => {
     expect(sideMargins(IPHONE, null, 4)).toEqual(IPHONE);
   });
 
+  it('keeps both insets when they differ: they already name the camera side', () => {
+    const duo = { left: 0, right: 84 };
+    expect(sideMargins(duo, 'left', 4)).toEqual({ left: 4, right: 84 });
+    expect(sideMargins(duo, 'right', 4)).toEqual({ left: 4, right: 84 });
+  });
+
   it('never goes under the least margin, and never adds to a small inset', () => {
     expect(sideMargins({ left: 0, right: 0 }, 'left', 4)).toEqual({ left: 4, right: 4 });
     expect(sideMargins({ left: 10, right: 10 }, 'left', 4)).toEqual({ left: 10, right: 10 });

@@ -417,7 +417,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: {
     flexGrow: 1,
     gap: theme.space.lg,
-    paddingHorizontal: theme.space.lg,
+    paddingLeft: rt.insets.left + theme.space.lg,
+    paddingRight: rt.insets.right + theme.space.lg,
     paddingTop: rt.insets.top + theme.space.sm,
     paddingBottom: rt.insets.bottom + theme.space.xl,
   },

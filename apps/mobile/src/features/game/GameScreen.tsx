@@ -2577,13 +2577,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   // Landscape keeps the island, the round corners and the home bar free.
   // iOS gives the same inset on both sides; the side away from the island
   // needs less (`sideMargins`), and the wide board gets the rest (#611).
+  // Upright keeps a side inset too: the iPhone Duo's camera column.
   screen: (landscape: boolean, island: IslandSide | null) => ({
     flex: 1,
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
     paddingBottom: Math.max(rt.insets.bottom, landscape ? theme.space.xs : theme.space.sm),
-    paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : 0,
-    paddingRight: landscape ? sideMargins(rt.insets, island, theme.space.xs).right : 0,
+    paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : rt.insets.left,
+    paddingRight: landscape
+      ? sideMargins(rt.insets, island, theme.space.xs).right
+      : rt.insets.right,
   }),
   content: (landscape: boolean) => ({
     flex: 1,
