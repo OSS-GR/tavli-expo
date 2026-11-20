@@ -1282,7 +1282,7 @@ describe('history texts', () => {
     await i18n.changeLanguage('el');
     try {
       expect(statTiles(line, 'bot', t).tiles.map(({ label }) => label)).toEqual([
-        'Ματς',
+        'Αγώνες',
         'Νίκες',
         'Ποσοστό νικών',
       ]);
