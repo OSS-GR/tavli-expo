@@ -25,7 +25,7 @@ How the app speaks Greek (#549). Read this before you add or change a string in 
 | bear off | μαζεύω, μάζεμα; a checker not off: αμάζευτο |
 | pin, mother (Plakoto) | πλακώνω, πλακωμένο; μάνα |
 | race | «Τελική ευθεία»; fast forward: «Γρήγορο τέλος» |
-| game, match | παρτίδα, ματς |
+| game, match | παρτίδα, αγώνας; never «ματς» (owner, 2026-11-19). «παιχνίδι» only for the kind (Πόρτες, Πλακωτό, Φεύγα) and in general phrases («Πρόσκληση σε παιχνίδι»); a list of matches is «Οι αγώνες σου» |
 | match points | πόντος, πόντοι («στους 5 πόντους»); never βαθμοί |
 | single, double win | μονό, διπλό |
 | rating, leaderboards | βαθμολογία, Κατατάξεις; ranked: «Παιχνίδι κατάταξης» (owner, 2026-11-16; not «Ματς») |
@@ -35,7 +35,7 @@ How the app speaks Greek (#549). Read this before you add or change a string in 
 | house rules | Κανόνες παρέας |
 | phone | κινητό |
 | online | online |
-| friend request, block, report | αίτημα φιλίας, αποκλεισμός, αναφορά |
+| friend request, block, report | αίτημα φιλίας, φραγή («βάζω φραγή», «Παίκτες με φραγή», «Άρση φραγής»), αναφορά; never «αποκλεισμός» (owner, 2026-11-19) |
 | guest, username | επισκέπτης, όνομα χρήστη |
 
 Game names are proper nouns: Πόρτες, Πλακωτό, Φεύγα, Ασόδυο, Τάβλι.

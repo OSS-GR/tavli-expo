@@ -394,7 +394,7 @@ describe('<HomeOnlineGames />', () => {
       await i18n.changeLanguage('el');
     });
     await show();
-    expect(screen.getByRole('header', { name: 'Τα παιχνίδια σου' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Οι αγώνες σου' })).toBeOnTheScreen();
     expect(
       screen.getByRole('button', {
         name: `Πόρτες · Επισκέπτης ${onlineFake.guestNumber(FRIEND)}, Σειρά σου, 0 προς 0, Μένουν 24 ώρες`,
