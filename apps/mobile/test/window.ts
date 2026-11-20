@@ -16,6 +16,8 @@ export interface TestWindow {
 export const PORTRAIT_SE: TestWindow = { width: 375, height: 667 };
 export const LANDSCAPE_SE: TestWindow = { width: 667, height: 375 };
 export const LANDSCAPE_PRO_MAX: TestWindow = { width: 956, height: 440 };
+/** The open iPhone Duo's inner screen: wider than tall, almost square (#649). */
+export const DUO_OPEN: TestWindow = { width: 951, height: 669 };
 
 const original = { window: Dimensions.get('window'), screen: Dimensions.get('screen') };
 

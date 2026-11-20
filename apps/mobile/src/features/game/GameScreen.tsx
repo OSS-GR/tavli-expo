@@ -17,6 +17,9 @@
  * (or Fast forward) left of it, the hint right of it. The board layout
  * comes from one place (`boardLayout`), so touches and flights follow it.
  *
+ * Rows (#649): a landscape window that is almost square (the open iPhone
+ * Duo) keeps the classic portrait rows, with the wide board.
+ *
  * Landscape (#185): when the phone lies on its side, the whole screen turns
  * with it (`useScreenLayout`). The classic board sits in the middle and
  * fills the height, between two rails (`rails`): the left one holds what
@@ -444,7 +447,10 @@ export function GameScreen({
   const landscape = layout === 'landscape';
   // On its side the wide board takes the margin away from the island (#611).
   const island = useIslandSide();
-  const classic = layout === 'classic';
+  // Rows (#649, the open iPhone Duo) is the classic portrait layout with
+  // the wide board.
+  const rows = layout === 'rows';
+  const classic = layout === 'classic' || rows;
   const tall = layout === 'tall';
 
   const view = useMemo(() => turnView(flow), [flow]);
@@ -2513,7 +2519,9 @@ export function GameScreen({
               testID="game-board-frame"
               style={
                 classic
-                  ? styles.classicBoard(boxRatioWithShadow(theme.layouts.landscape))
+                  ? styles.classicBoard(
+                      boxRatioWithShadow(theme.layouts[rows ? 'landscape-wide' : 'landscape']),
+                    )
                   : styles.boardArea
               }
               collapsable={false}

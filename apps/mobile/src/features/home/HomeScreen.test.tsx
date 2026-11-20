@@ -7,7 +7,11 @@ import { homeIntroDue, resetIntrosForTest } from '@/features/intro/introRuns';
 import { startBoard } from '@/features/rules/content';
 
 import { ContinueCard } from './ContinueCard';
+import { StyleSheet } from 'react-native';
+
 import { HomeScreen, inRows, levelList, type Cell } from './HomeScreen';
+
+import { DUO_OPEN, resetWindow, setWindow } from '../../../test/window';
 
 function setup(botLevels: readonly ('easy' | 'medium' | 'hard')[] = ['easy']) {
   const props = {
@@ -403,6 +407,31 @@ describe('<HomeScreen />', () => {
   it('shows a notice once, for example a broken save', async () => {
     await render(<HomeScreen {...setup()} notice="Your saved game could not be opened." />);
     expect(screen.getByTestId('toast')).toHaveTextContent('Your saved game could not be opened.');
+  });
+});
+
+describe('<HomeScreen /> on a wide window (#649)', () => {
+  afterEach(async () => {
+    await resetWindow();
+  });
+
+  const direction = () =>
+    StyleSheet.flatten(screen.getByTestId('home-columns').props.style).flexDirection;
+
+  it('keeps one column on a phone', async () => {
+    await render(<HomeScreen {...setup()} />);
+    expect(direction()).toBe('column');
+  });
+
+  it('puts the hero left and the tiles right on the open iPhone Duo', async () => {
+    await setWindow(DUO_OPEN);
+    await render(<HomeScreen {...setup()} />);
+    expect(direction()).toBe('row');
+    const main = screen.getByTestId('home-column-main');
+    const more = screen.getByTestId('home-column-more');
+    expect(within(main).getByTestId('home-vs-bot')).toBeOnTheScreen();
+    expect(within(more).getByTestId('home-links')).toBeOnTheScreen();
+    expect(within(more).getByRole('button', { name: /^Pass-and-play/ })).toBeOnTheScreen();
   });
 });
 

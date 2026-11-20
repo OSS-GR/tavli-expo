@@ -38,7 +38,7 @@ import { runOnFakeTimers } from '../../../test/clock';
 import { touch } from '../../../test/gestureHandlerMock';
 import { nativePath } from '../../../test/nativeParent';
 import { renderWithRoot } from '../../../test/render';
-import { LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
+import { DUO_OPEN, LANDSCAPE_SE, PORTRAIT_SE, resetWindow, setWindow } from '../../../test/window';
 
 const theme = getTheme('walnut-kafeneio');
 /** The board's space in landscape on an iPhone SE: between the two rails (and their 2 pt gaps). */
@@ -120,6 +120,31 @@ beforeEach(async () => {
 afterEach(async () => {
   await setSettings({});
   await resetWindow();
+});
+
+describe('<GameScreen /> in an almost square window (#649)', () => {
+  /** The board's space on the open iPhone Duo, between the seats and the buttons. */
+  const ROWS_SPACE = { width: 867, height: 470 };
+  const rowsGeo = () => fitBoardWithShadow(boardLayout(theme, 'wide', 'right'), ROWS_SPACE);
+
+  it.each(['tall', 'classic'] as const)(
+    'keeps the portrait rows around the wide board (setting %s)',
+    async (boardLayoutSetting) => {
+      await setWindow(DUO_OPEN);
+      await setSettings({ boardLayout: boardLayoutSetting });
+      await whiteToMove61(ROWS_SPACE);
+      // No rails: the seats sit above the board, the buttons below it.
+      expect(screen.queryByTestId('game-left')).toBeNull();
+      expect(screen.queryByTestId('game-right')).toBeNull();
+      const controls = screen.getByTestId('game-controls');
+      expect(within(controls).getByTestId('undo-button')).toBeOnTheScreen();
+      expect(within(controls).getByTestId('confirm-button')).toBeOnTheScreen();
+      expect(screen.getByTestId('game-label')).toBeOnTheScreen();
+      // The board is the wide one: a tap on its drawn points moves.
+      await tapMove(rowsGeo(), 8, 3, 7);
+      expect(screen.getByTestId('undo-button')).toBeEnabled();
+    },
+  );
 });
 
 describe('<GameScreen /> in landscape (#185)', () => {
