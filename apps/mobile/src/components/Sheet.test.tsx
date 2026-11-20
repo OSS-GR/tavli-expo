@@ -37,6 +37,25 @@ describe('<Sheet /> grab handle (#652)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('a parent that keeps the sheet open after the drag gets it back in place', async () => {
+    // The game screen holds its sheet while a call is on its way.
+    const onClose = jest.fn();
+    await shown('raised', onClose);
+    await touch('sheet-handle-pan', [
+      { x: 20, y: 10 },
+      { x: 20, y: 60 },
+      { x: 22, y: 10 + DRAG_CLOSE_DISTANCE + 5 },
+    ]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // The mock's animated style is read at render: render again to read it.
+    await screen.rerender(
+      <Sheet visible onClose={onClose} closeLabel="Close" look="raised" testID="the-sheet">
+        <Text>Inside</Text>
+      </Sheet>,
+    );
+    expect(offset()).toBe(0);
+  });
+
   it('a short drag springs back and keeps the sheet open', async () => {
     const onClose = jest.fn();
     await shown('raised', onClose);

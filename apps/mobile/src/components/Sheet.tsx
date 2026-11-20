@@ -109,6 +109,17 @@ export function Sheet({
   useEffect(() => {
     if (visible) dragY.set(0);
   }, [visible, dragY]);
+  // A drag that closes asks `onClose`. A parent may keep the sheet open
+  // (a call still on its way holds it): then the sheet springs back, so it
+  // never stays off screen under the scrim.
+  const [dragClosed, setDragClosed] = useState(0);
+  useEffect(() => {
+    if (dragClosed > 0 && visible) dragY.set(withSpring(0, SPRING));
+  }, [dragClosed, visible, dragY]);
+  const closeByDrag = () => {
+    setDragClosed((n) => n + 1);
+    onClose();
+  };
   const pan = usePanGesture({
     // No spread here: the Worklets Babel plugin does not allow one in a gesture config.
     minDistance: 4,
@@ -124,9 +135,9 @@ export function Sheet({
       // The end event has no translation: the last update left it in `dragY`.
       if (!e.canceled && dragY.get() >= DRAG_CLOSE_DISTANCE) {
         dragY.set(withTiming(DRAG_AWAY, { duration: 180 }));
-        scheduleOnRN(onClose);
+        scheduleOnRN(closeByDrag);
       } else {
-        dragY.set(withSpring(0, { damping: 20, stiffness: 220 }));
+        dragY.set(withSpring(0, SPRING));
       }
     },
   });
@@ -179,6 +190,9 @@ export function Sheet({
     </Modal>
   );
 }
+
+/** How a dragged sheet goes back to its place. */
+const SPRING = { damping: 20, stiffness: 220 };
 
 /** iOS only: the orientations the Modal allows. Android follows the screen under it. */
 const UPRIGHT: ModalProps['supportedOrientations'] = ['portrait'];
