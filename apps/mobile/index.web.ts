@@ -28,8 +28,12 @@
   }
 })();
 
-// SPIKE (#640): `?hud=1` shows a frame meter: frames per second, and the
-// longest frame of the last 3 seconds (a long frame is a visible stutter).
+// SPIKE (#640): `?hud=1` shows a frame meter. For the slowest frame of the
+// last 5 seconds it splits the time: `anim` (animation callbacks: Skia and
+// Reanimated), `react` (React's scheduler), `input` (touch and click
+// handlers), `timer`, and `rest` (not JavaScript we can see: the browser,
+// the graphics card, or a throttle). Tap the meter to copy the 12 slowest
+// frames of this page load.
 (() => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   let on = false;
@@ -41,30 +45,116 @@
     // No storage: no meter.
   }
   if (!on) return;
+
+  type Kind = 'anim' | 'react' | 'input' | 'timer';
+  const spent: Record<Kind, number> = { anim: 0, react: 0, input: 0, timer: 0 };
+  let depth = 0;
+  const timed = <A extends unknown[], R>(kind: Kind, fn: (...a: A) => R) =>
+    function (this: unknown, ...args: A): R {
+      if (depth > 0) return fn.apply(this, args);
+      depth += 1;
+      const t0 = performance.now();
+      try {
+        return fn.apply(this, args);
+      } finally {
+        spent[kind] += performance.now() - t0;
+        depth -= 1;
+      }
+    };
+
+  const w = window as unknown as Record<string, unknown>;
+  const raf = window.requestAnimationFrame.bind(window);
+  w.requestAnimationFrame = (cb: FrameRequestCallback) => raf(timed('anim', cb));
+  const st = window.setTimeout.bind(window);
+  w.setTimeout = (cb: unknown, ms?: number, ...rest: unknown[]) =>
+    st(typeof cb === 'function' ? timed('timer', cb as () => void) : (cb as string), ms, ...rest);
+  // React's scheduler posts itself a message for each slice of work.
+  const desc = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
+  if (desc?.set && desc.get) {
+    const set = desc.set;
+    Object.defineProperty(MessagePort.prototype, 'onmessage', {
+      configurable: true,
+      get: desc.get,
+      set(fn: unknown) {
+        set.call(this, typeof fn === 'function' ? timed('react', fn as () => void) : fn);
+      },
+    });
+  }
+  const add = EventTarget.prototype.addEventListener;
+  const INPUT = /^(pointer|touch|mouse|click|key)/;
+  EventTarget.prototype.addEventListener = function (
+    type: string,
+    fn: EventListenerOrEventListenerObject | null,
+    opts?: boolean | AddEventListenerOptions,
+  ) {
+    const wrapped =
+      typeof fn === 'function' && INPUT.test(type) ? timed('input', fn as (e: Event) => void) : fn;
+    return add.call(this, type, wrapped, opts);
+  };
+
+  interface Frame {
+    at: number;
+    gap: number;
+    anim: number;
+    react: number;
+    input: number;
+    timer: number;
+  }
+  const recent: Frame[] = [];
+  const worstEver: Frame[] = [];
+  const line = (f: Frame): string => {
+    const js = f.anim + f.react + f.input + f.timer;
+    const r = (n: number): number => Math.round(n);
+    return `${r(f.gap)}ms = anim ${r(f.anim)} react ${r(f.react)} input ${r(f.input)} timer ${r(f.timer)} rest ${r(Math.max(0, f.gap - js))}`;
+  };
   const box = document.createElement('div');
   box.style.cssText =
-    'position:fixed;left:50%;top:4px;transform:translateX(-50%);z-index:99999;padding:3px 8px;' +
-    'border-radius:8px;background:#000c;color:#0f0;font:12px/1.3 monospace;pointer-events:none;white-space:pre';
-  const frames: { t: number; d: number }[] = [];
+    'position:fixed;left:50%;top:2px;transform:translateX(-50%);z-index:99999;padding:2px 6px;' +
+    'border-radius:8px;background:#000d;color:#0f0;font:11px/1.35 monospace;white-space:pre;text-align:center';
+  box.addEventListener('click', () => {
+    const text = [
+      `${navigator.userAgent}`,
+      `screen ${window.innerWidth}x${window.innerHeight} dpr ${window.devicePixelRatio}`,
+      ...worstEver.map((f) => `t=${(f.at / 1000).toFixed(1)}s ${line(f)}`),
+    ].join('\n');
+    void navigator.clipboard?.writeText(text).then(
+      () => {
+        box.style.background = '#040d';
+      },
+      () => {
+        window.prompt('Copy this', text);
+      },
+    );
+  });
   let last = performance.now();
   let shown = 0;
   const tick = (t: number): void => {
-    frames.push({ t, d: t - last });
+    const f: Frame = { at: t, gap: t - last, ...spent };
+    spent.anim = 0;
+    spent.react = 0;
+    spent.input = 0;
+    spent.timer = 0;
     last = t;
-    while (frames.length > 0 && t - (frames[0]?.t ?? t) > 3000) frames.shift();
-    if (t - shown > 250) {
-      shown = t;
-      const recent = frames.filter((f) => t - f.t <= 1000);
-      const worst = frames.reduce((m, f) => Math.max(m, f.d), 0);
-      const slow = frames.filter((f) => f.d > 34).length;
-      box.textContent = `${recent.length} fps  worst ${Math.round(worst)} ms  slow ${slow}`;
-      box.style.color = worst > 100 ? '#f55' : worst > 34 ? '#fd0' : '#0f0';
+    recent.push(f);
+    while (recent.length > 0 && t - (recent[0]?.at ?? t) > 5000) recent.shift();
+    if (f.gap > 40 && t > 4000) {
+      worstEver.push(f);
+      worstEver.sort((x, y) => y.gap - x.gap);
+      worstEver.length = Math.min(worstEver.length, 12);
     }
-    requestAnimationFrame(tick);
+    if (t - shown > 300) {
+      shown = t;
+      const sec = recent.filter((x) => t - x.at <= 1000).length;
+      const worst = recent.reduce((m, x) => (x.gap > m.gap ? x : m), f);
+      const slow = recent.filter((x) => x.gap > 34).length;
+      box.textContent = `${sec} fps   slow frames (5s): ${slow}\nworst ${line(worst)}\ntap to copy`;
+      box.style.color = worst.gap > 100 ? '#f66' : worst.gap > 34 ? '#fd0' : '#0f0';
+    }
+    raf(tick);
   };
   const start = (): void => {
     document.body.appendChild(box);
-    requestAnimationFrame(tick);
+    raf(tick);
   };
   if (document.body) start();
   else window.addEventListener('DOMContentLoaded', start);
