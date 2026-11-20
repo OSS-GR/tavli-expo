@@ -32,6 +32,7 @@ import { checkerRadius, pointPath, type BoardGeometry } from '../geometry';
 import { linearProps, radialProps, rgba } from '../paint';
 
 import { CheckerShape } from './CheckerShape';
+import { SPIKE } from '@/spikeFlags';
 
 /** Loaded theme images by manifest key. A missing image falls back to colors. */
 export type BoardImages = Readonly<Record<string, SkImage | null | undefined>>;
@@ -132,15 +133,17 @@ export function BoardScene({
   return (
     <Group>
       {/* 1. Board shadow on the table. */}
-      <RoundedRect
-        x={board.x + layout.shadow.dx * W}
-        y={board.y + layout.shadow.dy * W}
-        width={board.width}
-        height={board.height}
-        r={corner}
-        color={rgba(layout.shadow.color, layout.shadow.opacity)}>
-        <BlurMask blur={layout.shadow.blur * W} style="normal" />
-      </RoundedRect>
+      {SPIKE.noblur ? null : (
+        <RoundedRect
+          x={board.x + layout.shadow.dx * W}
+          y={board.y + layout.shadow.dy * W}
+          width={board.width}
+          height={board.height}
+          r={corner}
+          color={rgba(layout.shadow.color, layout.shadow.opacity)}>
+          <BlurMask blur={layout.shadow.blur * W} style="normal" />
+        </RoundedRect>
+      )}
 
       {/* 2. Frame, bar, trays and field. Without images: plain theme colors. */}
       {images[layout.layers[0]?.image ?? ''] ? null : (

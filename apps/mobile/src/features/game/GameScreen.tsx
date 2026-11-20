@@ -109,7 +109,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import Animated, {
@@ -1586,7 +1586,12 @@ export function GameScreen({
   // does not start again), but hide until they have their new place.
   const placeGeo = freshGeo ?? boardGeo?.geo ?? null;
   const diceBox = showDice && placeGeo !== null ? boardDiceBox(placeGeo, dice.length) : null;
-  const diceHidden = freshGeo === null || throwPlaying;
+  // SPIKE (#640): on the web a new canvas is a new WebGL context (context
+  // set-up and shader compiles freeze frames), so the dice canvas stays
+  // mounted between rolls, hidden.
+  const diceMountBox =
+    diceBox ?? (Platform.OS === 'web' && placeGeo !== null ? boardDiceBox(placeGeo, 2) : null);
+  const diceHidden = freshGeo === null || throwPlaying || diceBox === null;
   // The hand-over of the throw (#183): the dice row lies on the board,
   // inside the canvas, so the thrown dice glide into it.
   const settle =
@@ -2236,7 +2241,7 @@ export function GameScreen({
           ) : null
         }
       />
-      {diceBox ? (
+      {diceMountBox ? (
         // The dice lie on the board, in the theme's dice area (#184), in
         // every layout. Touches go through. The dice canvas keeps its
         // own native view (`DiceRow`, #173), and this box is a native view
@@ -2248,7 +2253,7 @@ export function GameScreen({
           collapsable={false}
           style={[
             styles.boardDice,
-            { left: diceBox.left, top: diceBox.top },
+            { left: diceMountBox.left, top: diceMountBox.top },
             diceHidden && styles.diceHidden,
           ]}>
           <DiceRow
@@ -2259,8 +2264,8 @@ export function GameScreen({
             rest={thrownRest}
             split={reveal.split}
             onLanded={onDiceLanded}
-            size={diceBox.size}
-            pairSize={diceBox.pairSize}
+            size={diceMountBox.size}
+            pairSize={diceMountBox.pairSize}
             lostReason={
               dice === view.dice && lost !== null && lostRoll !== null
                 ? lostReason(t, lost, lostRoll)

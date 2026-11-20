@@ -15,6 +15,7 @@ import {
 import type { DiceStyle } from '@tavli/themes';
 
 import { radialProps, rgba } from '../paint';
+import { SPIKE } from '@/spikeFlags';
 
 /** Pip places for each face, in pip-spacing steps from the center. */
 export const PIP_LAYOUT: Readonly<Record<number, readonly (readonly [number, number])[]>> = {
@@ -65,15 +66,17 @@ export function DieBody({ style, size }: { style: DiceStyle; size: number }) {
   const face = faceBox(style, size);
   return (
     <Group>
-      <RoundedRect
-        x={-h + style.shadow.dx * size}
-        y={-h + style.shadow.dy * size}
-        width={size}
-        height={size}
-        r={corner}
-        color={rgba(style.shadow.color, style.shadow.opacity)}>
-        <BlurMask blur={style.shadow.blur * size} style="normal" />
-      </RoundedRect>
+      {SPIKE.noblur ? null : (
+        <RoundedRect
+          x={-h + style.shadow.dx * size}
+          y={-h + style.shadow.dy * size}
+          width={size}
+          height={size}
+          r={corner}
+          color={rgba(style.shadow.color, style.shadow.opacity)}>
+          <BlurMask blur={style.shadow.blur * size} style="normal" />
+        </RoundedRect>
+      )}
       <RoundedRect x={-h} y={-h} width={size} height={size} r={corner} color={style.side} />
       <RoundedRect {...face} r={corner * 0.85} color={style.face} />
       <RoundedRect {...face} r={corner * 0.85} opacity={style.highlightOpacity}>

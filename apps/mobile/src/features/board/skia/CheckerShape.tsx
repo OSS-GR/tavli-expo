@@ -13,6 +13,7 @@ import {
 import type { CheckerStyle, Groove, Shadow } from '@tavli/themes';
 
 import { linearProps, radialProps, rgba } from '../paint';
+import { SPIKE } from '@/spikeFlags';
 
 export interface CheckerShapeProps {
   cx: number;
@@ -50,15 +51,32 @@ export function CheckerShape({ cx, cy, r, style, shadow, opacity = 1 }: CheckerS
   const box = { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r };
   const dr = (style.dish?.radius ?? 0) * r;
   const dishBox = { x: cx - dr, y: cy - dr, width: 2 * dr, height: 2 * dr };
+  if (SPIKE.flat) {
+    return (
+      <Group opacity={opacity}>
+        <Circle cx={cx} cy={cy} r={r} color={style.fill} />
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={r * 0.92}
+          style="stroke"
+          strokeWidth={r * 0.08}
+          color="#00000055"
+        />
+      </Group>
+    );
+  }
   return (
     <Group opacity={opacity}>
-      <Circle
-        cx={cx + shadow.dx * r}
-        cy={cy + shadow.dy * r}
-        r={r}
-        color={rgba(shadow.color, shadow.opacity)}>
-        <BlurMask blur={shadow.blur * r} style="normal" />
-      </Circle>
+      {SPIKE.noblur ? null : (
+        <Circle
+          cx={cx + shadow.dx * r}
+          cy={cy + shadow.dy * r}
+          r={r}
+          color={rgba(shadow.color, shadow.opacity)}>
+          <BlurMask blur={shadow.blur * r} style="normal" />
+        </Circle>
+      )}
       <Circle cx={cx} cy={cy} r={r} color={style.fill} />
       <Circle cx={cx} cy={cy} r={r}>
         <RadialGradient {...radialProps(style.highlight, box)} />
