@@ -52,6 +52,7 @@ import type {
   FriendStatus,
   FriendsErrorCode,
   InviteView,
+  PlayerCard,
   RecentPlayer,
 } from '@tavli/contracts';
 import {
@@ -66,6 +67,7 @@ import {
   isInviteExpired,
   pickFriendToken,
   planRequest,
+  playerCardOf,
   recentOpponents,
   recordOf,
   searchWindowStart,
@@ -85,6 +87,7 @@ import { insertInvite, toInviteRecord } from './invites';
 import { createCryptoRng } from './model/cryptoRng';
 import { hasUsername, nameOf } from './playerNames';
 import { scheduleFriendInvitePush, scheduleFriendPush } from './push';
+import { globalBoardFor, ratingRow } from './ratings';
 import { blocks, met } from './safety';
 import { gameChoice, gameTurnTimeMinutes } from './schema';
 
@@ -739,6 +742,63 @@ export const listFriendInvites = query({
       listed.push(toInviteView(invite, now, await nameOf(ctx, row.from)));
     }
     return listed;
+  },
+});
+
+/**
+ * The card of a player the caller met (#651): name, rating, place on the
+ * global board, where the two stand, and the record when friends. Any
+ * signed-in player may call it, a guest too. The checks are
+ * `playerCardOf` in `@tavli/online`: the caller's own id is
+ * `BAD_REQUEST`; never met, a deleted account or a block either way is
+ * `NOT_FOUND`, before anything else is read.
+ */
+export const playerCard = query({
+  args: { playerId: v.string() },
+  handler: async (ctx, { playerId: other }): Promise<PlayerCard> => {
+    const { playerId } = await currentUser(ctx);
+    const self = playerId === other;
+    const [known, blocked] = self
+      ? [false, false]
+      : await Promise.all([met(ctx, playerId, other), blockedEither(ctx, playerId, other)]);
+    const base = { callerId: playerId, playerId: other, met: known, blockedEither: blocked };
+    if (self || !known || blocked) {
+      return await guarded(() =>
+        playerCardOf({
+          ...base,
+          name: null,
+          saved: false,
+          rating: null,
+          rank: null,
+          status: 'none',
+          record: null,
+        }),
+      );
+    }
+    const [name, saved, status, rating, friend] = await Promise.all([
+      nameOf(ctx, other),
+      isSavedPlayer(ctx, other),
+      statusBetween(ctx, playerId, other),
+      ratingRow(ctx, other),
+      friendRow(ctx, playerId, other),
+    ]);
+    // Only a listed player can have a place: skip the board read otherwise.
+    const rank =
+      rating?.boardable === true
+        ? ((await globalBoardFor(ctx, playerId)).find((row) => row.playerId === other)?.rank ??
+          null)
+        : null;
+    return await guarded(() =>
+      playerCardOf({
+        ...base,
+        name,
+        saved,
+        rating,
+        rank,
+        status,
+        record: friend === null ? null : { wins: friend.wins, losses: friend.losses },
+      }),
+    );
   },
 });
 

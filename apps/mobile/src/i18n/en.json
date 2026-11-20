@@ -624,7 +624,36 @@
       "ranked": "Miss your next turn too and you lose the match.",
       "here": "I am here"
     },
-    "seatDetail": "Online"
+    "seatDetail": "Online",
+    "card": {
+      "menu": "Opponent's profile",
+      "menuHint": "Rating, friend request, report or block",
+      "openHint": "Opens their profile",
+      "here": "Your opponent in this match",
+      "friends": "Friends",
+      "guest": "Guest account",
+      "rating": "rating",
+      "rank": "on the global board",
+      "noRank": "not on the global board",
+      "matches_one": "rated match",
+      "matches_other": "rated matches",
+      "statsLabel": "Rating {{rating}}, {{rank}}, {{matches}} rated matches",
+      "rankLabel": "number {{rank}} on the global board",
+      "add": "Add as friend",
+      "sent": "Friend request sent",
+      "cancel": "Cancel request",
+      "accept": "Accept request",
+      "together_one": "{{count}} match together",
+      "together_other": "{{count}} matches together",
+      "guestRating": "No rating. Saved accounts get a rating after a rated match.",
+      "guestFriends": "Only saved accounts can be friends.",
+      "youGuest": "Save your account to add friends.",
+      "loading": "Loading the profile…",
+      "failed": "The profile did not load.",
+      "retry": "Try again",
+      "problemTitle": "That did not work",
+      "ok": "OK"
+    }
   },
   "invite": {
     "loading": "Loading the invite…",
@@ -1273,6 +1302,11 @@
         "title": "A page for each friend",
         "body": "Tap a friend's name to see your record, the matches you are playing, your last matches and a Rematch button with the same settings.",
         "where": "Home › Friends › a friend's name"
+      },
+      "opponentCard": {
+        "title": "Your opponent's profile",
+        "body": "In an online match, tap the other player's name to see their rating, their place on the global board and your record. Add them as a friend from there.",
+        "where": "An online match › the other player's name"
       }
     }
   },

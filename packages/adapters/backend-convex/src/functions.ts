@@ -43,6 +43,7 @@ import type {
   NewInvite,
   OnlineGameStatus,
   OnlineGameView,
+  PlayerCard,
   PushLocale,
   PushPlatform,
   RecentPlayer,
@@ -330,6 +331,7 @@ export interface FriendFunctions {
   readonly removeFriend: FriendMutation<{ playerId: string }, null>;
   readonly inviteFriend: FriendMutation<NewInviteArgs & { playerId: string }, string>;
   readonly listFriendInvites: FriendQuery<InviteView[]>;
+  readonly playerCard: FunctionReference<'query', 'public', { playerId: string }, PlayerCard>;
 }
 
 export const FRIEND_FUNCTION_NAMES = {
@@ -349,6 +351,7 @@ export const FRIEND_FUNCTION_NAMES = {
   removeFriend: 'friends:removeFriend',
   inviteFriend: 'friends:inviteFriend',
   listFriendInvites: 'friends:listFriendInvites',
+  playerCard: 'friends:playerCard',
 } as const satisfies { readonly [K in keyof FriendFunctions]: string };
 
 export const FRIEND_FUNCTIONS: FriendFunctions = {
@@ -368,6 +371,7 @@ export const FRIEND_FUNCTIONS: FriendFunctions = {
   removeFriend: makeFunctionReference(FRIEND_FUNCTION_NAMES.removeFriend),
   inviteFriend: makeFunctionReference(FRIEND_FUNCTION_NAMES.inviteFriend),
   listFriendInvites: makeFunctionReference(FRIEND_FUNCTION_NAMES.listFriendInvites),
+  playerCard: makeFunctionReference(FRIEND_FUNCTION_NAMES.playerCard),
 };
 
 type RatingQuery<Result> = FunctionReference<'query', 'public', Record<string, never>, Result>;

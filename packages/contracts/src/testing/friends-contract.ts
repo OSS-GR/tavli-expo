@@ -250,6 +250,7 @@ function checks(): readonly CheckSpec[] {
           'NOT_SIGNED_IN',
           `listFriendInvites() ${what}`,
         );
+        await failsWith(friends.playerCard(bob), 'NOT_SIGNED_IN', `playerCard() ${what}`);
       },
     },
     {
@@ -630,6 +631,66 @@ function checks(): readonly CheckSpec[] {
         const gameId = await subject.invitesFor('bob').acceptInvite(code);
         check(typeof gameId === 'string', 'bob accepts: a game starts');
         same(await subject.friendsFor('bob').listFriendInvites(), [], 'no open friend invite');
+      },
+    },
+    {
+      name: 'a player card needs a meeting, and a block hides it (#651)',
+      run: async (subject) => {
+        const alice = subject.friendsFor('alice');
+        const bobId = subject.idOf('bob');
+        await failsWith(alice.playerCard(bobId), 'NOT_FOUND', 'alice never met bob');
+        await failsWith(
+          alice.playerCard(subject.idOf('alice')),
+          'BAD_REQUEST',
+          'alice opens her own card',
+        );
+
+        await playGame(subject, 'alice', 'bob');
+        same(
+          await alice.playerCard(bobId),
+          {
+            name: { kind: 'username', name: USERNAMES.bob },
+            rating: 1500,
+            matches: 0,
+            rank: null,
+            status: 'none',
+            record: null,
+          },
+          "bob's card after a game",
+        );
+        same(await alice.sendRequest(bobId), 'sent', 'alice asks bob');
+        same((await alice.playerCard(bobId)).status, 'sent', "bob's card after the request");
+        same(
+          (await subject.friendsFor('bob').playerCard(subject.idOf('alice'))).status,
+          'received',
+          "alice's card for bob",
+        );
+        await subject.friendsFor('bob').acceptRequest(subject.idOf('alice'));
+        const friends = await alice.playerCard(bobId);
+        same([friends.status, friends.record], ['friends', { wins: 0, losses: 0 }], 'friends');
+
+        // A guest has no rating and cannot be asked; a guest may read a card.
+        await playGame(subject, 'guest', 'carol');
+        const guestCard = await subject.friendsFor('carol').playerCard(subject.idOf('guest'));
+        same(
+          [guestCard.rating, guestCard.matches, guestCard.rank, guestCard.status, guestCard.record],
+          [null, 0, null, 'none', null],
+          "the guest's card",
+        );
+        same(
+          (await subject.friendsFor('guest').playerCard(subject.idOf('carol'))).rating,
+          1500,
+          "carol's card for the guest",
+        );
+
+        // A block either way: not found.
+        await subject.safetyFor('bob').block(subject.idOf('alice'));
+        await failsWith(alice.playerCard(bobId), 'NOT_FOUND', 'bob blocks alice');
+        await failsWith(
+          subject.friendsFor('bob').playerCard(subject.idOf('alice')),
+          'NOT_FOUND',
+          'bob opens the card of the player he blocks',
+        );
       },
     },
     {

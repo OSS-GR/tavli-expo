@@ -62,6 +62,13 @@ export interface GameMenuProps {
   onReportOrBlock?: () => void;
   /** The hint of the Report or block row, with the other player's name. */
   reportOrBlockHint?: string;
+  /**
+   * The other player's card (#651): the same card a tap on their name
+   * opens, so screen readers reach it from the menu too. Online only.
+   */
+  onOpponentCard?: () => void;
+  /** The hint of the card row: "Rating, friend request, report or block". */
+  opponentCardHint?: string;
   onExit: () => void;
   exitHint: string;
   onResume: () => void;
@@ -80,6 +87,7 @@ export function GameMenu(props: GameMenuProps) {
   const resignMatch = t('game.menu.resignMatch');
   const exit = t('game.menu.exit');
   const reportOrBlock = t('safety.action');
+  const opponentCard = t('online.card.menu');
   return (
     <View testID="game-menu" style={styles.menu}>
       <View style={styles.header}>
@@ -120,6 +128,18 @@ export function GameMenu(props: GameMenuProps) {
           label={t('game.menu.settings')}
           onPress={props.onSettings}
         />
+        {props.onOpponentCard ? (
+          <SectionRow
+            testID="menu-opponent-card"
+            icon="user"
+            iconLook="bare"
+            label={opponentCard}
+            {...(props.opponentCardHint ? { hint: props.opponentCardHint } : {})}
+            accessibilityLabel={rowLabel(opponentCard, props.opponentCardHint)}
+            accessibilityHint=""
+            onPress={props.onOpponentCard}
+          />
+        ) : null}
         {props.onReportOrBlock ? (
           <SectionRow
             testID="menu-report-block"

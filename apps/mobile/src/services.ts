@@ -340,6 +340,18 @@ export function devSafetyFor(playerId: string): Safety {
   return port;
 }
 
+const friendPorts = new Map<string, Friends>();
+
+/** Dev games' player card (#651) for `playerId`, on the in-memory server. One port per player. */
+export function devFriendsFor(playerId: string): Friends {
+  let port = friendPorts.get(playerId);
+  if (port === undefined) {
+    port = onlineServer().friendsFor(playerId);
+    friendPorts.set(playerId, port);
+  }
+  return port;
+}
+
 const invitePorts = new Map<string, Invites>();
 
 /**
