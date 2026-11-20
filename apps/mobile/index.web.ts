@@ -109,23 +109,44 @@
   };
   const box = document.createElement('div');
   box.style.cssText =
-    'position:fixed;left:50%;top:2px;transform:translateX(-50%);z-index:99999;padding:2px 6px;' +
+    'position:fixed;left:50%;top:2px;transform:translateX(-50%);z-index:99999;padding:6px 10px;' +
     'border-radius:8px;background:#000d;color:#0f0;font:11px/1.35 monospace;white-space:pre;text-align:center';
-  box.addEventListener('click', () => {
-    const text = [
-      `${navigator.userAgent}`,
-      `screen ${window.innerWidth}x${window.innerHeight} dpr ${window.devicePixelRatio}`,
-      ...worstEver.map((f) => `t=${(f.at / 1000).toFixed(1)}s ${line(f)}`),
+  // A tap opens the list on the page itself (the clipboard is not reliable
+  // on iOS Safari): take a screenshot, or select the text.
+  const panel = document.createElement('div');
+  panel.style.cssText =
+    'position:fixed;left:0;right:0;top:0;bottom:0;z-index:100000;background:#000e;color:#fff;' +
+    'font:13px/1.5 monospace;padding:48px 10px 10px;overflow:auto;white-space:pre-wrap;display:none;' +
+    '-webkit-user-select:text;user-select:text';
+  const report = (): string =>
+    [
+      'Slowest frames (ms). Screenshot this, then tap to close.',
+      `${window.innerWidth}x${window.innerHeight} dpr ${window.devicePixelRatio}`,
+      navigator.userAgent.replace(
+        /^.*?(\(.*?\)).*?(Version\/[\d.]+|Chrome\/[\d.]+|Firefox\/[\d.]+).*$/,
+        '$1 $2',
+      ),
+      '',
+      ...(worstEver.length === 0
+        ? ['No slow frame yet. Play a turn first.']
+        : worstEver.map((f) => `at ${(f.at / 1000).toFixed(0)}s  ${line(f)}`)),
     ].join('\n');
-    void navigator.clipboard?.writeText(text).then(
-      () => {
-        box.style.background = '#040d';
-      },
-      () => {
-        window.prompt('Copy this', text);
-      },
-    );
-  });
+  const open = (e: Event): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    panel.textContent = report();
+    panel.style.display = 'block';
+  };
+  const close = (e: Event): void => {
+    e.preventDefault();
+    panel.style.display = 'none';
+  };
+  box.style.cursor = 'pointer';
+  box.style.pointerEvents = 'auto';
+  add.call(box, 'touchend', open, { passive: false });
+  add.call(box, 'click', open);
+  add.call(panel, 'touchend', close, { passive: false });
+  add.call(panel, 'click', close);
   let last = performance.now();
   let shown = 0;
   const tick = (t: number): void => {
@@ -147,13 +168,14 @@
       const sec = recent.filter((x) => t - x.at <= 1000).length;
       const worst = recent.reduce((m, x) => (x.gap > m.gap ? x : m), f);
       const slow = recent.filter((x) => x.gap > 34).length;
-      box.textContent = `${sec} fps   slow frames (5s): ${slow}\nworst ${line(worst)}\ntap to copy`;
+      box.textContent = `${sec} fps   slow frames (5s): ${slow}\nworst ${line(worst)}\ntap for the list`;
       box.style.color = worst.gap > 100 ? '#f66' : worst.gap > 34 ? '#fd0' : '#0f0';
     }
     raf(tick);
   };
   const start = (): void => {
     document.body.appendChild(box);
+    document.body.appendChild(panel);
     raf(tick);
   };
   if (document.body) start();
