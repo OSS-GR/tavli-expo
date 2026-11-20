@@ -9,6 +9,7 @@ import {
   boardModeOf,
   isLandscapeWindow,
   railWidths,
+  ROWS_MAX_RATIO,
   screenLayoutFor,
 } from './screenLayout';
 
@@ -31,12 +32,23 @@ describe('screenLayoutFor (#185)', () => {
     expect(screenLayoutFor(turned, 'classic')).toBe('landscape');
   });
 
+  it('uses rows in an almost square landscape window (#649)', () => {
+    // The open iPhone Duo.
+    expect(screenLayoutFor({ width: 951, height: 669 }, 'tall')).toBe('rows');
+    expect(screenLayoutFor({ width: 951, height: 669 }, 'classic')).toBe('rows');
+    expect(screenLayoutFor({ width: 1.59 * 500, height: 500 }, 'tall')).toBe('rows');
+    expect(screenLayoutFor({ width: ROWS_MAX_RATIO * 500, height: 500 }, 'tall')).toBe('landscape');
+    // The closed Duo is a portrait window.
+    expect(screenLayoutFor({ width: 466, height: 678 }, 'tall')).toBe('tall');
+  });
+
   it('treats a square window as portrait', () => {
     expect(screenLayoutFor({ width: 500, height: 500 }, 'tall')).toBe('tall');
   });
 
   it('draws the wide board in landscape (#611)', () => {
     expect(boardModeOf('landscape')).toBe('wide');
+    expect(boardModeOf('rows')).toBe('wide');
     expect(boardModeOf('classic')).toBe('classic');
     expect(boardModeOf('tall')).toBe('tall');
   });

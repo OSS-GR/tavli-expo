@@ -1,7 +1,8 @@
 /**
  * Which layout the game screen and the tutorial use (#185). The window
  * decides: a window wider than tall is landscape, and then the screen uses
- * the landscape layout with the classic wide board. A portrait window uses
+ * the landscape layout with the classic wide board; an almost square one
+ * (the open iPhone Duo) uses rows (#649). A portrait window uses
  * the layout from Settings → Board → Board layout (#184).
  *
  * Only the game screen and the tutorial turn with the phone; the other
@@ -15,8 +16,13 @@ import { FALLBACK_LANGUAGE, isAppLanguage, type AppLanguage } from '@/i18n/langu
 import type { BoardLayoutMode } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
 
-/** `tall` and `classic`: portrait (#184). `landscape`: the phone lies on its side (#185). */
-export type ScreenLayout = BoardLayoutMode | 'landscape';
+/**
+ * `tall` and `classic`: portrait (#184). `landscape`: the phone lies on its
+ * side (#185). `rows`: a window wider than tall but almost square, like the
+ * open iPhone Duo (#649): the portrait rows (seats above, buttons below)
+ * around the wide board.
+ */
+export type ScreenLayout = BoardLayoutMode | 'landscape' | 'rows';
 
 /**
  * The board a screen draws: the Board layout setting (`tall`, `classic`),
@@ -34,14 +40,23 @@ export function isLandscapeWindow(window: WindowSize): boolean {
   return window.width > window.height;
 }
 
+/**
+ * Under this width-to-height ratio a landscape window uses `rows` (#649).
+ * A phone on its side is about 2.2 : 1 (an iPhone SE 1.78 : 1) and keeps
+ * the rails; the open iPhone Duo is 1.42 : 1, where rails leave the board
+ * short with empty space above and below it.
+ */
+export const ROWS_MAX_RATIO = 1.6;
+
 /** The screen layout for a window and the Board layout setting. */
 export function screenLayoutFor(window: WindowSize, mode: BoardLayoutMode): ScreenLayout {
-  return isLandscapeWindow(window) ? 'landscape' : mode;
+  if (!isLandscapeWindow(window)) return mode;
+  return window.width / window.height < ROWS_MAX_RATIO ? 'rows' : 'landscape';
 }
 
-/** The board a screen layout draws: landscape uses the wide board (#611). */
+/** The board a screen layout draws: landscape and rows use the wide board (#611, #649). */
 export function boardModeOf(layout: ScreenLayout): BoardShape {
-  return layout === 'landscape' ? 'wide' : layout;
+  return layout === 'landscape' || layout === 'rows' ? 'wide' : layout;
 }
 
 /**

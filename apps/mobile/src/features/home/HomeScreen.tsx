@@ -20,7 +20,7 @@ import { displayCaps } from '@tavli/ui';
 import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { Icon } from '@/components/Icon';
@@ -45,6 +45,14 @@ const SCENE_WIDTH = 144;
 
 /** Above this font scale the mode tiles take a row each. */
 const ONE_COLUMN_FONT_SCALE = 1.3;
+
+/**
+ * From this usable width (the window without the side insets) Home has
+ * two columns (#649, Figma "37 · iPhone Duo · Simple"): the next thing to
+ * do on the left, the lists and tiles on the right. The open iPhone Duo
+ * has 867 pt; every phone upright has less than 450.
+ */
+export const TWO_COLUMNS_MIN_WIDTH = 800;
 
 export interface HomeScreenProps {
   onNewGame: (mode: MatchMode) => void;
@@ -136,6 +144,8 @@ export function HomeScreen({
   const { t } = useTranslation();
   const { theme, rt } = useUnistyles();
   const perRow = rt.fontScale > ONE_COLUMN_FONT_SCALE ? 1 : 2;
+  const window = useWindowDimensions();
+  const twoColumns = window.width - rt.insets.left - rt.insets.right >= TWO_COLUMNS_MIN_WIDTH;
   const [toast, showToast] = useToast();
   useEffect(() => {
     if (notice !== null) showToast(notice);
@@ -309,43 +319,51 @@ export function HomeScreen({
           </View>
         </View>
 
-        {hero ?? (
-          <HomeHero
-            testID="home-vs-bot"
-            eyebrow={displayCaps(t('home.newGame'))}
-            title={vsBotTitle}
-            {...(levels ? { lines: [levels] } : {})}
-            action={t('home.playNow')}
-            accessibilityLabel={vsBotLabel}
-            board={startPosition}
-            onPress={() => onNewGame('bot')}
-          />
-        )}
-        {learnCard}
-        {reminderCard}
-        {onlineGames}
-        {invites}
-        {friendInvites}
+        {/* One column, or two side by side on a wide window (#649). Screen
+            readers read the left column first, in the one-column order. */}
+        <View testID="home-columns" style={styles.columns(twoColumns)}>
+          <View testID="home-column-main" style={styles.column(twoColumns)}>
+            {hero ?? (
+              <HomeHero
+                testID="home-vs-bot"
+                eyebrow={displayCaps(t('home.newGame'))}
+                title={vsBotTitle}
+                {...(levels ? { lines: [levels] } : {})}
+                action={t('home.playNow')}
+                accessibilityLabel={vsBotLabel}
+                board={startPosition}
+                onPress={() => onNewGame('bot')}
+              />
+            )}
+            {learnCard}
+            {reminderCard}
+          </View>
+          <View testID="home-column-more" style={styles.column(twoColumns)}>
+            {onlineGames}
+            {invites}
+            {friendInvites}
 
-        <SectionHeader title={t('home.moreModes')} />
-        <View style={styles.grid}>
-          {botTile ? (
-            <ModeTile
-              testID="home-vs-bot"
-              kind="primary"
-              wide
-              icon="bot"
-              title={vsBotTitle}
-              {...(levels ? { subtitle: levels } : {})}
-              onPress={() => onNewGame('bot')}
-            />
-          ) : null}
-          <CellRows cells={gridTiles} perRow={perRow} />
-        </View>
+            <SectionHeader title={t('home.moreModes')} />
+            <View style={styles.grid}>
+              {botTile ? (
+                <ModeTile
+                  testID="home-vs-bot"
+                  kind="primary"
+                  wide
+                  icon="bot"
+                  title={vsBotTitle}
+                  {...(levels ? { subtitle: levels } : {})}
+                  onPress={() => onNewGame('bot')}
+                />
+              ) : null}
+              <CellRows cells={gridTiles} perRow={perRow} />
+            </View>
 
-        {/* The other links in one list in the tiles' look (#517). Screen
+            {/* The other links in one list in the tiles' look (#517). Screen
             readers hear How to play and History as links, as before #342. */}
-        <HomeLinks testID="home-links" links={links} />
+            <HomeLinks testID="home-links" links={links} />
+          </View>
+        </View>
       </ScrollView>
       <Toast text={toast} />
     </View>
@@ -425,6 +443,17 @@ const styles = StyleSheet.create((theme, rt) => ({
   header: {
     gap: theme.space.xs,
   },
+  columns: (two: boolean) => ({
+    flexDirection: two ? 'row' : 'column',
+    alignItems: 'flex-start',
+    gap: theme.space.lg,
+  }),
+  // A column keeps the content's gap; side by side, each takes half.
+  column: (two: boolean) => ({
+    flex: two ? 1 : undefined,
+    alignSelf: 'stretch',
+    gap: theme.space.lg,
+  }),
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

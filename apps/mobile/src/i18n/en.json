@@ -1264,6 +1264,11 @@
         "body": "Open a friend's link or scan their QR code, then tap Yes. You are friends at once, with no request to accept, and they get a notification.",
         "where": "Home › Friends › Add a friend"
       },
+      "foldable": {
+        "title": "Made for the foldable iPhone",
+        "body": "Open the iPhone Duo and the board grows to fill the big screen, with the players above it and the buttons below. Home shows two columns.",
+        "where": "Any game, and Home"
+      },
       "friendPage": {
         "title": "A page for each friend",
         "body": "Tap a friend's name to see your record, the matches you are playing, your last matches and a Rematch button with the same settings.",
