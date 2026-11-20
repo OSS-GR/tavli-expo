@@ -12,15 +12,18 @@
  *
  * The `raised` look is the bottom sheet of the Figma polish pass (#515):
  * full width like `sheet`, with the raised fill, a brass top edge, 28 pt
- * top corners and a grab handle. Only the game menu uses it so far. The
- * handle only decorates: the sheet closes with a tap on the dimmed part,
- * the Android back button or the content's own button.
+ * top corners and a grab handle. The handle works (#652): drag it down and
+ * the sheet follows the finger; let go past `DRAG_CLOSE_DISTANCE` and it
+ * slides away and calls `onClose`, a shorter drag springs it back. The
+ * dimmed part, the Android back button and the content's own button close
+ * it too; screen readers use those (the handle is hidden from them).
+ * Android needs its own `GestureHandlerRootView` in a `Modal`.
  *
  * A text field in it (the email code, the username) stays above the
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
  * Android resizes the window.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -30,7 +33,26 @@ import {
   View,
   type ModalProps,
 } from 'react-native';
+import {
+  GestureDetector,
+  GestureHandlerRootView,
+  usePanGesture,
+} from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
+import { scheduleOnRN } from 'react-native-worklets';
+
+/** A drag of the handle this far down closes the sheet (points). */
+export const DRAG_CLOSE_DISTANCE = 90;
+/** How far a closing sheet slides before the Modal fades (points). */
+const DRAG_AWAY = 400;
+/** The handle's touch area: taller than the bar, so a thumb finds it. */
+const HANDLE_HEIGHT = 28;
 
 export type SheetLook = 'sheet' | 'raised' | 'dialog' | 'bare';
 
@@ -81,6 +103,35 @@ export function Sheet({
   const [kept, setKept] = useState(look);
   if (visible && kept !== look) setKept(look);
   const shown = visible ? look : kept;
+
+  // The drag of the handle (#652). A sheet that opens again starts in place.
+  const dragY = useSharedValue(0);
+  useEffect(() => {
+    if (visible) dragY.set(0);
+  }, [visible, dragY]);
+  const pan = usePanGesture({
+    // No spread here: the Worklets Babel plugin does not allow one in a gesture config.
+    minDistance: 4,
+    enabled: visible && shown === 'raised',
+    testID: 'sheet-handle-pan',
+    onUpdate: (e) => {
+      'worklet';
+      // Never above its place: only down.
+      dragY.set(Math.max(0, e.translationY));
+    },
+    onFinalize: (e) => {
+      'worklet';
+      // The end event has no translation: the last update left it in `dragY`.
+      if (!e.canceled && dragY.get() >= DRAG_CLOSE_DISTANCE) {
+        dragY.set(withTiming(DRAG_AWAY, { duration: 180 }));
+        scheduleOnRN(onClose);
+      } else {
+        dragY.set(withSpring(0, { damping: 20, stiffness: 220 }));
+      }
+    },
+  });
+  const dragged = useAnimatedStyle(() => ({ transform: [{ translateY: dragY.get() }] }));
+
   return (
     <Modal
       visible={visible}
@@ -88,34 +139,43 @@ export function Sheet({
       animationType="fade"
       onRequestClose={onClose}
       supportedOrientations={turns ? TURNS : UPRIGHT}>
-      <KeyboardAvoidingView
-        style={styles.root(shown)}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable
-          style={styles.scrim}
-          onPress={onClose}
-          accessible={!ownCloseButton}
-          accessibilityRole="button"
-          accessibilityLabel={closeLabel}
-          accessibilityElementsHidden={ownCloseButton}
-          importantForAccessibility={ownCloseButton ? 'no-hide-descendants' : 'auto'}
-        />
-        <View testID={testID} style={styles.sheet(shown)} accessibilityViewIsModal>
-          {shown === 'raised' ? (
-            <View
-              style={styles.handle}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-            />
-          ) : null}
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.content(shown)}
-            keyboardShouldPersistTaps="handled">
-            {children}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+      <GestureHandlerRootView style={styles.gestures}>
+        <KeyboardAvoidingView
+          style={styles.root(shown)}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable
+            style={styles.scrim}
+            onPress={onClose}
+            accessible={!ownCloseButton}
+            accessibilityRole="button"
+            accessibilityLabel={closeLabel}
+            accessibilityElementsHidden={ownCloseButton}
+            importantForAccessibility={ownCloseButton ? 'no-hide-descendants' : 'auto'}
+          />
+          <Animated.View
+            testID={testID}
+            style={[styles.sheet(shown), dragged]}
+            accessibilityViewIsModal>
+            {shown === 'raised' ? (
+              <GestureDetector gesture={pan}>
+                <View
+                  testID="sheet-handle"
+                  style={styles.handleArea}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants">
+                  <View style={styles.handle} />
+                </View>
+              </GestureDetector>
+            ) : null}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.content(shown)}
+              keyboardShouldPersistTaps="handled">
+              {children}
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -174,12 +234,19 @@ const styles = StyleSheet.create((theme, rt) => ({
             borderColor: theme.colors.border,
           }),
   }),
+  gestures: {
+    flex: 1,
+  },
+  handleArea: {
+    height: HANDLE_HEIGHT,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingTop: theme.space.sm,
+  },
   handle: {
-    alignSelf: 'center',
     width: 40,
     height: 5,
     borderRadius: 3,
-    marginTop: theme.space.sm,
     backgroundColor: theme.colors.border,
   },
   scroll: {
@@ -189,7 +256,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: (look: SheetLook) => ({
     gap: look === 'bare' ? 0 : theme.space.sm,
     paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
-    paddingTop: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
+    // `raised`: the handle area above already gives the space.
+    paddingTop: look === 'bare' ? 0 : look === 'raised' ? theme.space.xxs : theme.space.xl,
     paddingBottom:
       look === 'bare'
         ? 0
