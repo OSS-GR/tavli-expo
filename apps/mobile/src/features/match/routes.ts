@@ -134,6 +134,11 @@ export function friendInviteHref(playerId: string) {
   return { pathname: '/friends/invite/[id]', params: { id: playerId } } as const;
 }
 
+/** The friend page (#644): the record, the matches in play and the recent ones. */
+export function friendPageHref(playerId: string) {
+  return { pathname: '/friends/[id]', params: { id: playerId } } as const;
+}
+
 /** The screen of a friend link (#406): what `https://tavlaki.com/add/<token>` opens. */
 export function friendLinkHref(token: string) {
   return { pathname: '/add/[token]', params: { token } } as const;

@@ -394,7 +394,7 @@ describe('<MatchEndScreen />', () => {
           ['white', 1],
         ]),
       ).view;
-      expect(screen.getByText('Κέρδισες το ματς!')).toBeOnTheScreen();
+      expect(screen.getByText('Κέρδισες τον αγώνα!')).toBeOnTheScreen();
       expect(
         screen.getByLabelText('Παρτίδα 1 · Πόρτες, Κέρδισες, Διπλό, 2 πόντοι'),
       ).toBeOnTheScreen();

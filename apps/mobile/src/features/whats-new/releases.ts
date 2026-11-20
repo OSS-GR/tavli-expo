@@ -50,7 +50,8 @@ export type WhatsNewEntryId =
   | 'takeBack'
   | 'betterPushes'
   | 'quickFriends'
-  | 'foldable';
+  | 'foldable'
+  | 'friendPage';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -72,6 +73,7 @@ export const RELEASES: readonly WhatsNewRelease[] = [
       { id: 'betterPushes', icon: 'bell' },
       { id: 'quickFriends', icon: 'userPlus' },
       { id: 'foldable', icon: 'smartphone' },
+      { id: 'friendPage', icon: 'users' },
     ],
   },
   {

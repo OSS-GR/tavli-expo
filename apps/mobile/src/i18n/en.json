@@ -897,6 +897,27 @@
       "invite": "Invite to a game",
       "remove": "Remove friend",
       "removeLabel": "Remove {{name}}"
+    },
+    "page": {
+      "openHint": "Opens the friend page",
+      "rating": "Rating {{rating}}",
+      "last": "Last match on {{date}}",
+      "ratingLast": "Rating {{rating}} · last match on {{date}}",
+      "lead": "You lead",
+      "behind": "They lead",
+      "even": "Even",
+      "matches_one": "{{count}} match",
+      "matches_other": "{{count}} matches",
+      "recordLabel": "{{lead}}, {{wins}} to {{losses}}, {{matches}}",
+      "activeTitle": "Matches in play",
+      "invited": "Invite for you",
+      "rematch": "Rematch",
+      "sameSettings": "Same settings: {{game}}",
+      "changeLabel": "Change the settings",
+      "recentTitle": "Recent matches",
+      "history": "History",
+      "emptyTitle": "No matches yet",
+      "emptyBody": "Invite them to a game. Your matches show here."
     }
   },
   "ratings": {
@@ -1247,6 +1268,11 @@
         "title": "Made for the foldable iPhone",
         "body": "Open the iPhone Duo and the board grows to fill the big screen, with the players above it and the buttons below. Home shows two columns.",
         "where": "Any game, and Home"
+      },
+      "friendPage": {
+        "title": "A page for each friend",
+        "body": "Tap a friend's name to see your record, the matches you are playing, your last matches and a Rematch button with the same settings.",
+        "where": "Home › Friends › a friend's name"
       }
     }
   },
