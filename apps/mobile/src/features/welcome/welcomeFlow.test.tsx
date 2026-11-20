@@ -90,6 +90,7 @@ const routes = {
   'friends/index': stub('friends'),
   'friends/add': stub('add a friend'),
   'friends/invite/[id]': stub('friend invite'),
+  'friends/[id]': stub('friend page'),
   'add/[token]': stub('friend link'),
   ratings: stub('leaderboards'),
   ranked: stub('play ranked'),
