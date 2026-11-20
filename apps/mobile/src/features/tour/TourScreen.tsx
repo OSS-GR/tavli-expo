@@ -359,6 +359,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.background,
     paddingTop: rt.insets.top + theme.space.xs,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
+    paddingLeft: rt.insets.left,
+    paddingRight: rt.insets.right,
     gap: theme.space.sm,
   },
   top: {

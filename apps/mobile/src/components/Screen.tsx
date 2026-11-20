@@ -2,8 +2,10 @@
  * The page under a screen in the Home style (#356): lit from the top, as by
  * a kafeneio lamp, and fading to a dark floor (#496, the Figma polish pass).
  *
- * `Screen` pads the top safe area, so a `ScreenHeader` inside it sits below
- * the status bar. The bottom safe area is the screen's own job (usually the
+ * `Screen` pads the top, left and right safe areas, so a `ScreenHeader`
+ * inside it sits below the status bar and clear of a camera at the side (an
+ * iPhone Duo gives a right inset of 84 pt for its camera column).
+ * The bottom safe area is the screen's own job (usually the
  * bottom padding of its scroll content), because only the screen knows what
  * sits at the bottom. See "Shared screen parts" in
  * `docs/architecture/app-shell.md`.
@@ -57,6 +59,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
     paddingTop: rt.insets.top,
+    paddingLeft: rt.insets.left,
+    paddingRight: rt.insets.right,
     ...screenBackground(theme.colors),
   },
 }));

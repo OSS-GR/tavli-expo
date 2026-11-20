@@ -384,8 +384,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.background,
     paddingTop: rt.insets.top + theme.space.xs,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.sm),
-    paddingLeft: landscape ? rt.insets.left : 0,
-    paddingRight: landscape ? Math.max(rt.insets.right, theme.space.xs) : 0,
+    paddingLeft: rt.insets.left,
+    paddingRight: landscape ? Math.max(rt.insets.right, theme.space.xs) : rt.insets.right,
   }),
   lead: {
     gap: theme.space.sm,

@@ -132,7 +132,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     flex: 1,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: atBottom(look) ? 0 : theme.space.lg,
+    // Clear of a camera at the side (an iPhone Duo's camera column).
+    paddingLeft: rt.insets.left + (atBottom(look) ? 0 : theme.space.lg),
+    paddingRight: rt.insets.right + (atBottom(look) ? 0 : theme.space.lg),
   }),
   scrim: {
     ...StyleSheet.absoluteFillObject,

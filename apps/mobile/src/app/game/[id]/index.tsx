@@ -122,5 +122,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: 'center',
     backgroundColor: theme.colors.background,
     paddingTop: rt.insets.top,
+    paddingLeft: rt.insets.left,
+    paddingRight: rt.insets.right,
   },
 }));

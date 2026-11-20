@@ -52,8 +52,8 @@ export function Toast({
 const styles = StyleSheet.create((theme, rt) => ({
   wrap: {
     position: 'absolute',
-    left: theme.space.lg,
-    right: theme.space.lg,
+    left: rt.insets.left + theme.space.lg,
+    right: rt.insets.right + theme.space.lg,
     bottom: rt.insets.bottom + theme.space.xxl,
     alignItems: 'center',
   },

@@ -6,6 +6,8 @@
  * island is on one side only. Knowing the side lets the game screen use
  * only a small margin on the other side, so the wide board gets that room.
  * Android gives the real inset of each side, so it needs nothing here.
+ * Neither does a phone whose insets differ, such as the iPhone Duo (only its
+ * right side has the camera column): then the insets are already real.
  */
 import {
   addOrientationChangeListener,
@@ -62,17 +64,19 @@ export const OPEN_SIDE_MARGIN = 16;
 /**
  * The left and right margins of a screen on its side: the safe insets, but
  * at most `OPEN_SIDE_MARGIN` on the side away from the island, and never
- * less than `least`. With the island side unknown, both insets stay.
+ * less than `least`. With the island side unknown, or with insets that
+ * differ (they already name the camera's side), both insets stay.
  */
 export function sideMargins(
   insets: { readonly left: number; readonly right: number },
   island: IslandSide | null,
   least: number,
 ): { left: number; right: number } {
+  const known = insets.left === insets.right ? island : null;
   const side = (inset: number, open: boolean) =>
     Math.max(open ? Math.min(inset, OPEN_SIDE_MARGIN) : inset, least);
   return {
-    left: side(insets.left, island === 'right'),
-    right: side(insets.right, island === 'left'),
+    left: side(insets.left, known === 'right'),
+    right: side(insets.right, known === 'left'),
   };
 }

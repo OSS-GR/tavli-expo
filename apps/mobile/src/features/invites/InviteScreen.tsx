@@ -291,7 +291,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: 'center',
     paddingTop: Math.max(rt.insets.top, theme.space.lg),
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
-    paddingHorizontal: theme.space.lg,
+    paddingLeft: rt.insets.left + theme.space.lg,
+    paddingRight: rt.insets.right + theme.space.lg,
   },
   loading: {
     alignItems: 'center',
