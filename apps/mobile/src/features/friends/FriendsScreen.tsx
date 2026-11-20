@@ -117,6 +117,8 @@ export interface FriendsScreenProps {
   onOpenInvite: (code: string) => void;
   /** Opens Settings → Account (a guest saves the account there). */
   onAccount: () => void;
+  /** Opens the friend page (#644). `undefined`: a row does not open. */
+  onOpenFriend?: (playerId: string) => void;
 }
 
 interface FriendsData {
@@ -148,6 +150,7 @@ export function FriendsScreen({
   onInvited,
   onOpenInvite,
   onAccount,
+  onOpenFriend,
   visit = 0,
 }: FriendsScreenProps) {
   const { t, i18n } = useTranslation();
@@ -399,12 +402,13 @@ export function FriendsScreen({
             list.map((friend) => {
               const name = nameOf(friend.name);
               return (
-                <PersonRow
+                <FriendRow
                   key={friend.playerId}
                   testID={`friend-${friend.playerId}`}
                   playerKey={friend.playerId}
                   name={name}
-                  hint={recordText(friend.record, t)}>
+                  hint={recordText(friend.record, t)}
+                  {...(onOpenFriend ? { onOpen: () => onOpenFriend(friend.playerId) } : {})}>
                   <ActionButton
                     testID={`friend-${friend.playerId}-invite`}
                     kind="secondary"
@@ -420,7 +424,7 @@ export function FriendsScreen({
                     label={t('friends.list.more', { name })}
                     onPress={() => setPanel({ kind: 'friend', friend })}
                   />
-                </PersonRow>
+                </FriendRow>
               );
             })
           )}
@@ -621,6 +625,65 @@ function PersonRow({ testID, playerKey, name, title, hint, children, below }: Pe
   );
 }
 
+/**
+ * One friend (#644, Figma 31 "After B"): the name has the whole width; the
+ * record, Invite and "…" share the line under it, so a long name never
+ * squeezes the buttons. With `onOpen` the avatar and the name open the
+ * friend page; screen readers hear one button with the name and the record.
+ */
+function FriendRow({
+  testID,
+  playerKey,
+  name,
+  hint,
+  onOpen,
+  children,
+}: {
+  testID: string;
+  playerKey: string;
+  name: string;
+  hint: string | null;
+  onOpen?: () => void;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View testID={testID} style={styles.personRow}>
+      <View style={styles.person}>
+        <Pressable
+          onPress={onOpen}
+          disabled={onOpen === undefined}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden>
+          <CheckerAvatar playerKey={playerKey} name={name} />
+        </Pressable>
+        <View style={styles.texts}>
+          <Pressable
+            testID={`${testID}-open`}
+            onPress={onOpen}
+            disabled={onOpen === undefined}
+            accessibilityRole={onOpen ? 'button' : 'text'}
+            accessibilityLabel={hint ? `${name}, ${hint}` : name}
+            {...(onOpen ? { accessibilityHint: t('friends.page.openHint') } : {})}
+            style={({ pressed }) => [styles.nameLine, pressed && styles.pressed]}>
+            <Text style={[styles.name, styles.nameFlex]}>{name}</Text>
+          </Pressable>
+          <View style={styles.friendLine}>
+            <Text
+              style={[styles.hint, styles.nameFlex]}
+              importantForAccessibility="no"
+              accessibilityElementsHidden>
+              {hint ?? ''}
+            </Text>
+            {children}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 /** The "…" button of a friend row: it opens the friend sheet. */
 function MoreButton({
   testID,
@@ -789,7 +852,8 @@ interface SheetRowProps {
   onPress: () => void;
 }
 
-function SheetRow({
+/** One row of an action sheet: an icon and a label (coral for Report or block). */
+export function SheetRow({
   testID,
   icon,
   label,
@@ -910,6 +974,23 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.sm,
     // Under the texts, past the 40 pt avatar.
     paddingLeft: 40 + theme.space.md,
+  },
+  nameLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.xs,
+    minHeight: 28,
+  },
+  nameFlex: {
+    flexShrink: 1,
+    flexGrow: 1,
+  },
+  friendLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    columnGap: theme.space.xs,
   },
   more: {
     width: theme.touch.minTarget,

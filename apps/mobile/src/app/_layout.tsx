@@ -123,6 +123,8 @@ function RootStack() {
           <Stack.Screen name="friends/index" />
           <Stack.Screen name="friends/add" />
           <Stack.Screen name="friends/invite/[id]" />
+          {/* The friend page (#644). */}
+          <Stack.Screen name="friends/[id]" />
           <Stack.Screen name="add/[token]" />
           {/* Leaderboards (#407). */}
           <Stack.Screen name="ratings" />

@@ -10,6 +10,7 @@ import {
   ADD_FRIEND_HREF,
   RATINGS_HREF,
   friendInviteHref,
+  friendPageHref,
   inviteHref,
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
@@ -39,6 +40,7 @@ export default function FriendsRoute() {
       }}
       onOpenInvite={(code) => router.push(inviteHref(code))}
       onAccount={() => router.push('/account')}
+      onOpenFriend={(playerId) => router.push(friendPageHref(playerId))}
     />
   );
 }

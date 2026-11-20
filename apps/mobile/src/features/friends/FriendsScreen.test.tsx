@@ -302,6 +302,31 @@ describe('<FriendsScreen />', () => {
     expect(props.onInvite).toHaveBeenCalledWith('ann');
   });
 
+  it('a tap on the name opens the friend page (#644)', async () => {
+    await signInSaved();
+    await befriend('ann');
+    const onOpenFriend = jest.fn();
+    await render(
+      <FriendsScreen
+        auth={auth!}
+        usernames={usernames!}
+        friends={onlineFake.friends}
+        onBack={jest.fn()}
+        onAdd={jest.fn()}
+        onInvite={jest.fn()}
+        onInvited={jest.fn()}
+        onOpenInvite={jest.fn()}
+        onAccount={jest.fn()}
+        onOpenFriend={onOpenFriend}
+      />,
+    );
+    await flush();
+    const open = screen.getByRole('button', { name: nameOf('ann') });
+    expect(open.props.accessibilityHint).toBe('Opens the friend page');
+    await setupUser().press(open);
+    expect(onOpenFriend).toHaveBeenCalledWith('ann');
+  });
+
   describe('Invite with the last setup (#488)', () => {
     const LAST: NewInvite = { choice: 'plakoto', targetPoints: 3, turnTimeMinutes: null };
 

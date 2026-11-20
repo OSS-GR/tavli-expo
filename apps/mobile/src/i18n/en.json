@@ -897,6 +897,27 @@
       "invite": "Invite to a game",
       "remove": "Remove friend",
       "removeLabel": "Remove {{name}}"
+    },
+    "page": {
+      "openHint": "Opens the friend page",
+      "rating": "Rating {{rating}}",
+      "last": "Last match on {{date}}",
+      "ratingLast": "Rating {{rating}} · last match on {{date}}",
+      "lead": "You lead",
+      "behind": "They lead",
+      "even": "Even",
+      "matches_one": "{{count}} match",
+      "matches_other": "{{count}} matches",
+      "recordLabel": "{{lead}}, {{wins}} to {{losses}}, {{matches}}",
+      "activeTitle": "Matches in play",
+      "invited": "Invite for you",
+      "rematch": "Rematch",
+      "sameSettings": "Same settings: {{game}}",
+      "changeLabel": "Change the settings",
+      "recentTitle": "Recent matches",
+      "history": "History",
+      "emptyTitle": "No matches yet",
+      "emptyBody": "Invite them to a game. Your matches show here."
     }
   },
   "ratings": {
@@ -1242,6 +1263,11 @@
         "title": "Friends in one tap",
         "body": "Open a friend's link or scan their QR code, then tap Yes. You are friends at once, with no request to accept, and they get a notification.",
         "where": "Home › Friends › Add a friend"
+      },
+      "friendPage": {
+        "title": "A page for each friend",
+        "body": "Tap a friend's name to see your record, the matches you are playing, your last matches and a Rematch button with the same settings.",
+        "where": "Home › Friends › a friend's name"
       }
     }
   },
