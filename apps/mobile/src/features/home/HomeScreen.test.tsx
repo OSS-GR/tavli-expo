@@ -433,6 +433,19 @@ describe('<HomeScreen /> on a wide window (#649)', () => {
     expect(within(more).getByTestId('home-links')).toBeOnTheScreen();
     expect(within(more).getByRole('button', { name: /^Pass-and-play/ })).toBeOnTheScreen();
   });
+
+  // Each column has an exact width, so the columns never keep a size from
+  // the closed fold when the Duo opens (#655): 951 pt, less the two side
+  // paddings and the gap (16 pt each), in two.
+  it('gives each column half the width when the fold opens', async () => {
+    await render(<HomeScreen {...setup()} />);
+    const width = (id: string) => StyleSheet.flatten(screen.getByTestId(id).props.style).width;
+    expect(width('home-column-main')).toBeUndefined();
+    await setWindow(DUO_OPEN);
+    expect(direction()).toBe('row');
+    expect(width('home-column-main')).toBe((951 - 3 * 16) / 2);
+    expect(width('home-column-more')).toBe((951 - 3 * 16) / 2);
+  });
 });
 
 describe('inRows', () => {
