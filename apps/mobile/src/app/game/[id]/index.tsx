@@ -121,8 +121,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     flex: 1,
     justifyContent: 'center',
     backgroundColor: theme.colors.background,
+    // The sides are `GameScreen`'s job (it trims the side away from the
+    // island, #611): padding them here too would count them twice.
     paddingTop: rt.insets.top,
-    paddingLeft: rt.insets.left,
-    paddingRight: rt.insets.right,
   },
 }));
