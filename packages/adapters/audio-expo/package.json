@@ -17,9 +17,9 @@
     "@tavli/contracts": "workspace:*"
   },
   "peerDependencies": {
-    "expo-audio": "~58.0.11"
+    "expo-audio": "~58.0.12"
   },
   "devDependencies": {
-    "expo-audio": "~58.0.11"
+    "expo-audio": "~58.0.12"
   }
 }
