@@ -3,8 +3,8 @@
 // workflow does). No packages: it speaks the WebDriver protocol with fetch.
 //
 //   node safari.mjs [url] [variants, comma separated]
-import { spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 const BASE = (process.argv[2] || 'https://tavlaki-play-dev.orestisstefanis.workers.dev').replace(
   /\/$/,
@@ -28,6 +28,67 @@ async function wd(method, path, body) {
   if (json.value && json.value.error)
     throw new Error(`${path}: ${json.value.error}: ${json.value.message}`);
   return json.value;
+}
+
+// SAMPLE=<seconds>: run macOS `sample` on the busiest web page process while
+// the game plays, and print where its main thread spent the time.
+const SAMPLE = Number(process.env.SAMPLE ?? 30);
+
+function startSample(name) {
+  if (!SAMPLE) return null;
+  try {
+    const rows = execSync('ps -axo pid=,%cpu=,command=')
+      .toString()
+      .split('\n')
+      .filter((l) => l.includes('com.apple.WebKit.WebContent'))
+      .map((l) => l.trim().split(/\s+/))
+      .sort((a, b) => Number(b[1]) - Number(a[1]));
+    if (rows.length === 0) return null;
+    console.log(
+      `  sampling pid ${rows[0][0]} (${rows[0][1]}% cpu) of ${rows.length} page processes`,
+    );
+    const file = `${OUT}/sample-${name}.txt`;
+    const child = spawn('sudo', ['sample', rows[0][0], String(SAMPLE), '1', '-file', file], {
+      stdio: 'ignore',
+    });
+    return { file, done: new Promise((r) => child.on('exit', r)) };
+  } catch (e) {
+    console.log(`  sample failed: ${String(e).slice(0, 200)}`);
+    return null;
+  }
+}
+
+async function printSample(sample) {
+  if (!sample) return;
+  await sample.done;
+  if (!existsSync(sample.file)) return console.log('  no sample file');
+  const lines = readFileSync(sample.file, 'utf8').split('\n');
+  const clean = (l) =>
+    l
+      .replace(/\s+\[0x[0-9a-f,]+\]/g, '')
+      .replace(/ \+ \d+/g, '')
+      .slice(0, 190);
+  const start = lines.findIndex((l) => /Thread_\d+.*main-thread/.test(l));
+  if (start >= 0) {
+    const total = Number((lines[start].match(/^\s*(\d+)/) || [0, 0])[1]);
+    let end = lines.findIndex((l, i) => i > start && /^\s{4}\d+ Thread_/.test(l));
+    if (end < 0) end = lines.length;
+    const min = Math.max(3, total * Number(process.env.SAMPLE_MIN || 0.015));
+    console.log(`  main thread, ${total} samples (1 ms each); lines with >= ${min.toFixed(0)}:`);
+    let out = 0;
+    for (let i = start; i < end && out < Number(process.env.SAMPLE_LINES || 260); i++) {
+      const m = lines[i].match(/^([\s+!:|]*)(\d+) (.*)$/);
+      if (!m || Number(m[2]) < min) continue;
+      const depth = Math.floor(m[1].length / 2);
+      console.log(`    ${String(depth).padStart(3)} ${m[2].padStart(6)} ${clean(m[3])}`);
+      out += 1;
+    }
+  }
+  const top = lines.findIndex((l) => l.startsWith('Sort by top of stack'));
+  if (top >= 0) {
+    console.log('  top of stack, all threads:');
+    for (const l of lines.slice(top + 1, top + 46)) if (l.trim()) console.log(`    ${clean(l)}`);
+  }
 }
 
 async function play(variant) {
@@ -79,6 +140,7 @@ async function play(variant) {
       `  ${await js(`const c=document.createElement('canvas');const g=c.getContext('webgl2');const x=g&&g.getExtension('WEBGL_debug_renderer_info');return (g&&x?g.getParameter(x.UNMASKED_RENDERER_WEBGL):'no webgl info')+' | dpr '+devicePixelRatio+' | '+innerWidth+'x'+innerHeight`)}`,
     );
     await js('window.__spikeReset && window.__spikeReset()');
+    const sample = startSample(variant.replace(/\W+/g, '-'));
     let rolls = 0;
     let moves = 0;
     for (let i = 0; i < 30 && moves < 8; i++) {
@@ -120,6 +182,7 @@ async function play(variant) {
       );
     }
     for (const l of report.worst.slice(0, Number(process.env.WORST || 8))) console.log(`    ${l}`);
+    await printSample(sample);
   } catch (e) {
     console.log(`  FAILED: ${String(e).slice(0, 300)}`);
     await shot(`safari-failed-${variant.replace(/\W+/g, '-')}`).catch(() => {});
