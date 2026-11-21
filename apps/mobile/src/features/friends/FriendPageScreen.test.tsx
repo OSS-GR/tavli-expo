@@ -108,6 +108,7 @@ async function show(games: GameTransport = fakeGames({}), friends: Friends = onl
   const props = {
     onBack: jest.fn(),
     onOpenGame: jest.fn(),
+    onOpenFinished: jest.fn(),
     onOpenInvite: jest.fn(),
     onInvite: jest.fn(),
     onInvited: jest.fn(),
@@ -245,7 +246,9 @@ describe('<FriendPageScreen />', () => {
     expect(screen.getByText('1–3')).toBeOnTheScreen();
     const user = setupUser();
     await user.press(screen.getByTestId('friend-page-recent-g2'));
-    expect(props.onOpenGame).toHaveBeenCalledWith('g2');
+    // A finished match opens its end screen, never the board.
+    expect(props.onOpenFinished).toHaveBeenCalledWith('g2');
+    expect(props.onOpenGame).not.toHaveBeenCalled();
     await user.press(screen.getByTestId('friend-page-history'));
     expect(props.onHistory).toHaveBeenCalled();
   });
