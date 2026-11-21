@@ -34,8 +34,10 @@ function goHome() {
 }
 
 export default function MatchEndRoute() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; back?: string }>();
   const id = parseIdParam(params.id);
+  // Opened from a list: a back button goes there (only online matches are listed).
+  const back = params.back === '1' && router.canGoBack();
   if (id !== null && !isLocalGameId(id)) {
     return (
       <OnlineConnect gameId={id} onHome={goHome}>
@@ -53,6 +55,7 @@ export default function MatchEndRoute() {
             onPlayAgain={(playerId) => router.replace(friendInviteHref(playerId))}
             onSupport={() => router.push(supportHref('ask'))}
             onReview={(game) => router.push(reviewHref(id, game))}
+            {...(back ? { onBack: () => router.back() } : {})}
           />
         )}
       </OnlineConnect>

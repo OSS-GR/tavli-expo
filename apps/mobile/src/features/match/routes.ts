@@ -144,9 +144,16 @@ export function friendLinkHref(token: string) {
   return { pathname: '/add/[token]', params: { token } } as const;
 }
 
-/** The match-end screen of a finished match, local or online (wireframe 9). */
-export function matchEndHref(id: string) {
-  return { pathname: '/game/[id]/match-end', params: { id } } as const;
+/**
+ * The match-end screen of a finished match, local or online (wireframe 9).
+ * `back`: opened from a list (a friend's recent matches), with a back button.
+ */
+export function matchEndHref(id: string, back = false) {
+  return {
+    pathname: '/game/[id]/match-end',
+    // `back`: opened from a list, so the screen shows a back button.
+    params: back ? { id, back: '1' } : { id },
+  } as const;
 }
 
 /**
