@@ -63,7 +63,7 @@ import { saveFriendInviteSetup } from '@/features/invites/friendInviteSetup';
 import { sendInviteCreated } from '@/features/invites/inviteAnalytics';
 import { gameScore } from '@/features/online/gameText';
 import { listTickMs, useMyOnlineGames, usePhoneClock } from '@/features/online/myGames';
-import { cachedFor, rememberFor } from '@/features/online/shownCache';
+import { cachedFor } from '@/features/online/shownCache';
 import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlock } from '@/features/safety/ReportOrBlock';
 
@@ -170,23 +170,19 @@ export function FriendPageScreen({
   // A first visit opens with what the Friends list already showed of this
   // friend (#672), not a spinner: the name, the record and their invites.
   const pageKey = `friendPage:${playerId}`;
-  useState(() => {
-    if (cachedFor<PageData>(auth, pageKey) !== undefined) return;
+  const seed = (): PageData | undefined => {
     const list = cachedFor<ListShown>(auth, 'friends');
     const friend = list?.friends.find((f) => f.playerId === playerId);
-    if (list === undefined || friend === undefined) return;
-    rememberFor(auth, pageKey, {
-      friend,
-      invites: invitesFrom(list.invites, playerId),
-      rating: null,
-    } satisfies PageData);
-  });
+    if (list === undefined || friend === undefined) return undefined;
+    return { friend, invites: invitesFrom(list.invites, playerId), rating: null };
+  };
   const { state, reload, retry, sessionLost } = useFriendsData(
     auth,
     load,
     visit,
     usernames,
     pageKey,
+    seed,
   );
   const ready = state.kind === 'ready' && state.data.friend !== null;
   const active = useMyOnlineGames(ready ? auth : undefined, games, 'active');

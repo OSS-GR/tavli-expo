@@ -116,7 +116,8 @@ function lostState(error: unknown): FriendsLoad<never> | null {
  *   not stop the load: the server still answers `USERNAME_NEEDED`.
  * - With `cacheKey` (#672), a screen seen before in this app run opens
  *   with the data it showed last (`shownCache.ts`, per user, in memory)
- *   and loads the new data quietly. That data is never current.
+ *   and loads the new data quietly. That data is never current. With no
+ *   cached data, `seed` (pure, read once) may give a first guess.
  */
 export function useFriendsData<T>(
   auth: AuthProvider,
@@ -124,9 +125,10 @@ export function useFriendsData<T>(
   visit = 0,
   usernames?: Usernames,
   cacheKey?: string,
+  seed?: () => T | undefined,
 ) {
   const [state, setState] = useState<FriendsLoad<T>>(() => {
-    const cached = cacheKey === undefined ? undefined : cachedFor<T>(auth, cacheKey);
+    const cached = (cacheKey === undefined ? undefined : cachedFor<T>(auth, cacheKey)) ?? seed?.();
     // `visit: -1`: shown before, never this visit's data.
     return cached === undefined ? { kind: 'loading' } : { kind: 'ready', data: cached, visit: -1 };
   });
