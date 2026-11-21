@@ -12,7 +12,7 @@ App Store Connect asks for these (v1.0 page, 2026-11-21):
 |-----|------|-----------|-------|
 | iPhone 6.3" | **1206 × 2622** portrait | iPhone 17 Pro | Required. Apple scales it for other iPhones. Up to 10 per language. |
 | iPhone Duo | **2853 × 2007** landscape (the open inner screen) | iPhone Duo, posture open | The app supports the open Duo (#649, #659). |
-| Header image (optional) | 5244 × 2950 or 3840 × 1646 | none | **Owner:** make it from a board picture (`pnpm --filter @tavli/mobile screenshots`) and the app icon, or skip it. |
+| Header image (optional) | 3840 × 1646 | none | Made (2026-11-21): the icon, the name and three phone shots on the walnut colors. A second version has the phones only. |
 | iPad | none | | The app is iPhone only (`ios.supportsTablet` is not set). |
 
 **Owner:** check the sizes in App Store Connect before you upload. Apple changes them from time to time.
@@ -21,22 +21,22 @@ App Store Connect asks for these (v1.0 page, 2026-11-21):
 
 The first three matter most: the store shows them in search results too.
 
-| # | File | Screen | State | Caption (en) | Caption (el) |
-|---|------|--------|-------|--------------|--------------|
-| 1 | `01-board.png` | Game, Portes vs Hard | Double 4s, a checker picked, its targets lit, a blot to hit | Greek tavli, kafeneio style | Ελληνικό τάβλι, όπως στο καφενείο |
-| 2 | `02-home.png` | Home | Hero board, Play vs bot, Learn to play | Play the computer, friends or ranked | Με τον υπολογιστή, με φίλους ή με κατάταξη |
-| 3 | `03-games.png` | Play vs bot setup | Portes, Plakoto, Fevga, Asodio and Tavli; 5 points; Hard | Four Greek games | Και τα τέσσερα ελληνικά παιχνίδια |
-| 4 | `04-online.png` | Online game, Plakoto | Your turn, the turn clock ring, Roll dice | Play a friend online | Παίξε με φίλο online |
-| 5 | `05-hint.png` | Game, opening 4-2 | The hint line and the lit checkers | A hint when you need it | Υπόδειξη όποτε τη θες |
-| 6 | `06-lesson.png` | Learn Plakoto, lesson 3 of 4 | "The mother", lesson text on the real board | Learn on the real board | Μάθε στο κανονικό ταμπλό |
-| 7 | `07-boards.png` | Settings → Board & look | The three boards, Kafeneio Night picked | Three boards, your colors | Τρία ταμπλό, τα χρώματά σου |
+| # | File | Screen | State | Caption |
+|---|------|--------|-------|---------|
+| 1 | `01-board.png` | Game, Portes vs Hard | Double 4s, a checker picked, its targets lit, a blot to hit | Greek tavli, kafeneio style |
+| 2 | `02-home.png` | Home | Hero board, Play vs bot, Learn to play | Play the computer, friends or ranked |
+| 3 | `03-games.png` | Play vs bot setup | Portes, Plakoto, Fevga, Asodio and Tavli; 5 points; Hard | Four Greek games |
+| 4 | `04-online.png` | Online game, Plakoto | Your turn, the turn clock ring, Roll dice | Play a friend online |
+| 5 | `05-hint.png` | Game, opening 4-2 | The hint line and the lit checkers | A hint when you need it |
+| 6 | `06-lesson.png` | Learn Plakoto, lesson 3 of 4 | "The mother", lesson text on the real board | Learn on the real board |
+| 7 | `07-boards.png` | Settings → Board & look | The three boards, Kafeneio Night picked | Three boards, your colors |
 
 ## iPhone Duo shots
 
-| # | File | Screen | State | Caption (en) | Caption (el) |
-|---|------|--------|-------|--------------|--------------|
-| 1 | `duo-01-board.png` | Online game, Portes (rows layout) | Your turn, dice on the board, Undo and Confirm on the rail | Made for the open Duo | Φτιαγμένο για το ανοιχτό Duo |
-| 2 | `duo-02-home.png` | Home, two columns | The saved game and More ways to play | Every way to play, side by side | Όλοι οι τρόποι, δίπλα δίπλα |
+| # | File | Screen | State | Caption |
+|---|------|--------|-------|---------|
+| 1 | `duo-01-board.png` | Online game, Portes (rows layout) | Your turn, dice on the board, Undo and Confirm on the rail | Made for the open Duo |
+| 2 | `duo-02-home.png` | Home, two columns | The saved game and More ways to play | Every way to play, side by side |
 
 The Duo shots use the Olive Inlay board, so the set shows a second look.
 
@@ -60,4 +60,4 @@ The Duo shots use the Olive Inlay board, so the set shows a second look.
 5. Take the shot: `xcrun simctl io <device> screenshot shot.png`. On the open Duo, `simctl` fails; take the screenshot with the simulator's own screenshot command instead.
 6. `xcrun simctl status_bar booted clear` when you are done.
 
-Greek shots: set Settings → Language → Ελληνικά and take the same states again.
+No Greek shots (owner, 2026-11-21): the Greek page uses the English shots.
