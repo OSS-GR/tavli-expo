@@ -34,3 +34,7 @@ In Jest the app uses `createMemoryPushNotifications` from `@tavli/contracts` (`a
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `src/index.ts`      | `createExpoPushNotifications({ platform, projectId, channelName })`, `toPermission`, `tapOf`, `hidePushesInForeground` |
 | `src/index.test.ts` | The `pushNotificationsContract` checks and the mapping, on a mocked `expo-notifications`                               |
+
+## In a browser
+
+`src/expo.web.ts` is the browser twin (#675): the permission reads as denied, and there is no token and no tap. expo-notifications logs errors when it loads on the web, so the web build must not load `src/expo.ts`. Web push comes in phase 3 of `docs/architecture/web-app.md`.

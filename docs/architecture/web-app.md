@@ -26,7 +26,7 @@ Facts from the code on 2026-11-19:
 | Online games | Convex client over a web socket | Convex is made for browsers too |
 | Pushes | `expo-notifications`, Expo push | Web push: the browser's own system (a service worker, the Push API, VAPID keys). A second sender on the server |
 | Haptics | `expo-haptics` | None. An adapter that does nothing |
-| Sound | `expo-audio` | Ships web files. Browsers play no sound before the first click |
+| Sound | `expo-audio` | Ships web files, but they freeze Safari (see "The Safari freezes"). The web uses the Web Audio API in `@tavli/audio-expo` (#675). Browsers play no sound before the first click |
 | Crash reports, analytics | Sentry, PostHog (React Native SDKs) | Both ship web files. **Not tested** |
 | Update check | Build number from `expo-application` + `updatePolicy` | A web page is always the newest after a reload. Needs its own rule |
 | Share | `Share.share` (6 places), `Linking.openURL` (10 places) | Web Share where the browser has it, else "Copy link" |
@@ -76,7 +76,7 @@ Find out if the plan holds, before we build. The work lives on a spike branch an
 
 ### Phase 1: the web build (size M)
 
-**Status (2026-11-21):** started, epic #668. Done: the app builds and starts in a browser, with the CI job (#669).
+**Status (2026-11-21):** started, epic #668. Done: the app builds and starts in a browser, with the CI job (#669). In review or next: the adapter twins, sound first (#675).
 
 The app runs in a browser with offline play. Not public.
 
