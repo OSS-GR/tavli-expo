@@ -145,7 +145,13 @@ export function HomeScreen({
   const { theme, rt } = useUnistyles();
   const perRow = rt.fontScale > ONE_COLUMN_FONT_SCALE ? 1 : 2;
   const window = useWindowDimensions();
-  const twoColumns = window.width - rt.insets.left - rt.insets.right >= TWO_COLUMNS_MIN_WIDTH;
+  const usableWidth = window.width - rt.insets.left - rt.insets.right;
+  const twoColumns = usableWidth >= TWO_COLUMNS_MIN_WIDTH;
+  // Each column gets an exact width: with only `flex: 1`, Yoga kept the
+  // column's height from the closed fold as its width after the fold
+  // opened, and the right column ran off the screen (#655). The content
+  // pads both sides and the columns have a gap, all `space.lg`.
+  const columnWidth = twoColumns ? (usableWidth - 3 * theme.space.lg) / 2 : undefined;
   const [toast, showToast] = useToast();
   useEffect(() => {
     if (notice !== null) showToast(notice);
@@ -322,7 +328,7 @@ export function HomeScreen({
         {/* One column, or two side by side on a wide window (#649). Screen
             readers read the left column first, in the one-column order. */}
         <View testID="home-columns" style={styles.columns(twoColumns)}>
-          <View testID="home-column-main" style={styles.column(twoColumns)}>
+          <View testID="home-column-main" style={styles.column(columnWidth)}>
             {hero ?? (
               <HomeHero
                 testID="home-vs-bot"
@@ -338,7 +344,7 @@ export function HomeScreen({
             {learnCard}
             {reminderCard}
           </View>
-          <View testID="home-column-more" style={styles.column(twoColumns)}>
+          <View testID="home-column-more" style={styles.column(columnWidth)}>
             {onlineGames}
             {invites}
             {friendInvites}
@@ -449,8 +455,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.lg,
   }),
   // A column keeps the content's gap; side by side, each takes half.
-  column: (two: boolean) => ({
-    flex: two ? 1 : undefined,
+  column: (width: number | undefined) => ({
+    width,
     alignSelf: 'stretch',
     gap: theme.space.lg,
   }),
