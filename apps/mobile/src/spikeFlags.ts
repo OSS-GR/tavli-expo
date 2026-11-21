@@ -32,6 +32,10 @@ export const SPIKE = {
   nopoints: fx.has('nopoints'),
   /** Leave out the checkers on the points (to count their drawing calls). */
   nocheckers: fx.has('nocheckers'),
+  /** Checkers draw from one ready image each (off with `?fx=nosprite`). Web only. */
+  sprite: typeof document !== 'undefined' && !fx.has('nosprite') && !fx.has('flat'),
+  /** Draw the dice once, hidden, when a canvas starts (off with `?fx=nowarm`). Web only. */
+  warm: typeof document !== 'undefined' && !fx.has('nowarm'),
   /** A frame meter in the corner. */
   hud: knob('hud') === '1',
 };

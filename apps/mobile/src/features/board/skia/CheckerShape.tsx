@@ -7,6 +7,7 @@ import {
   BlurMask,
   Circle,
   Group,
+  Image,
   LinearGradient,
   RadialGradient,
 } from '@shopify/react-native-skia';
@@ -14,6 +15,8 @@ import type { CheckerStyle, Groove, Shadow } from '@tavli/themes';
 
 import { linearProps, radialProps, rgba } from '../paint';
 import { SPIKE } from '@/spikeFlags';
+
+import { useCheckerSprite } from './checkerSprite';
 
 export interface CheckerShapeProps {
   cx: number;
@@ -47,7 +50,31 @@ function GrooveRing({ cx, cy, r, g }: { cx: number; cy: number; r: number; g: Gr
   );
 }
 
-export function CheckerShape({ cx, cy, r, style, shadow, opacity = 1 }: CheckerShapeProps) {
+export function CheckerShape(props: CheckerShapeProps) {
+  return SPIKE.sprite ? <SpriteChecker {...props} /> : <CheckerArt {...props} />;
+}
+
+function SpriteChecker(props: CheckerShapeProps) {
+  const { cx, cy, r, style, shadow, opacity = 1 } = props;
+  const sprite = useCheckerSprite(style, shadow, r, (c, px) => (
+    <CheckerArt cx={c} cy={c} r={px} style={style} shadow={shadow} />
+  ));
+  if (!sprite) return <CheckerArt {...props} />;
+  const half = sprite.reach * r;
+  return (
+    <Image
+      image={sprite.image}
+      x={cx - half}
+      y={cy - half}
+      width={2 * half}
+      height={2 * half}
+      fit="fill"
+      opacity={opacity}
+    />
+  );
+}
+
+function CheckerArt({ cx, cy, r, style, shadow, opacity = 1 }: CheckerShapeProps) {
   const box = { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r };
   const dr = (style.dish?.radius ?? 0) * r;
   const dishBox = { x: cx - dr, y: cy - dr, width: 2 * dr, height: 2 * dr };

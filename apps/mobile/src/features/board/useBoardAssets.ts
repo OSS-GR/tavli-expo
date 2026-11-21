@@ -166,7 +166,10 @@ export function useNumberFont(size: number): SkFont | null {
   const rounded = Math.max(6, Math.round(size));
   // SPIKE (#637): CanvasKit has no system fonts, so the web loads a font file.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const webFont = useFont(WEB ? require('../../../assets/fonts/Piazzolla-Bold.ttf') : null, rounded);
+  const webFont = useFont(
+    WEB ? require('../../../assets/fonts/Piazzolla-Bold.ttf') : null,
+    rounded,
+  );
   const systemFont = useSystemNumberFont(rounded);
   return WEB ? webFont : systemFont;
 }

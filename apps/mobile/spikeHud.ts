@@ -132,6 +132,21 @@
   wrapGl(['linkProgram'], () => {
     gl.links += 1;
   });
+  // Which canvas built a program, and when (for the shader warm-up hunt).
+  const linkLog: string[] = [];
+  (globalThis as { __spikeLinkLog?: string[] }).__spikeLinkLog = linkLog;
+  for (const proto of glProtos) {
+    const orig = proto.linkProgram as (...a: unknown[]) => unknown;
+    proto.linkProgram = function (
+      this: { canvas?: { width: number; height: number } },
+      ...args: unknown[]
+    ) {
+      const c = this.canvas;
+      linkLog.push(`${Math.round(performance.now())}:${c ? `${c.width}x${c.height}` : '?'}`);
+      if (linkLog.length > 400) linkLog.shift();
+      return orig.apply(this, args);
+    };
+  }
   wrapGl(['texImage2D', 'texSubImage2D', 'compressedTexImage2D'], (a) => {
     const src = a[a.length - 1] as { width?: number; height?: number; byteLength?: number } | null;
     const bytes =

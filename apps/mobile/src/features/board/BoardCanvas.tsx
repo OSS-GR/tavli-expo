@@ -29,6 +29,7 @@ import type { BoardPicture } from './boardModel';
 import type { BoardShape } from './screenLayout';
 import { checkerRadius, type BoardGeometry } from './geometry';
 import { BoardScene, type BoardHighlights } from './skia/BoardScene';
+import { SpikeWarmDice, useSpikeWarming } from './skia/SpikeWarmDice';
 import { useBoardImages, useNumberFont } from './useBoardAssets';
 import { SPIKE } from '@/spikeFlags';
 
@@ -133,6 +134,15 @@ export function BoardCanvas({
 }: BoardCanvasProps) {
   const images = useBoardImages(theme, geo.layout);
   const font = useNumberFont(theme.checkers.badge.fontSize * checkerRadius(geo));
+  const warming = useSpikeWarming();
+  const warm = warming ? (
+    <SpikeWarmDice
+      style={theme.dice}
+      size={geo.layout.dice.size * geo.width}
+      x={size.width / 2}
+      y={size.height / 2}
+    />
+  ) : null;
   if (SPIKE.split) {
     // SPIKE (#640): two canvases. Safari is slow per drawing call, and the
     // board is about 280 calls; an animation must not repeat them per frame.
@@ -146,6 +156,7 @@ export function BoardCanvas({
             images={images}
             picture={picture}
             font={font}
+            under={warm}
             {...(hidden ? { hidden } : {})}
             {...(highlights ? { highlights } : {})}
           />
@@ -164,6 +175,7 @@ export function BoardCanvas({
         images={images}
         picture={picture}
         font={font}
+        under={warm}
         {...(hidden ? { hidden } : {})}
         {...(highlights ? { highlights } : {})}>
         {children}

@@ -31,6 +31,7 @@ import { ActionButton } from '@/components/ActionButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
+import { SpikeWarmDice, useSpikeWarming } from '@/features/board/skia/SpikeWarmDice';
 
 import { CountdownLine } from './CountdownLine';
 import { openingDice, type OpeningStatus } from './opening';
@@ -102,34 +103,40 @@ function OpeningDie({
   onLand?: () => void;
 }) {
   const tilt = theme.layouts['portrait-rotated'].dice.tilt[index] ?? 0;
+  const warming = useSpikeWarming() && value === null;
   return (
     // One canvas for the whole card life, always in this native view
     // (`collapsable={false}`): on iOS a canvas that moves to another native
     // parent loses its drawing (#173). The empty slot comes after it, so the
     // canvas keeps its place.
     <View collapsable={false} style={styles.dieBox}>
-      <Canvas
-        testID={testID}
-        style={styles.dieBox}
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={label}>
-        {value === null ? null : (
-          <AnimatedDie
-            key={rollKey}
-            style={theme.dice}
-            x={BOX / 2}
-            y={BOX / 2}
-            size={SIZE}
-            value={value}
-            index={index}
-            tilt={tilt}
-            used={false}
-            rollKey={rollKey}
-            {...(onLand ? { onLand } : {})}
-          />
-        )}
-      </Canvas>
+      <View style={{ opacity: warming ? 0 : 1 }}>
+        <Canvas
+          testID={testID}
+          style={styles.dieBox}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={label}>
+          {warming ? (
+            <SpikeWarmDice style={theme.dice} size={SIZE} x={BOX / 2} y={BOX / 2} />
+          ) : null}
+          {value === null ? null : (
+            <AnimatedDie
+              key={rollKey}
+              style={theme.dice}
+              x={BOX / 2}
+              y={BOX / 2}
+              size={SIZE}
+              value={value}
+              index={index}
+              tilt={tilt}
+              used={false}
+              rollKey={rollKey}
+              {...(onLand ? { onLand } : {})}
+            />
+          )}
+        </Canvas>
+      </View>
       {value === null ? (
         // Not rolled yet: an empty slot with a brass outline. The canvas says it.
         <View

@@ -71,6 +71,8 @@ export interface BoardSceneProps {
   highlights?: BoardHighlights;
   /** Drawn over the checkers and highlights, under the lamp (moving checkers). */
   children?: ReactNode;
+  /** SPIKE: drawn first, under the board art. */
+  under?: ReactNode;
 }
 
 const NO_HIGHLIGHTS: BoardHighlights = { select: null, targets: [] };
@@ -104,6 +106,7 @@ export function BoardScene({
   hidden,
   highlights = NO_HIGHLIGHTS,
   children,
+  under,
 }: BoardSceneProps) {
   const { layout } = geo;
   const W = geo.width;
@@ -132,6 +135,7 @@ export function BoardScene({
 
   return (
     <Group>
+      {under}
       {/* 1. Board shadow on the table. */}
       {SPIKE.noblur ? null : (
         <RoundedRect
