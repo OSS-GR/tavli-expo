@@ -445,7 +445,7 @@ export function GameScreen({
   const showMoveList = useMoveListShown();
   const { layout, rails, spaceKey } = useScreenLayout();
   // The app's colors (the board theme is `theme`).
-  const { theme: ui } = useUnistyles();
+  const { theme: ui, rt } = useUnistyles();
   const landscape = layout === 'landscape';
   // On its side the wide board takes the margin away from the island (#611).
   const island = useIslandSide();
@@ -456,6 +456,14 @@ export function GameScreen({
   const [leadHeight, setLeadHeight] = useState(0);
   const classic = layout === 'classic' || rows;
   const tall = layout === 'tall';
+  // The iPhone Duo keeps its camera in a column on the right (inset 84 pt,
+  // top inset 0, on both screens). Under the clock that column is empty, so
+  // the classic board and the rows rail use it; only the top row keeps clear
+  // of it (#659). The tall board starts at the top, so it keeps the inset.
+  const cameraColumn =
+    !landscape && !tall && rt.insets.top === 0 && rt.insets.right > 0 ? rt.insets.right : 0;
+  // Landscape and rows put the round buttons on a rail: rail sizes.
+  const railLayout = landscape || rows;
 
   const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
@@ -1449,8 +1457,8 @@ export function GameScreen({
   let rollAside: string | null = null;
   // Undo, Fast forward and the hint have one size. In portrait every circle
   // sits in a box as tall as the main one, so the three share a center line.
-  const sideSize = landscape ? RAIL_LANDSCAPE_SECONDARY : RAIL_SECONDARY;
-  const circleBox = landscape ? undefined : RAIL_PRIMARY;
+  const sideSize = railLayout ? RAIL_LANDSCAPE_SECONDARY : RAIL_SECONDARY;
+  const circleBox = railLayout ? undefined : RAIL_PRIMARY;
   if (phase === 'opening-roll') {
     mainButton = null;
   } else if (remoteStatus !== null) {
@@ -1514,7 +1522,7 @@ export function GameScreen({
         testID="roll-button"
         label={t('game.roll.dice')}
         subtitle={t('game.roll.orSwipeBoard')}
-        subtitleBeside={!landscape}
+        subtitleBeside={!railLayout}
         icon="dices"
         circleBox={circleBox}
         onPress={() => roll()}
@@ -1588,7 +1596,7 @@ export function GameScreen({
     ) : null);
   const statusText =
     status !== null ? (
-      <Text testID={status.testID} style={styles.statusText(landscape)}>
+      <Text testID={status.testID} style={styles.statusText(railLayout)}>
         {status.text}
       </Text>
     ) : null;
@@ -2424,7 +2432,7 @@ export function GameScreen({
     // between them.
     lead = (
       <View
-        style={styles.lead(rows)}
+        style={styles.lead(rows, cameraColumn)}
         onLayout={rows ? (e) => setLeadHeight(e.nativeEvent.layout.height) : undefined}>
         <View style={styles.topRow(rows)}>
           {menuButton}
@@ -2448,7 +2456,9 @@ export function GameScreen({
       // rows it sits on the right, under the top row (#659).
       <ScrollView
         testID="game-right"
-        style={rows ? styles.rowsRail(rails.right, leadHeight) : styles.rail(rails.right)}
+        style={
+          rows ? styles.rowsRail(rails.right, leadHeight, cameraColumn) : styles.rail(rails.right)
+        }
         contentContainerStyle={styles.railButtons(rows)}
         alwaysBounceVertical={false}>
         {undoButton ?? <View style={styles.railSlot(true)} />}
@@ -2502,7 +2512,7 @@ export function GameScreen({
   // the board never flatten (`collapsable={false}`), so the canvases keep
   // their native parent too (#173).
   return (
-    <View style={styles.screen(landscape, island)}>
+    <View style={styles.screen(landscape, island, cameraColumn)}>
       <GestureDetector gesture={swipeArea}>
         <View
           testID="game-content"
@@ -2518,7 +2528,11 @@ export function GameScreen({
           <View
             testID="game-middle"
             style={
-              tall ? styles.boardArea : rows ? styles.middleBesideRail(rails.right) : styles.middle
+              tall
+                ? styles.boardArea
+                : rows
+                  ? styles.middleBesideRail(Math.max(rails.right, cameraColumn))
+                  : styles.middle
             }
             collapsable={false}
             onLayout={(e) => {
@@ -2596,7 +2610,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   // iOS gives the same inset on both sides; the side away from the island
   // needs less (`sideMargins`), and the wide board gets the rest (#611).
   // Upright keeps a side inset too: the iPhone Duo's camera column.
-  screen: (landscape: boolean, island: IslandSide | null) => ({
+  screen: (landscape: boolean, island: IslandSide | null, column: number) => ({
     flex: 1,
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
@@ -2604,7 +2618,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : rt.insets.left,
     paddingRight: landscape
       ? sideMargins(rt.insets, island, theme.space.xs).right
-      : rt.insets.right,
+      : rt.insets.right - column,
   }),
   content: (landscape: boolean) => ({
     flex: 1,
@@ -2616,17 +2630,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     width,
     flexGrow: 0,
   }),
-  // The rail in rows (#659): on the right, from under the top row down.
-  // Rows: the open iPhone Duo's right inset is a column under the clock
-  // with nothing in it, so the rail sits there (#659). Pulled out of the
-  // screen's padding, it takes the whole column when the column is wide
-  // enough; the board gets the rest.
-  rowsRail: (width: number, top: number) => ({
+  // The rail in rows (#659): on the right, from under the top row down,
+  // in the iPhone Duo's camera column (`column`) when there is one. The
+  // screen does not pad that column, so the rail stays inside its parent.
+  // Until the top row is measured it hides, so it never shows over the seats.
+  rowsRail: (width: number, top: number, column: number) => ({
     position: 'absolute',
-    right: -rt.insets.right,
+    right: 0,
     top: top + theme.space.xs,
     bottom: 0,
-    width: Math.max(width, rt.insets.right),
+    width: Math.max(width, column),
+    opacity: top > 0 ? 1 : 0,
   }),
   // The left rail: the menu at the top, then the other seat, the score and
   // your seat, spread over the height.
@@ -2668,9 +2682,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.sm,
   },
   // Rows (#659): a little room above the menu, away from the round corner.
-  lead: (rows: boolean) => ({
+  // `column`: the camera column the screen no longer pads; the top row keeps
+  // clear of the clock in it.
+  lead: (rows: boolean, column: number) => ({
     gap: theme.space.xxs,
     paddingTop: rows ? theme.space.sm : 0,
+    paddingRight: column,
   }),
   // The menu, your seat, the score, the other seat. The seats stretch to
   // the same height.
@@ -2735,12 +2752,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.xs,
   },
   // Rows (#659): the board's space keeps clear of the rail on the right.
-  // Only the part of the rail wider than the right inset takes board space.
+  // Rows: the board ends where the rail starts.
   middleBesideRail: (rail: number) => ({
     flex: 1,
     justifyContent: 'center',
     gap: theme.space.xs,
-    marginRight: Math.max(0, rail - rt.insets.right) + theme.space.xxs,
+    marginRight: rail + theme.space.xxs,
   }),
   // As wide as the screen, as tall as the board needs. A large font may
   // squeeze it; the board then fits the space it has.
