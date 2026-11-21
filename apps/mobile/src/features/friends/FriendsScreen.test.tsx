@@ -325,6 +325,13 @@ describe('<FriendsScreen />', () => {
     expect(open.props.accessibilityHint).toBe('Opens the friend page');
     await setupUser().press(open);
     expect(onOpenFriend).toHaveBeenCalledWith('ann');
+
+    // The whole row opens it too, not only the name (#670), and a chevron says so.
+    expect(
+      screen.getByTestId('friend-ann-chevron', { includeHiddenElements: true }),
+    ).toBeOnTheScreen();
+    await setupUser().press(screen.getByTestId('friend-ann'));
+    expect(onOpenFriend).toHaveBeenCalledTimes(2);
   });
 
   describe('Invite with the last setup (#488)', () => {
