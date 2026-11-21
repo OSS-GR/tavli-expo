@@ -76,7 +76,7 @@ Find out if the plan holds, before we build. The work lives on a spike branch an
 
 ### Phase 1: the web build (size M)
 
-**Status (2026-11-21):** started, epic #668. Done: the app builds and starts in a browser, with the CI job (#669). In review or next: the adapter twins, sound first (#675).
+**Status (2026-11-21):** started, epic #668. Done: the app builds and starts in a browser, with the CI job (#669). The adapter twins, sound first (#675). SVG icons and the browser check in CI (#677): after it the busiest screen has 9 canvases (the board step of the welcome flow), so the board previews stay as they are.
 
 The app runs in a browser with offline play. Not public.
 
@@ -168,7 +168,7 @@ Done when: the owner plays on the public address, the legal pages are live, and 
 | Screens and flows | Jest with the native preset (as today) | Every PR |
 | The web build compiles | `expo export --platform web` in CI | Every PR, from phase 1 |
 | Web adapters | The port contract checks in `@tavli/contracts/testing` | Every PR |
-| The real browser | Playwright: start a game vs the bot, roll, move, confirm; from phase 3 the online flows | Every PR (Chromium); all three engines before a release |
+| The real browser | Playwright (`apps/mobile/tools/web-smoke.mjs`, #677): the welcome flow, a game vs the bot (roll, move), the main routes, the canvas count and the sound; from phase 3 the online flows | Every PR (Chromium); all three engines before a release |
 | Speed and size | The phase 0 measures, run again before the release | Phase 0 and phase 4 |
 
 ## Risks

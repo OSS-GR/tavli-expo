@@ -76,7 +76,7 @@ The workflow is `.github/workflows/ci.yml`. Its jobs run at the same time (#248)
 | `test-packages` | `pnpm -r --filter '!@tavli/mobile' --filter '!@tavli/bot' test` (Vitest) |
 | `test-bot` | `pnpm --filter @tavli/bot test`, the longest package, on its own runner (#287) |
 | `test-app (1/2)`, `test-app (2/2)` | `jest --shard=i/2` in `apps/mobile`. `apps/mobile/test/shardSequencer.js` splits the files by size, so both halves take about the same time. |
-| `web` | `pnpm --filter @tavli/mobile web:export`: the web app builds (#669). No browser test yet. |
+| `web` | `pnpm --filter @tavli/mobile web:export`: the web app builds (#669). Then `web:smoke`: Playwright Chromium plays the build (#677). |
 | `checks` | Fails if any job above failed or was cancelled. |
 
 Each job runs `pnpm install --frozen-lockfile` first (`.github/actions/setup`).

@@ -156,8 +156,8 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec jest --shard=${{ matrix.shard }}/2
 
-  # The web app builds (#669). A change that breaks the browser build then
-  # blocks the merge. The job has no secrets: it only bundles.
+  # The web app builds (#669) and plays in Chromium (#677). A change that
+  # breaks the browser build then blocks the merge. The job has no secrets.
   web:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -177,6 +177,15 @@ jobs:
       - name: Check the build
         working-directory: apps/mobile
         run: test -s web-dist/index.html && test -s web-dist/canvaskit.wasm
+
+      # A real browser plays the build (#677): no page error, no dropped
+      # WebGL context, at most 12 canvases per screen, sound from one
+      # AudioContext, and a roll and a move work.
+      - name: Install Chromium
+        run: pnpm --filter @tavli/mobile exec playwright install --with-deps chromium
+
+      - name: Play the build in Chromium
+        run: pnpm --filter @tavli/mobile web:smoke
 
   # The required check. It fails when any job above failed or was cancelled.
   # A skipped job (docs-only change) counts as passed.
