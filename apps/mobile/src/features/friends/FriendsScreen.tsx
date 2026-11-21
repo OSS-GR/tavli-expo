@@ -89,7 +89,14 @@ import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlock, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { Footnote, friendsStyles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
+import {
+  Footnote,
+  friendsStyles,
+  ListSkeleton,
+  NotReady,
+  RefreshFailed,
+  useProblemText,
+} from './FriendsParts';
 import { takeInviteSent, type SentInvite } from './inviteSent';
 import { recordText } from './record';
 
@@ -164,7 +171,13 @@ export function FriendsScreen({
     ]);
     return { friends: list, requests, invites: invites.filter((i) => i.status === 'open') };
   }, [friends]);
-  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit, usernames);
+  const { state, reload, retry, sessionLost } = useFriendsData(
+    auth,
+    load,
+    visit,
+    usernames,
+    'friends',
+  );
   // The player whose call is on its way.
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
@@ -300,7 +313,9 @@ export function FriendsScreen({
   );
 
   let body: ReactNode;
-  if (state.kind !== 'ready') {
+  if (state.kind === 'loading') {
+    body = <ListSkeleton testID="friends" />;
+  } else if (state.kind !== 'ready') {
     body = (
       <NotReady
         state={state}

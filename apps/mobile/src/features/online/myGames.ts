@@ -122,7 +122,13 @@ export function useMyOnlineGames(
     }),
     [now],
   );
-  return useSessionWatch(games === undefined ? undefined : auth, start, toLoaded);
+  // One list per status, shared by Home, History and the friend page (#672).
+  return useSessionWatch(
+    games === undefined ? undefined : auth,
+    start,
+    toLoaded,
+    `myGames:${status}`,
+  );
 }
 
 /**

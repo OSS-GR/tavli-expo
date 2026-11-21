@@ -17,6 +17,7 @@ import {
 } from '@tavli/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { cachedFor, rememberFor } from '@/features/online/shownCache';
 import { needsUsernameStep } from '@/features/online/usernameStep';
 
 export type FriendsLoad<T> =
@@ -113,14 +114,24 @@ function lostState(error: unknown): FriendsLoad<never> | null {
  * - With `usernames`, a saved account with no username gets the
  *   `username` state in place of the data (#599). A failed `mine()` does
  *   not stop the load: the server still answers `USERNAME_NEEDED`.
+ * - With `cacheKey` (#672), a screen seen before in this app run opens
+ *   with the data it showed last (`shownCache.ts`, per user, in memory)
+ *   and loads the new data quietly. That data is never current. With no
+ *   cached data, `seed` (pure, read once) may give a first guess.
  */
 export function useFriendsData<T>(
   auth: AuthProvider,
   load: () => Promise<T>,
   visit = 0,
   usernames?: Usernames,
+  cacheKey?: string,
+  seed?: () => T | undefined,
 ) {
-  const [state, setState] = useState<FriendsLoad<T>>({ kind: 'loading' });
+  const [state, setState] = useState<FriendsLoad<T>>(() => {
+    const cached = (cacheKey === undefined ? undefined : cachedFor<T>(auth, cacheKey)) ?? seed?.();
+    // `visit: -1`: shown before, never this visit's data.
+    return cached === undefined ? { kind: 'loading' } : { kind: 'ready', data: cached, visit: -1 };
+  });
   const live = useRef(true);
   const latest = useRef(0);
   useEffect(() => {
@@ -135,6 +146,7 @@ export function useFriendsData<T>(
     const run = latest.current;
     const settle = (next: FriendsLoad<T>) => {
       if (!live.current || run !== latest.current) return;
+      if (next.kind === 'ready' && cacheKey !== undefined) rememberFor(auth, cacheKey, next.data);
       setState((shown) =>
         next.kind === 'failed' && shown.kind === 'ready' ? { ...shown, refreshFailed: true } : next,
       );
@@ -159,7 +171,7 @@ export function useFriendsData<T>(
       .then(settle, (error: unknown) => {
         settle(lostState(error) ?? { kind: 'failed' });
       });
-  }, [auth, load, visit, usernames]);
+  }, [auth, load, visit, usernames, cacheKey]);
 
   // A new visit makes a new `reload`: load again.
   useEffect(() => {
