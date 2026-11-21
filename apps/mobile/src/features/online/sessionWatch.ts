@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { checkAppUpdate } from '@/features/update/updateCheck';
 
 import { forgetOnlineAccount } from './accountHint';
+import { cachedFor, rememberFor } from './shownCache';
 
 export type SessionWatchState<Loaded extends object> =
   /** No saved session: no list at all. */
@@ -58,20 +59,31 @@ export type StartSessionWatch<Value> = (
  *
  * With no `auth` (no online play, or Home on a phone that never signed
  * in) it watches nothing and shows `signedOut`.
+ *
+ * With `cacheKey` (#672) it starts from the list it showed last for the
+ * signed-in user in this app run (`shownCache.ts`, in memory), until the
+ * watch brings the new one.
  */
 export function useSessionWatch<Value, Loaded extends object>(
   auth: AuthProvider | undefined,
   start: StartSessionWatch<Value>,
   toLoaded: (value: Value) => Loaded,
+  cacheKey?: string,
 ): { readonly state: SessionWatchState<Loaded>; readonly retry: () => void } {
-  const [state, setState] = useState<SessionWatchState<Loaded>>({ status: 'loading' });
+  const first = (): SessionWatchState<Loaded> => {
+    const cached = cacheKey === undefined ? undefined : cachedFor<Loaded>(auth, cacheKey);
+    return cached === undefined
+      ? { status: 'loading' }
+      : { ...cached, status: 'loaded', failed: false };
+  };
+  const [state, setState] = useState<SessionWatchState<Loaded>>(first);
   const [attempt, setAttempt] = useState(0);
   // A watch that stops (no `auth`, e.g. after a sign-out) forgets its list,
   // so the next user never sees the last one's, not even for one frame.
   const [watched, setWatched] = useState(auth);
   if (watched !== auth) {
     setWatched(auth);
-    setState({ status: 'loading' });
+    setState(first());
   }
 
   useEffect(() => {
@@ -110,7 +122,9 @@ export function useSessionWatch<Value, Loaded extends object>(
       setState((last) => (switched || last.status !== 'loaded' ? { status: 'loading' } : last));
       stop = start((value) => {
         if (!live) return;
-        setState({ ...toLoaded(value), status: 'loaded', failed: false });
+        const loaded = toLoaded(value);
+        if (cacheKey !== undefined) rememberFor(auth, cacheKey, loaded);
+        setState({ ...loaded, status: 'loaded', failed: false });
       }, fail);
     };
 
@@ -129,7 +143,7 @@ export function useSessionWatch<Value, Loaded extends object>(
       unsubscribe();
       stop?.();
     };
-  }, [auth, start, toLoaded, attempt]);
+  }, [auth, start, toLoaded, attempt, cacheKey]);
 
   const retry = useCallback(() => {
     setState((last) => (last.status === 'failed' ? { status: 'loading' } : last));

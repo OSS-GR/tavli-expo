@@ -11,6 +11,7 @@ import { resetAnnouncements } from '../src/features/game/useAnnouncement';
 import { resetTurnPushesForTest } from '../src/features/notifications/appTurnPushes';
 import { forgetPushTapsForTest } from '../src/features/notifications/pushTaps';
 import { forgetOnlineAccount } from '../src/features/online/accountHint';
+import { resetShownCacheForTest } from '../src/features/online/shownCache';
 import { forgetDevGamesForTest } from '../src/features/online/devGameIds';
 import { forgetRankedRulesForTest } from '../src/features/ranked/rankedRules';
 import { forgetRankedStartsForTest } from '../src/features/ranked/rankedStarts';
@@ -36,6 +37,7 @@ beforeEach(() => {
   // The table scene (#509): Home rests on its last frame, and game start
   // plays no intro (a test of it turns it on), so tests tap the opening card.
   resetIntrosForTest();
+  resetShownCacheForTest();
   // The phone starts upright (#611, the island side).
   setOrientation(Orientation.PORTRAIT_UP);
 });

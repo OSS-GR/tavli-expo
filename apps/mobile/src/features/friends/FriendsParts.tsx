@@ -8,6 +8,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
 
@@ -124,6 +125,61 @@ export function RefreshFailed({ onRetry, testID }: { onRetry: () => void; testID
   );
 }
 
+/**
+ * Quiet placeholders shaped like the rows to come (#672), on a first visit
+ * only: a screen seen before opens with its last data (`shownCache.ts`).
+ * No motion, no "Loading…" line: screen readers hear one "Loading".
+ */
+function SkeletonRows({ rows, avatar }: { rows: number; avatar: boolean }) {
+  return (
+    <CardFrame>
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i}>
+          {i > 0 ? <RowDivider /> : null}
+          <View style={skeleton.row}>
+            {avatar ? <View style={skeleton.avatar} /> : null}
+            <View style={skeleton.texts}>
+              <View style={[skeleton.bar, skeleton.long]} />
+              <View style={[skeleton.bar, skeleton.short]} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </CardFrame>
+  );
+}
+
+/** The Friends list while its first load runs. */
+export function ListSkeleton({ testID }: { testID: string }) {
+  const { t } = useTranslation();
+  return (
+    <View
+      testID={`${testID}-skeleton`}
+      style={skeleton.block}
+      accessible
+      accessibilityLabel={t('friends.loading')}>
+      <View style={skeleton.button} />
+      <SkeletonRows rows={1} avatar={false} />
+      <SkeletonRows rows={2} avatar />
+    </View>
+  );
+}
+
+/** The friend page's Rematch and Recent matches while the matches load. */
+export function MatchesSkeleton() {
+  const { t } = useTranslation();
+  return (
+    <View
+      testID="friend-page-matches-skeleton"
+      style={skeleton.block}
+      accessible
+      accessibilityLabel={t('friends.loading')}>
+      <View style={skeleton.button} />
+      <SkeletonRows rows={2} avatar={false} />
+    </View>
+  );
+}
+
 /** A quiet note at the end of a screen, with a small icon (#503). */
 export function Footnote({ icon, text }: { icon: IconName; text: string }) {
   const { theme } = useUnistyles();
@@ -205,3 +261,43 @@ export const friendsStyles = StyleSheet.create((theme) => ({
 }));
 
 const styles = friendsStyles;
+
+const skeleton = StyleSheet.create((theme) => ({
+  block: {
+    gap: theme.space.md,
+  },
+  button: {
+    height: theme.touch.button,
+    borderRadius: theme.radii.pill,
+    backgroundColor: theme.colors.surfaceSunken,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    minHeight: theme.touch.row + theme.space.md,
+    paddingHorizontal: theme.space.md,
+    paddingVertical: theme.space.md,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.surfaceSunken,
+  },
+  texts: {
+    flex: 1,
+    gap: theme.space.sm,
+  },
+  bar: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: theme.colors.surfaceSunken,
+  },
+  long: {
+    width: '60%',
+  },
+  short: {
+    width: '35%',
+  },
+}));

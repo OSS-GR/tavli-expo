@@ -6,7 +6,7 @@
 import type { Friends, GameSummary, GameTransport, OnlineGameStatus } from '@tavli/contracts';
 import { ASYNC_TURN_TIME_MS } from '@tavli/contracts';
 import { markNamed } from '@tavli/online/testing';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, cleanup, render, screen } from '@testing-library/react-native';
 
 import {
   FRIEND_INVITE_SETUP_KEY,
@@ -142,6 +142,38 @@ describe('<FriendPageScreen />', () => {
     expect(screen.queryByTestId('friend-page-rematch')).toBeNull();
     await setupUser().press(screen.getByTestId('friend-page-invite'));
     expect(props.onInvite).toHaveBeenCalledWith(ANN);
+  });
+
+  it('never says "No matches yet" before the matches load: placeholders show (#672)', async () => {
+    await signInSaved();
+    await befriend(ANN);
+    // The finished list never answers.
+    const games = {
+      watchMyGames: () => () => {},
+    } as unknown as GameTransport;
+    await show(games);
+    expect(screen.getByRole('header', { name: nameOf(ANN) })).toBeOnTheScreen();
+    expect(screen.getByTestId('friend-page-matches-skeleton')).toBeOnTheScreen();
+    expect(screen.queryByTestId('friend-page-empty')).toBeNull();
+    expect(screen.queryByTestId('friend-page-invite')).toBeNull();
+    expect(screen.queryByTestId('friend-page-rematch')).toBeNull();
+  });
+
+  it('a second visit opens with the last page at once, then loads quietly (#672)', async () => {
+    await signInSaved();
+    await befriend(ANN);
+    const games = fakeGames({ finished: [finished('m1', 1)] });
+    await show(games);
+    expect(screen.getByTestId('friend-page-rematch')).toBeOnTheScreen();
+    await cleanup();
+
+    // Nothing answers this time: what shows is what the last visit showed.
+    const silent: Friends = { ...onlineFake.friends, listFriends: () => new Promise(() => {}) };
+    const quiet = { watchMyGames: () => () => {} } as unknown as GameTransport;
+    await show(quiet, silent);
+    expect(screen.queryByTestId('friend-page-skeleton')).toBeNull();
+    expect(screen.getByRole('header', { name: nameOf(ANN) })).toBeOnTheScreen();
+    expect(screen.getByTestId('friend-page-rematch')).toBeOnTheScreen();
   });
 
   it('shows the record in numbers and words', async () => {
