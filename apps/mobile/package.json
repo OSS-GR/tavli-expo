@@ -8,6 +8,7 @@
     "android": "expo start --android",
     "web": "node tools/copy-canvaskit.mjs && expo start --web",
     "web:export": "node tools/copy-canvaskit.mjs && expo export --clear --platform web --output-dir web-dist",
+    "web:smoke": "node tools/web-smoke.mjs",
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tools",
     "test": "jest",
@@ -84,6 +85,7 @@
     "babel-preset-expo": "~58.0.24",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.14",
+    "playwright": "1.63.0",
     "typescript": "~6.0.3"
   },
   "expo": {

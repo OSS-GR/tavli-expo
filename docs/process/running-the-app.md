@@ -237,6 +237,8 @@ pnpm --filter @tavli/mobile web:export   # a static site in apps/mobile/web-dist
 
 Both scripts first copy `canvaskit.wasm` (Skia for the web, 8 MB) into `apps/mobile/public/`. Git ignores that file and `web-dist/`. The web entry is `apps/mobile/index.web.ts`: it loads CanvasKit, then starts Expo Router. To look at an export, serve `web-dist` with any static server that answers unknown paths with `index.html`.
 
+`pnpm --filter @tavli/mobile web:smoke` plays the export in Chromium (`tools/web-smoke.mjs`, #677): the welcome flow, Home, a game vs the bot and the main routes. It fails on a page error, a console error, more than 12 Skia canvases on a screen, a dropped WebGL context, or a sound outside the one `AudioContext`. CI runs it in the `web` job. Once per machine: `pnpm --filter @tavli/mobile exec playwright install chromium`.
+
 ### Web preview
 
 The **Web preview** workflow (`.github/workflows/web-preview.yml`, #637) builds the web version from a branch and puts it on the dev site, the Cloudflare Worker `tavlaki-play-dev` (`apps/mobile/web/wrangler.jsonc`). Use it to test the web version on a real phone and in Safari. The web version is a plan, not a product yet: see [the web plan](../architecture/web-app.md).
