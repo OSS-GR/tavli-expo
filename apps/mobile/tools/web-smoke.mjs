@@ -9,6 +9,7 @@
 // - no screen has more than MAX_CANVASES Skia canvases, and the browser
 //   never drops a WebGL context (it keeps about 16; each canvas is one);
 // - sounds use one AudioContext and no <audio> element (#675);
+// - the table intro shows at game start (#681);
 // - a roll and a move work on the board.
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -130,6 +131,10 @@ try {
   // A game vs the bot: the opening roll, then rolls and moves until you moved once.
   await tap('home-vs-bot');
   await tap('new-game-start');
+  // The game-start intro plays in a browser too (#681).
+  await byId('table-intro')
+    .waitFor({ timeout: 5000 })
+    .catch(() => problems.push('the game: the table intro did not show at game start'));
   await byId('game-board').waitFor({ timeout: 20000 });
   let moved = false;
   for (let step = 0; step < 14 && !moved; step += 1) {

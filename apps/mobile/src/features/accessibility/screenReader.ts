@@ -3,7 +3,7 @@
  * move list (#134)?
  */
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Platform } from 'react-native';
 
 import type { MoveListMode } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
@@ -37,4 +37,24 @@ export function useMoveListShown(): boolean {
   const mode = useSettings((s) => s.moveList);
   const screenReader = useScreenReaderEnabled();
   return moveListShown(mode, screenReader);
+}
+
+/**
+ * Did the player ask for the move list, as far as the app can know (#681)?
+ * The game-start intro and other motion that a screen reader user does not
+ * need skip themselves by this, not by `useMoveListShown`.
+ *
+ * On a phone the two are the same. In a browser they differ: a page cannot
+ * ask if a screen reader is on, and `react-native-web` answers "on" every
+ * time, so `auto` shows the list to everyone there. That answer is no
+ * reason to skip the intro. In a browser only the setting `on` counts.
+ */
+export function moveListAsked(mode: MoveListMode, screenReader: boolean, web: boolean): boolean {
+  return web ? mode === 'on' : moveListShown(mode, screenReader);
+}
+
+export function useMoveListAsked(): boolean {
+  const mode = useSettings((s) => s.moveList);
+  const screenReader = useScreenReaderEnabled();
+  return moveListAsked(mode, screenReader, Platform.OS === 'web');
 }

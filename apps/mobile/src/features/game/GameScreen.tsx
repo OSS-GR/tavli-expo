@@ -131,7 +131,11 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { ActionButton } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
 import { MoveList } from '@/features/accessibility/MoveList';
-import { useMoveListShown, useScreenReaderEnabled } from '@/features/accessibility/screenReader';
+import {
+  useMoveListAsked,
+  useMoveListShown,
+  useScreenReaderEnabled,
+} from '@/features/accessibility/screenReader';
 import { markMatchIntroPlayed, matchIntroDue } from '@/features/intro/introRuns';
 import { TableScene } from '@/features/intro/TableScene';
 import { TABLE_SCENE_MS } from '@/features/intro/tableMotion';
@@ -446,6 +450,7 @@ export function GameScreen({
   const offerFastForward = useSettings((s) => s.offerFastForward);
   const setSetting = useSettings((s) => s.setSetting);
   const showMoveList = useMoveListShown();
+  const moveListAsked = useMoveListAsked();
   const { layout, rails, spaceKey } = useScreenLayout();
   // The app's colors (the board theme is `theme`).
   const { theme: ui, rt } = useUnistyles();
@@ -557,7 +562,8 @@ export function GameScreen({
   // board before the opening card. Once per match: the screen reads the
   // match it opened with, and a rematch (same store, new screen) plays none
   // (`introRuns.ts`). A tap skips it; Reduce motion and a screen reader skip
-  // it too.
+  // it too (`useMoveListAsked`: in a browser only the Move list setting
+  // counts, since a page cannot know of a screen reader, #681).
   const [introMatch] = useState(() =>
     opening !== null && match.games.length === 0 && matchIntroDue(matchKey, store)
       ? matchKey
@@ -565,7 +571,7 @@ export function GameScreen({
   );
   const [introDone, setIntroDone] = useState(false);
   const showIntro =
-    introMatch !== null && !introDone && !reduceMotion && !showMoveList && showOpening;
+    introMatch !== null && !introDone && !reduceMotion && !moveListAsked && showOpening;
   useEffect(() => {
     if (introMatch !== null) markMatchIntroPlayed(introMatch, store);
   }, [introMatch, store]);

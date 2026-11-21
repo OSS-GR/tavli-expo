@@ -237,7 +237,7 @@ The owner saw lag in Safari on a Mac, and more on an iPhone (2026-11-20). What w
 
 ### What else we saw
 
-- **The move list always shows on the web.** `react-native-web` answers "a screen reader is on" every time, because a page cannot know. Phase 2 must decide: a setting, or always on.
+- **The move list always shows on the web.** `react-native-web` answers "a screen reader is on" every time, because a page cannot know. Phase 2 must decide: a setting, or always on. Until then, motion that a screen reader user does not need (the game-start intro) asks `useMoveListAsked`, which counts only the setting **On** in a browser (#681): the always-on answer is no reason to skip it.
 - **Many texts say "phone"**: "On this phone only", "Off in the phone settings", "Your phone's language". Phase 2 needs web wording, in English and Greek.
 - **A wide window works at once on the game screen**: the wide board shows, and a resize does not remount the canvas. Home and the lists stretch to the full width and need the middle column.
 - **`EXPO_PUBLIC_*` values are cached by Metro.** A build for another server needs `expo export --clear`. The deploy workflow must use it.
