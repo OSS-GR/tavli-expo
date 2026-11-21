@@ -35,10 +35,17 @@
  *
  * Navigation stays in the route (`app/game/[id]/index.tsx`).
  */
-import { turnDeadlineMs, type GameTransport, type Safety } from '@tavli/contracts';
+import {
+  turnDeadlineMs,
+  type Friends,
+  type GameTransport,
+  type PlayerCard,
+  type Safety,
+} from '@tavli/contracts';
 import { opponent, type PlayerId, type PresetId } from '@tavli/engine';
 import { mayRollOpening } from '@tavli/online';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -53,6 +60,7 @@ import {
   type OnlineSide,
   type OnlineTimedOutCard,
 } from '@/features/game/GameScreen';
+import type { Seat } from '@/features/game/seats';
 import { GameMenu } from '@/features/match/GameMenu';
 import { MissingGame } from '@/features/match/MissingGame';
 import { resignMatchText } from '@/features/match/resign';
@@ -70,6 +78,8 @@ import {
 } from './clock';
 import { useOnlineStore, type OnlineNotice, type OnlineStore } from './onlineStore';
 import { playerNameText } from './playerName';
+import { OpponentCard } from './OpponentCard';
+import { usePlayerCard } from './playerCard';
 import { onlineSeats } from './seats';
 import { timeLeft } from './timeLeft';
 import { useOnlineGame } from './useOnlineGame';
@@ -79,6 +89,8 @@ export interface OnlineMatchScreenProps {
   transport: GameTransport;
   /** Block and report (#435). Without it the menu has no Report or block row. */
   safety?: Safety;
+  /** The other player's card (#651). Without it their name is not a button. */
+  friends?: Friends;
   /** The player id of this phone. */
   me: string;
   /** Another screen is on top (Settings). */
@@ -142,10 +154,26 @@ type Overlay =
   | { readonly kind: 'none' }
   | { readonly kind: 'menu' }
   | { readonly kind: 'resignMatch' }
+  /** The other player's card (#651). */
+  | { readonly kind: 'card' }
   /** Report or block (#435), with the player as the menu named them. */
   | { readonly kind: 'safety'; readonly player: SafetyPlayer };
 
 const NO_OVERLAY: Overlay = { kind: 'none' };
+
+/**
+ * The other player's seat as a button to their card (#651): the rating in
+ * place of "Online" once the card loaded, and only the "›" for a guest.
+ */
+function cardSeat(seat: Seat, card: PlayerCard | null, onPress: () => void, t: TFunction): Seat {
+  const { detail, ...rest } = seat;
+  const shown = card === null ? detail : card.rating === null ? undefined : String(card.rating);
+  return {
+    ...rest,
+    ...(shown === undefined ? {} : { detail: shown }),
+    press: { onPress, hint: t('online.card.openHint') },
+  };
+}
 
 /**
  * The notices' texts. `news` (#615): the notice only gives news ("The game
@@ -178,6 +206,7 @@ function OnlineBoard({
   side,
   gameId,
   safety,
+  friends,
   paused = false,
   covered = false,
   onExit,
@@ -238,7 +267,20 @@ function OnlineBoard({
 
   const opponentSide = side === 'white' ? 'black' : 'white';
   const opponentName = view?.names[opponentSide] ?? null;
-  const seats = onlineSeats(side, t, opponentName, view?.players[opponentSide]);
+  const opponentId = view?.players[opponentSide];
+  // Loaded once per game screen: the seat shows the rating from it.
+  const card = usePlayerCard(friends ?? null, friends ? opponentId : undefined);
+  const plainSeats = onlineSeats(side, t, opponentName, opponentId);
+  const loaded = card.load.kind === 'ready' ? card.load.card : null;
+  // Each opening asks again: a request may have come in since.
+  const openCard = () => {
+    card.reload();
+    setOverlay({ kind: 'card' });
+  };
+  const seats =
+    friends === undefined || opponentId === undefined
+      ? plainSeats
+      : { ...plainSeats, [opponentSide]: cardSeat(plainSeats[opponentSide], loaded, openCard, t) };
   const named = playerNameText(opponentName, t);
   const name = (player: PlayerId) => seats[player].name;
   if (view === null) return null;
@@ -391,6 +433,9 @@ function OnlineBoard({
           close();
           onSettings();
         }}
+        {...(friends
+          ? { opponentCardHint: t('online.card.menuHint'), onOpponentCard: openCard }
+          : {})}
         {...(safety
           ? {
               reportOrBlockHint: t('safety.actionHint', { name: safetyName(opponentName, t) }),
@@ -429,6 +474,23 @@ function OnlineBoard({
         onCancel={close}
       />
     );
+  } else if (overlay.kind === 'card' && friends && opponentId !== undefined) {
+    content = (
+      <OpponentCard
+        playerId={opponentId}
+        name={name(opponentSide)}
+        card={card}
+        friends={friends}
+        {...(safety
+          ? {
+              onReportOrBlock: () =>
+                setOverlay({ kind: 'safety', player: { id: opponentId, name: opponentName } }),
+            }
+          : {})}
+        onClose={close}
+        onHold={setHeld}
+      />
+    );
   } else if (overlay.kind === 'safety' && safety) {
     content = (
       <ReportOrBlock player={overlay.player} safety={safety} onClose={close} onHold={setHeld} />
@@ -457,7 +519,7 @@ function OnlineBoard({
           if (!held) close();
         }}
         closeLabel={t('game.menu.resume')}
-        look={overlay.kind === 'menu' ? 'raised' : 'dialog'}
+        look={overlay.kind === 'menu' || overlay.kind === 'card' ? 'raised' : 'dialog'}
         // The game screen turns with the phone (#185); its menu and dialog too.
         turns>
         {content}

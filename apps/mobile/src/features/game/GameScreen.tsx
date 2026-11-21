@@ -2113,6 +2113,9 @@ export function GameScreen({
       turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
       avatar={seats[player].avatar ?? null}
+      {...(seats[player].press
+        ? { onPress: seats[player].press.onPress, pressHint: seats[player].press.hint }
+        : {})}
       status={seatStatus(player)}
       note={asodioNote(player)}
       clock={seatClock(player)}

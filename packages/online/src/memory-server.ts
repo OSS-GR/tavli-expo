@@ -74,6 +74,7 @@ import {
   normalizeInviteCode,
 } from '@tavli/contracts';
 import type {
+  BoardRow,
   FoundPlayer,
   Friends,
   FriendsErrorData,
@@ -137,6 +138,7 @@ import {
   friendStatusOf,
   pickFriendTokenNow,
   planRequest,
+  playerCardOf,
   recentOpponents,
   recordOf,
   searchWindowStart,
@@ -1605,6 +1607,20 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     return 'sent';
   }
 
+  /** The global board as `callerId` sees it (#407), like the Convex `globalBoardFor`. */
+  function globalBoardFor(callerId: string): BoardRow[] {
+    const top = [...ratings]
+      .filter(([player, row]) => isSaved(player) && isBoardable(row))
+      .map(([player]): BoardPlayer => {
+        const name = nameRecords.get(player)?.username === undefined ? null : nameOf(player);
+        const { rating, matches } = ratingOf(player);
+        return { playerId: player, name, rating, matches };
+      })
+      .filter((player) => player.name !== null)
+      .sort((a, b) => b.rating - a.rating || (a.playerId < b.playerId ? -1 : 1));
+    return globalBoardRows(top, callerId, (player) => blocksPlayer(callerId, player));
+  }
+
   /** Ratings (#407), like the Convex `ratings.ts`. */
   function ratingsFor(playerId: string | null): Ratings {
     const saved = (): string => {
@@ -1655,16 +1671,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             id,
           );
         }),
-      globalBoard: () =>
-        call(() => {
-          const id = saved();
-          const top = [...ratings]
-            .filter(([player, row]) => isSaved(player) && isBoardable(row))
-            .map(([player]) => boardPlayer(player, usernameOf(player)))
-            .filter((player) => player.name !== null)
-            .sort((a, b) => b.rating - a.rating || (a.playerId < b.playerId ? -1 : 1));
-          return globalBoardRows(top, id, (player) => blocksPlayer(id, player));
-        }),
+      globalBoard: () => call(() => globalBoardFor(saved())),
       setShown: (shown) =>
         call(() => {
           const id = saved();
@@ -2035,6 +2042,23 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             .filter((invite) => !isInviteExpired(invite, at) && !blockedEither(id, invite.from))
             .reverse()
             .map((invite) => toInviteView(invite, at, nameOf(invite.from)));
+        }),
+      playerCard: (other) =>
+        call(() => {
+          const id = caller();
+          const status = statusBetween(id, other);
+          return playerCardOf({
+            callerId: id,
+            playerId: other,
+            met: met(id, other),
+            blockedEither: blockedEither(id, other),
+            name: nameOf(other),
+            saved: isSaved(other),
+            rating: ratings.get(other) ?? null,
+            rank: globalBoardFor(id).find((row) => row.playerId === other)?.rank ?? null,
+            status,
+            record: status === 'friends' ? recordBetween(id, other) : null,
+          });
         }),
     };
   }

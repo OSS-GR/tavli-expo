@@ -17,11 +17,19 @@ import {
   MAX_INCOMING_FRIEND_REQUESTS,
   MAX_OPEN_FRIEND_REQUESTS,
 } from '@tavli/contracts';
-import type { FriendRecord, FriendStatus, FriendsErrorCode } from '@tavli/contracts';
+import type {
+  FriendRecord,
+  FriendStatus,
+  FriendsErrorCode,
+  PlayerCard,
+  PlayerName,
+} from '@tavli/contracts';
 import type { PerPlayer, PlayerId, Rng } from '@tavli/engine';
 
 import { SERVER_ACTOR } from './calls';
 import { MAX_CODE_TRIES, randomCode } from './invites';
+import { NEW_RATING, shownRating } from './ratings';
+import type { RatingRecord } from './ratings';
 
 /** A rejected friends call. The servers turn it into `FriendsErrorData`. */
 export class FriendsError extends Error {
@@ -295,4 +303,49 @@ export function recentOpponents(
   return [...latest]
     .map(([playerId, playedAt]) => ({ playerId, playedAt }))
     .sort((a, b) => b.playedAt - a.playedAt);
+}
+
+// ---------------------------------------------------------------------------
+// The player card (#651)
+
+/** What the server knows when the caller opens another player's card. */
+export interface PlayerCardInput {
+  readonly callerId: string;
+  readonly playerId: string;
+  /** The two met (`met` in Safety: a game, an answered invite, a friend or a request). */
+  readonly met: boolean;
+  /** A block either way. */
+  readonly blockedEither: boolean;
+  readonly name: PlayerName | null;
+  /** The player has a saved account. A guest has no rating and no friends. */
+  readonly saved: boolean;
+  /** The player's rating row, or `null` before their first rated match. */
+  readonly rating: RatingRecord | null;
+  /** Their place on the caller's global board, or `null`. */
+  readonly rank: number | null;
+  readonly status: FriendStatus;
+  /** The record on the friend row, when they are friends. */
+  readonly record: FriendRecord | null;
+}
+
+/**
+ * The card both servers return (#651), after the checks: the caller's own
+ * id is `BAD_REQUEST`; a player they never met, or a block either way, is
+ * `NOT_FOUND` (one code, so a block stays hidden).
+ */
+export function playerCardOf(input: PlayerCardInput): PlayerCard {
+  if (input.callerId === input.playerId) {
+    throw new FriendsError('BAD_REQUEST', 'this is the caller');
+  }
+  if (!input.met || input.blockedEither) throw new FriendsError('NOT_FOUND', 'no such player');
+  const row = input.rating ?? NEW_RATING;
+  const friends = input.status === 'friends';
+  return {
+    name: input.name,
+    rating: input.saved ? shownRating(row.rating) : null,
+    matches: input.saved ? row.matches : 0,
+    rank: input.saved ? input.rank : null,
+    status: input.saved ? input.status : 'none',
+    record: friends ? (input.record ?? NO_RECORD) : null,
+  };
 }

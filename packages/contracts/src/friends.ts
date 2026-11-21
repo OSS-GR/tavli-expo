@@ -154,6 +154,28 @@ export interface FoundPlayer {
   readonly status: FriendStatus;
 }
 
+/**
+ * The card of a player the caller met (#651): what the caller sees when
+ * they tap the other player's name in an online match.
+ */
+export interface PlayerCard {
+  readonly name: PlayerName | null;
+  /**
+   * The rating, rounded, also when "Show me on the global board" is off
+   * (owner, 2026-11-20): that switch hides a player from the board only.
+   * `null` for a guest (only saved accounts are rated).
+   */
+  readonly rating: number | null;
+  /** Rated matches (0 for a guest). */
+  readonly matches: number;
+  /** The place on the caller's global board, or `null` when the board does not list them. */
+  readonly rank: number | null;
+  /** Never `self`. `none` for a guest (nobody can ask a guest). */
+  readonly status: FriendStatus;
+  /** The record between the two when they are friends, else `null`. */
+  readonly record: FriendRecord | null;
+}
+
 export const FRIENDS_ERROR_CODES = [
   /** No valid sign-in, or the caller's account is gone. */
   'NOT_SIGNED_IN',
@@ -212,7 +234,7 @@ export function isFriendsErrorData(value: unknown): value is FriendsErrorData {
 /**
  * The friends port. Every call rejects with `FriendsErrorData`:
  * `NOT_SIGNED_IN` with nobody signed in, `NOT_SAVED` for a guest (except
- * `openFriendLink`, which any signed-in player may call), and
+ * `openFriendLink` and `playerCard`, which any signed-in player may call), and
  * `USERNAME_NEEDED` for a saved account with no username on `findPlayer`,
  * `myFriendLink`, `resetFriendLink`, `requestByLink`, `requestByUsername`,
  * `sendRequest`, `acceptRequest` and `inviteFriend` (#599).
@@ -273,4 +295,11 @@ export interface Friends {
   inviteFriend(playerId: string, game: NewInvite): Promise<string>;
   /** The open friend invites to the caller, newest first. Answer one with `Invites.acceptInvite`. */
   listFriendInvites(): Promise<readonly InviteView[]>;
+  /**
+   * The card of a player the caller met (#651, the same rule as
+   * `sendRequest`). Any signed-in player may call it, a guest too.
+   * `BAD_REQUEST` for the caller's own id; `NOT_FOUND` for a player the
+   * caller never met, a deleted account, or a block either way.
+   */
+  playerCard(playerId: string): Promise<PlayerCard>;
 }

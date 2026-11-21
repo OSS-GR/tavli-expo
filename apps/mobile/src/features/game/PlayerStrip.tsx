@@ -26,10 +26,13 @@
  *   game keeps the ring's room, so it does not move when the turn passes.
  * - A long name or a large font wraps the lines; the seat then grows. There
  *   is no pip count (#238).
+ * - With `onPress` (the other player online, #651) the seat is a button: a
+ *   "›" ends its status line, and a tap opens their card.
  */
 import type { CheckerStyle } from '@tavli/themes';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { CheckerAvatar } from '@/components/CheckerAvatar';
@@ -86,6 +89,10 @@ export interface PlayerStripProps {
   stacked?: boolean;
   /** The seat on the right of the portrait row: the checker on the right. */
   mirrored?: boolean;
+  /** The seat is a button (#651): a tap opens the player's card. */
+  onPress?: () => void;
+  /** What a tap does, for screen readers. */
+  pressHint?: string;
   testID?: string;
 }
 
@@ -103,6 +110,8 @@ export function PlayerStrip({
   turnLabel,
   stacked = false,
   mirrored = false,
+  onPress,
+  pressHint,
   testID,
 }: PlayerStripProps) {
   const { t } = useTranslation();
@@ -159,14 +168,17 @@ export function PlayerStrip({
     ) : (
       checkerPiece
     );
+  // A seat that opens a card ends its line with "›" (on its own when empty).
+  const chevron = onPress === undefined ? null : line.length === 0 ? '›' : `${NBSP}›`;
   const statusLine =
-    line.length === 0 ? null : (
+    line.length === 0 && chevron === null ? null : (
       <Text
         style={[
           warning !== null ? styles.warning : styles.status(active),
           stacked ? styles.centredText : mirrored && styles.mirroredText,
         ]}>
         {line.map((part, index) => (index === 0 ? part : `${NBSP}· ${keepTogether(part)}`))}
+        {chevron}
       </Text>
     );
   const clockColor = clock?.urgent
@@ -212,29 +224,44 @@ export function PlayerStrip({
     </Text>
   );
 
-  if (stacked) {
-    return (
+  const seat = (style: StyleProp<ViewStyle>, children: ReactNode) =>
+    onPress === undefined ? (
       <View
         testID={testID}
-        style={styles.stacked}
+        style={style}
         accessible
         accessibilityLabel={label}
         accessibilityState={{ selected: active }}>
+        {children}
+      </View>
+    ) : (
+      <Pressable
+        testID={testID}
+        style={({ pressed }) => [style, pressed && styles.pressed]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        {...(pressHint ? { accessibilityHint: pressHint } : {})}
+        accessibilityState={{ selected: active }}>
+        {children}
+      </Pressable>
+    );
+
+  if (stacked) {
+    return seat(
+      styles.stacked,
+      <>
         {marked}
         {nameView}
         {statusLine}
         {clockLine}
         {timeView}
-      </View>
+      </>,
     );
   }
-  return (
-    <View
-      testID={testID}
-      style={[styles.row, mirrored && styles.mirrored]}
-      accessible
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}>
+  return seat(
+    [styles.row, mirrored && styles.mirrored],
+    <>
       {marked}
       <View style={styles.texts}>
         {nameView}
@@ -242,7 +269,7 @@ export function PlayerStrip({
         {clockLine}
       </View>
       {timeView}
-    </View>
+    </>,
   );
 }
 
@@ -256,6 +283,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   mirrored: {
     flexDirection: 'row-reverse',
+  },
+  pressed: {
+    opacity: 0.6,
   },
   mirroredText: {
     textAlign: 'right',

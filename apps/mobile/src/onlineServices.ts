@@ -211,6 +211,7 @@ export function lazyFriends(get: () => Friends): Friends {
     removeFriend: (playerId) => get().removeFriend(playerId),
     inviteFriend: (playerId, game) => get().inviteFriend(playerId, game),
     listFriendInvites: () => get().listFriendInvites(),
+    playerCard: (playerId) => get().playerCard(playerId),
   };
 }
 

@@ -53,12 +53,17 @@ describe('useOnlineConnection', () => {
       status: 'ready',
       transport: onlineFake.transportFor('me'),
       safety: expect.objectContaining({ report: expect.any(Function) }),
+      // The opponent card (#651) on the same in-memory server.
+      friends: onlineFake.devFriendsFor('me'),
       me: 'me',
     });
-    // The same port on each render.
+    // The same ports on each render.
     const first = result.current.status === 'ready' ? result.current.safety : null;
     await flush();
     expect(result.current.status === 'ready' ? result.current.safety : undefined).toBe(first);
+    expect(result.current.status === 'ready' ? result.current.friends : undefined).toBe(
+      onlineFake.devFriendsFor('me'),
+    );
     await flush();
     expect(onlineFake.authStore.guests).toBe(0);
   });
@@ -73,6 +78,7 @@ describe('useOnlineConnection', () => {
       status: 'ready',
       transport: onlineFake.games,
       safety: onlineFake.safety,
+      friends: onlineFake.friends,
       me: 'guest-1',
     });
     expect(onlineFake.authStore.guests).toBe(0);

@@ -15,12 +15,21 @@
  *
  * Never send the user id to analytics.
  */
-import type { GameTransport, Safety } from '@tavli/contracts';
+import type { Friends, GameTransport, Safety } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { checkAppUpdate } from '@/features/update/updateCheck';
-import { auth, devSafetyFor, gameTransportFor, games, onlinePlayerId, safety } from '@/services';
+import {
+  auth,
+  devFriendsFor,
+  devSafetyFor,
+  friends,
+  gameTransportFor,
+  games,
+  onlinePlayerId,
+  safety,
+} from '@/services';
 
 import { rememberOnlineAccount } from './accountHint';
 import { isDevGame } from './devGameIds';
@@ -33,6 +42,8 @@ export type OnlineConnection =
       readonly status: 'ready';
       readonly transport: GameTransport;
       readonly safety: Safety;
+      /** The opponent's card (#651). `null` when the build has none. */
+      readonly friends: Friends | null;
       readonly me: string;
     }
   /** This build has no online server (no Convex URL). */
@@ -77,11 +88,12 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
       status: 'ready',
       transport: gameTransportFor(onlinePlayerId),
       safety: devSafetyFor(onlinePlayerId),
+      friends: devFriendsFor(onlinePlayerId),
       me: onlinePlayerId,
     };
   }
   if (auth === undefined || games === undefined || safety === undefined) return { status: 'off' };
   if (session === null) return { status: 'connecting' };
   if (session === 'signedOut' || session === 'failed') return { status: session };
-  return { status: 'ready', transport: games, safety, me: session.me };
+  return { status: 'ready', transport: games, safety, friends: friends ?? null, me: session.me };
 }

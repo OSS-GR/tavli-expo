@@ -18,6 +18,8 @@ export interface Seat {
   readonly detail?: string;
   /** A named online opponent: their id and name for the checker avatar (#499). */
   readonly avatar?: { readonly key: string; readonly name: string };
+  /** The seat is a button (#651): a tap opens the player's card; `hint` is for screen readers. */
+  readonly press?: { readonly onPress: () => void; readonly hint: string };
   /** The human vs the bot: texts say "you" ("You win the game!"). */
   readonly you: boolean;
 }

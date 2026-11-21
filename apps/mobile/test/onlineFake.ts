@@ -101,6 +101,7 @@ let server = newServer();
 const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();
 const safetyPorts = new Map<string, Safety>();
+const friendPorts = new Map<string, Friends>();
 const notifications = createMemoryPushNotifications('ios');
 const appleSheet = createMemoryAppleSheet();
 const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
@@ -133,6 +134,16 @@ function devSafetyFor(playerId: string): Safety {
   if (port === undefined) {
     port = server.safetyFor(playerId);
     safetyPorts.set(playerId, port);
+  }
+  return port;
+}
+
+/** One `Friends` port per player on the current server, like `devFriendsFor` in the app. */
+function devFriendsFor(playerId: string): Friends {
+  let port = friendPorts.get(playerId);
+  if (port === undefined) {
+    port = server.friendsFor(playerId);
+    friendPorts.set(playerId, port);
   }
   return port;
 }
@@ -271,6 +282,7 @@ const friends: Friends = {
   removeFriend: (playerId) => friendsCaller().removeFriend(playerId),
   inviteFriend: (playerId, game) => friendsCaller().inviteFriend(playerId, game),
   listFriendInvites: () => friendsCaller().listFriendInvites(),
+  playerCard: (playerId) => friendsCaller().playerCard(playerId),
 };
 
 /**
@@ -352,6 +364,8 @@ export const onlineFake = {
   invitesFor,
   /** The cached dev `Safety` port of `playerId` on the current server. */
   devSafetyFor,
+  /** The cached dev `Friends` port of `playerId` on the current server (#651). */
+  devFriendsFor,
   /**
    * Rolls both opening dice of a new match (#379), as its players, again
    * after each tie. Resolves to the view after the opening.
@@ -371,6 +385,7 @@ export function resetOnlineFake(): void {
   transports.clear();
   invitePorts.clear();
   safetyPorts.clear();
+  friendPorts.clear();
   notifications.reset();
   pushTokens.reset();
   appUpdates.reset();
