@@ -19,16 +19,17 @@ import { useSettings } from '@/features/settings/store';
 /**
  * `tall` and `classic`: portrait (#184). `landscape`: the phone lies on its
  * side (#185). `rows`: a window wider than tall but almost square, like the
- * open iPhone Duo (#649): the portrait rows (seats above, buttons below)
- * around the wide board.
+ * open iPhone Duo (#649): the portrait top row (menu, seats, score) above
+ * the deep board (#659), with the round buttons on a rail on the right.
  */
 export type ScreenLayout = BoardLayoutMode | 'landscape' | 'rows';
 
 /**
  * The board a screen draws: the Board layout setting (`tall`, `classic`),
- * or `wide`, the classic board 10% longer, for a phone on its side (#611).
+ * `wide`, the classic board 10% longer, for a phone on its side (#611), or
+ * `deep`, the classic board made deeper, for the open iPhone Duo (#659).
  */
-export type BoardShape = BoardLayoutMode | 'wide';
+export type BoardShape = BoardLayoutMode | 'wide' | 'deep';
 
 export interface WindowSize {
   readonly width: number;
@@ -54,9 +55,10 @@ export function screenLayoutFor(window: WindowSize, mode: BoardLayoutMode): Scre
   return window.width / window.height < ROWS_MAX_RATIO ? 'rows' : 'landscape';
 }
 
-/** The board a screen layout draws: landscape and rows use the wide board (#611, #649). */
+/** The board a screen layout draws: landscape the wide board (#611), rows the deep one (#659). */
 export function boardModeOf(layout: ScreenLayout): BoardShape {
-  return layout === 'landscape' || layout === 'rows' ? 'wide' : layout;
+  if (layout === 'landscape') return 'wide';
+  return layout === 'rows' ? 'deep' : layout;
 }
 
 /**
