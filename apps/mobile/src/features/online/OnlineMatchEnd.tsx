@@ -59,6 +59,8 @@ export interface OnlineMatchEndProps {
   onSupport?: () => void;
   /** Review of a game of the match (#604), by its number (from 1). */
   onReview?: (gameNumber: number) => void;
+  /** Opened from a list (a friend's recent matches): a back button goes there. */
+  onBack?: () => void;
 }
 
 export function OnlineMatchEnd(props: OnlineMatchEndProps) {
@@ -93,6 +95,7 @@ function OnlineMatchEndView({
   onPlayAgain,
   onSupport,
   onReview,
+  onBack,
 }: OnlineMatchEndProps & { store: OnlineStore }) {
   const { t } = useTranslation();
   const [reporting, setReporting] = useState<SafetyPlayer | null>(null);
@@ -146,6 +149,7 @@ function OnlineMatchEndView({
         // The result is read once per app run (#216).
         announceKey={`online:${gameId}`}
         onHome={onHome}
+        {...(onBack ? { onBack } : {})}
         // The review of the last game (#604), as after a local match.
         {...(onReview && view.match.games.length >= 1
           ? { onReview: () => onReview(view.match.games.length) }

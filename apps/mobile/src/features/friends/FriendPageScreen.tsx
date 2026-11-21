@@ -105,8 +105,14 @@ export interface FriendPageScreenProps {
   /** Report or block. `undefined`: the menu has no such row. */
   safety?: Safety;
   onBack: () => void;
-  /** Opens an online game (in play or finished). */
+  /** Opens an online game in play (the board). */
   onOpenGame: (gameId: string) => void;
+  /**
+   * Opens a finished match: its end screen with the score and a Review for
+   * each game, never the board (a board route of a finished match showed an
+   * empty board before it moved on).
+   */
+  onOpenFinished: (gameId: string) => void;
   /** Opens a friend invite to you (the invite screen). */
   onOpenInvite: (code: string) => void;
   /** Opens the full game setup for a friend invite. */
@@ -146,6 +152,7 @@ export function FriendPageScreen({
   safety,
   onBack,
   onOpenGame,
+  onOpenFinished,
   onOpenInvite,
   onInvite,
   onInvited,
@@ -408,7 +415,11 @@ export function FriendPageScreen({
               {recent.map((game, i) => (
                 <View key={game.gameId}>
                   {i > 0 ? <RowDivider /> : null}
-                  <RecentRow game={game} locale={locale} onPress={() => onOpenGame(game.gameId)} />
+                  <RecentRow
+                    game={game}
+                    locale={locale}
+                    onPress={() => onOpenFinished(game.gameId)}
+                  />
                 </View>
               ))}
             </CardFrame>
