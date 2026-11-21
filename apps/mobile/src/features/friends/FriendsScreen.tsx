@@ -667,7 +667,7 @@ function FriendRow({
             accessibilityRole={onOpen ? 'button' : 'text'}
             accessibilityLabel={hint ? `${name}, ${hint}` : name}
             {...(onOpen ? { accessibilityHint: t('friends.page.openHint') } : {})}
-            style={styles.nameLine}>
+            style={({ pressed }) => [styles.nameLine, pressed && styles.pressed]}>
             <Text style={[styles.name, styles.nameFlex]}>{name}</Text>
             {onOpen ? (
               // Says there is a page behind the row, like the Leaderboards row.

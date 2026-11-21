@@ -332,6 +332,11 @@ describe('<FriendsScreen />', () => {
     ).toBeOnTheScreen();
     await setupUser().press(screen.getByTestId('friend-ann'));
     expect(onOpenFriend).toHaveBeenCalledTimes(2);
+
+    // Invite and "…" inside the row keep their own action.
+    await setupUser().press(screen.getByTestId('friend-ann-more'));
+    await setupUser().press(screen.getByTestId('friend-ann-invite'));
+    expect(onOpenFriend).toHaveBeenCalledTimes(2);
   });
 
   describe('Invite with the last setup (#488)', () => {
