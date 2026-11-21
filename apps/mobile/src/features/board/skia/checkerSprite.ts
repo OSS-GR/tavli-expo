@@ -74,12 +74,18 @@ const subscribe = (listener: () => void) => {
 };
 const snapshot = () => version;
 
-const lookKeys = new WeakMap<object, string>();
+/** The key of a look, kept per style object and per shadow object. */
+const lookKeys = new WeakMap<object, WeakMap<object, string>>();
 function lookKey(style: CheckerStyle, shadow: Shadow): string {
-  let key = lookKeys.get(style);
+  let byShadow = lookKeys.get(style);
+  if (byShadow === undefined) {
+    byShadow = new WeakMap();
+    lookKeys.set(style, byShadow);
+  }
+  let key = byShadow.get(shadow);
   if (key === undefined) {
     key = JSON.stringify([style, shadow]);
-    lookKeys.set(style, key);
+    byShadow.set(shadow, key);
   }
   return key;
 }
