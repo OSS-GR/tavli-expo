@@ -240,6 +240,8 @@ Setup once (owner):
 
 The build job runs the branch's code with no secrets. The deploy job has the token and runs only `wrangler` from `main`. Online play does not work on the dev site yet: the dev server does not allow calls from it (phase 3 of the plan).
 
+**Safari check.** The **Safari check** workflow (`.github/workflows/safari-check.yml`, #640) opens a web address in real Safari on a GitHub Mac runner, plays a few turns against the bot and prints the frame numbers of the spike's frame meter. It runs the script `apps/mobile/tools/web-spike/safari.mjs` from the branch you name. It has no secrets. Use it to measure Safari without a Mac at hand. A runner's graphics are virtual, so compare runs with each other; do not read the numbers as a real phone's.
+
 ### Versions and build numbers
 
 - **`version`** in `app.json` (now `1.0.0`) is the version people see in the store. We change it by hand for each store release.

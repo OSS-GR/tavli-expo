@@ -1,0 +1,73 @@
+name: Safari check
+
+# Plays the web version in real Safari on a GitHub Mac runner and prints the
+# frame numbers (#640, the web plan's phase 0). It lets us measure Safari
+# without the owner's computer. Manual only ("Run workflow").
+#
+# It checks out a branch and runs one script from it
+# (`apps/mobile/tools/web-spike/safari.mjs`) against a public web address.
+# The job has no secrets and can only read the repo. Never add secrets here.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit with the script
+        type: string
+        default: spike/web-phase0
+      url:
+        description: Web address to test
+        type: string
+        default: https://tavlaki-play-dev.orestisstefanis.workers.dev
+      variants:
+        description: Test switches, comma separated
+        type: string
+        default: fx=off,fx=noblur,fx=flat
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  safari:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+          # Folders only. Files at the repo root (.nvmrc) always come too.
+          sparse-checkout: apps/mobile/tools/web-spike
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Show the Mac and Safari
+        run: |
+          sw_vers
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" /Applications/Safari.app/Contents/Info.plist
+          system_profiler SPDisplaysDataType | head -n 20
+
+      - name: Allow Safari automation
+        run: sudo safaridriver --enable
+
+      - name: Play in Safari
+        env:
+          URL: ${{ inputs.url }}
+          VARIANTS: ${{ inputs.variants }}
+          OUT_DIR: ${{ runner.temp }}/safari
+        run: |
+          mkdir -p "$OUT_DIR"
+          node apps/mobile/tools/web-spike/safari.mjs "$URL" "$VARIANTS"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: safari-screenshots
+          path: ${{ runner.temp }}/safari
+          retention-days: 3
+          if-no-files-found: ignore
