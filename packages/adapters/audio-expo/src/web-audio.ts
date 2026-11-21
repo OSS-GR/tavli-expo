@@ -80,8 +80,12 @@ export function createWebAudioSoundPlayer(
   const loading = new Set<SoundSource>();
   let sounds = new Map<string, Sound>();
   const playing = new Set<WebAudioSource>();
-  /** Goes up at each `load` and `unload`: a late decode of an old bank is dropped. */
-  let generation = 0;
+  /**
+   * The sources of the bank loaded now. A decode that ends late is kept only
+   * when the current bank still uses its source: a bank loaded again while
+   * its files are on the way gets them, and an old bank's files are dropped.
+   */
+  let wanted = new Set<SoundSource>();
 
   const ready = (): WebAudioContext | null => {
     if (context !== undefined) return context;
@@ -102,12 +106,11 @@ export function createWebAudioSoundPlayer(
   const fetchInto = (source: SoundSource, ctx: WebAudioContext) => {
     if (buffers.has(source) || loading.has(source)) return;
     loading.add(source);
-    const mine = generation;
     Promise.resolve()
       .then(() => deps.fetchBytes(deps.uriOf(source)))
       .then((bytes) => ctx.decodeAudioData(bytes))
       .then((buffer) => {
-        if (mine === generation) buffers.set(source, buffer);
+        if (wanted.has(source)) buffers.set(source, buffer);
       })
       .catch(() => undefined) // This take stays silent.
       .finally(() => loading.delete(source));
@@ -128,14 +131,13 @@ export function createWebAudioSoundPlayer(
     load: (bank: SoundBank) => {
       const ctx = ready();
       const next = new Map<string, Sound>();
-      const wanted = new Set<SoundSource>();
+      wanted = new Set<SoundSource>();
       for (const [name, sources] of Object.entries(bank)) {
         if (sources.length === 0) continue;
         next.set(name, { takes: sources, next: 0 });
         for (const source of sources) wanted.add(source);
       }
       // Keep the buffers this bank still uses; free the rest.
-      generation += 1;
       buffers = new Map([...buffers].filter(([source]) => wanted.has(source)));
       sounds = next;
       if (ctx) for (const source of wanted) fetchInto(source, ctx);
@@ -162,7 +164,7 @@ export function createWebAudioSoundPlayer(
     },
 
     unload: () => {
-      generation += 1;
+      wanted = new Set();
       stopAll();
       buffers = new Map();
       sounds = new Map();

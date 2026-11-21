@@ -203,6 +203,30 @@ describe('createWebAudioSoundPlayer', () => {
     expect(audio.nodes).toHaveLength(0);
   });
 
+  it('a bank loaded again while its files are on the way still gets them', async () => {
+    audio = fakeAudio('running');
+    const player = createWebAudioSoundPlayer(audio.deps);
+    player.load({ diceRoll: ['d'] });
+    player.unload();
+    player.load({ diceRoll: ['d'] }); // the first fetch of `d` has not ended
+    await settle();
+    player.play('diceRoll');
+    expect(audio.log.filter((l) => l.startsWith('start:'))).toEqual(['start:buffer:d']);
+    expect(audio.log.filter((l) => l === 'fetch:d')).toHaveLength(1);
+  });
+
+  it('the same holds after another bank came between', async () => {
+    audio = fakeAudio('running');
+    const player = createWebAudioSoundPlayer(audio.deps);
+    player.load({ diceRoll: ['d'] });
+    player.load({ other: ['o'] });
+    player.load({ diceRoll: ['d'] });
+    await settle();
+    player.play('diceRoll');
+    player.play('other'); // not in the bank loaded now
+    expect(audio.log.filter((l) => l.startsWith('start:'))).toEqual(['start:buffer:d']);
+  });
+
   it('never throws where the browser has no audio', async () => {
     const none = createWebAudioSoundPlayer({ ...audio.deps, createContext: () => null });
     const broken = createWebAudioSoundPlayer({
