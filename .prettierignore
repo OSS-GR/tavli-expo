@@ -1,6 +1,8 @@
 pnpm-lock.yaml
 node_modules/
 dist/
+web-dist/
+apps/mobile/public/
 coverage/
 .expo/
 .claude/

@@ -81,6 +81,8 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules/',
     '**/dist/',
+    '**/web-dist/',
+    'apps/mobile/public/',
     '**/coverage/',
     '**/.expo/',
     'apps/mobile/ios/',

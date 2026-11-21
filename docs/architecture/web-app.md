@@ -76,6 +76,8 @@ Find out if the plan holds, before we build. The work lives on a spike branch an
 
 ### Phase 1: the web build (size M)
 
+**Status (2026-11-21):** started, epic #668. Done: the app builds and starts in a browser, with the CI job (#669).
+
 The app runs in a browser with offline play. Not public.
 
 - **Config:** `web` in `platforms`, `react-native-web`, the web output of Expo Router, a `web` script. `app.config.ts` stays a function of `config`.
