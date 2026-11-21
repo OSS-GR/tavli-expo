@@ -169,7 +169,7 @@ export function BoardScene({
       {layers('underPoints')}
 
       {/* 3. Points: vector triangles, color first, then the wood tile. */}
-      {layout.points.map((p) => {
+      {(SPIKE.nopoints ? [] : layout.points).map((p) => {
         const style = theme.points[p.tone];
         const d = pointPath(geo, p.index);
         const texture = images[style.texture];
@@ -232,7 +232,7 @@ export function BoardScene({
       ))}
 
       {/* 6. Checkers (frozen ones shaded, Asodio) and count badges. */}
-      {picture.checkers.map((c) =>
+      {(SPIKE.nocheckers ? [] : picture.checkers).map((c) =>
         hidden?.has(c.key) ? null : c.frozen ? (
           <Group key={c.key}>
             <CheckerShape

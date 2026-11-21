@@ -28,6 +28,10 @@ export const SPIKE = {
    * on each frame of an animation.
    */
   split: fx.has('split'),
+  /** Leave out the 24 points (to count their drawing calls). */
+  nopoints: fx.has('nopoints'),
+  /** Leave out the checkers on the points (to count their drawing calls). */
+  nocheckers: fx.has('nocheckers'),
   /** A frame meter in the corner. */
   hud: knob('hud') === '1',
 };

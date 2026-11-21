@@ -6,6 +6,14 @@
 // slowest frames of this page load. It is the first import of the web entry.
 (() => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  // Keep the `fx` switches now: the board code loads later, when the router
+  // has already dropped the query from the address (`spikeFlags.ts`).
+  try {
+    const fx = new URLSearchParams(window.location.search).get('fx');
+    if (fx !== null) window.sessionStorage.setItem('spike.fx', fx);
+  } catch {
+    // No storage: no switches.
+  }
   let on = false;
   try {
     const q = new URLSearchParams(window.location.search).get('hud');
@@ -200,6 +208,8 @@
   // (`window.__spikeReport()`).
   const totals = { frames: 0, over34: 0, over50: 0, over100: 0, ms: 0, slowMs: 0 };
   const sums = { draws: 0, links: 0, texMb: 0, sync: 0, ctx: 0, glMs: 0 };
+  // Drawing calls of the frames that drew a lot (a board redraw).
+  const bigDraws: number[] = [];
   const line = (f: Frame): string => {
     const r = (n: number): number => Math.round(n);
     const busyMs = Math.min(f.gap, f.busy);
@@ -233,6 +243,7 @@
   (window as unknown as Record<string, unknown>).__spikeReport = () => ({
     totals: { ...totals },
     gl: { ...sums },
+    bigDraws: [...bigDraws],
     worst: worstEver.map((f) => `at ${(f.at / 1000).toFixed(0)}s  ${line(f)}`),
   });
   (window as unknown as Record<string, unknown>).__spikeReset = () => {
@@ -266,6 +277,10 @@
       busy,
       gl: `draws ${gl.draws} links ${gl.links} tex ${gl.texMb.toFixed(1)}MB fbo ${gl.fbos} sync ${gl.sync} newctx ${gl.ctx} ms ${Math.round(gl.glMs)}`,
     };
+    if (gl.draws > 60) {
+      bigDraws.push(gl.draws);
+      if (bigDraws.length > 40) bigDraws.shift();
+    }
     sums.draws += gl.draws;
     sums.links += gl.links;
     sums.texMb += gl.texMb;
