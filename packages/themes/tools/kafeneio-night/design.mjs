@@ -30,6 +30,7 @@ import {
   landscapeGeometry as baseLandscapeGeometry,
   portraitGeometry as basePortraitGeometry,
   wideGeometry as baseWideGeometry,
+  deepGeometry as baseDeepGeometry,
   SIZES,
 } from '../walnut-kafeneio/design.mjs';
 
@@ -65,7 +66,7 @@ const C = {
 };
 
 export function geometries() {
-  return [basePortraitGeometry(), baseLandscapeGeometry(), baseWideGeometry()];
+  return [basePortraitGeometry(), baseLandscapeGeometry(), baseWideGeometry(), baseDeepGeometry()];
 }
 
 /** The `layouts.<id>` block of theme.json: the shared layout, a low lamp and brass seams on the points. */
@@ -228,8 +229,9 @@ function cornerPlatesSvg(g) {
  * Nail heads along the middle of the outer frame, in portrait pt. They keep
  * clear of the corner plates, the fold and the clasps.
  */
-function nailPositions() {
-  const p = basePortraitGeometry();
+function nailPositions(g) {
+  // The portrait board `g` turns from: the wide and deep boards get their own (#659).
+  const p = g.orientation === 'portrait' ? g : basePortraitGeometry(g.width, g.height);
   const frame = p.fields[0].x;
   const m = frame / 2;
   const seamY = p.seam.a[1];
@@ -301,7 +303,7 @@ export function boardSVG(g, tex) {
   // Brass: nails, hinges and corner plates.
   const map = fromPortrait(g);
   s.push(
-    `<g filter="url(#shadowSoft)">${nailPositions()
+    `<g filter="url(#shadowSoft)">${nailPositions(g)
       .map((p) => nailSvg(map(p)))
       .join('')}</g>`,
   );

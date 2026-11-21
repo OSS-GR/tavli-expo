@@ -122,25 +122,26 @@ afterEach(async () => {
   await resetWindow();
 });
 
-describe('<GameScreen /> in an almost square window (#649)', () => {
-  /** The board's space on the open iPhone Duo, between the seats and the buttons. */
-  const ROWS_SPACE = { width: 867, height: 470 };
-  const rowsGeo = () => fitBoardWithShadow(boardLayout(theme, 'wide', 'right'), ROWS_SPACE);
+describe('<GameScreen /> in an almost square window (#649, #659)', () => {
+  /** The board's space on the open iPhone Duo, under the seats, left of the rail. */
+  const ROWS_SPACE = { width: 857, height: 570 };
+  const rowsGeo = () => fitBoardWithShadow(boardLayout(theme, 'deep', 'right'), ROWS_SPACE);
 
   it.each(['tall', 'classic'] as const)(
-    'keeps the portrait rows around the wide board (setting %s)',
+    'keeps the seats on top and the buttons on a rail beside the deep board (setting %s)',
     async (boardLayoutSetting) => {
       await setWindow(DUO_OPEN);
       await setSettings({ boardLayout: boardLayoutSetting });
       await whiteToMove61(ROWS_SPACE);
-      // No rails: the seats sit above the board, the buttons below it.
+      // The seats sit above the board, as in portrait: no left rail.
       expect(screen.queryByTestId('game-left')).toBeNull();
-      expect(screen.queryByTestId('game-right')).toBeNull();
-      const controls = screen.getByTestId('game-controls');
-      expect(within(controls).getByTestId('undo-button')).toBeOnTheScreen();
-      expect(within(controls).getByTestId('confirm-button')).toBeOnTheScreen();
       expect(screen.getByTestId('game-label')).toBeOnTheScreen();
-      // The board is the wide one: a tap on its drawn points moves.
+      // The buttons sit on the right rail, not under the board.
+      expect(screen.queryByTestId('game-controls')).toBeNull();
+      const right = screen.getByTestId('game-right');
+      expect(within(right).getByTestId('undo-button')).toBeOnTheScreen();
+      expect(within(right).getByTestId('confirm-button')).toBeOnTheScreen();
+      // The board is the deep one: a tap on its drawn points moves.
       await tapMove(rowsGeo(), 8, 3, 7);
       expect(screen.getByTestId('undo-button')).toBeEnabled();
     },

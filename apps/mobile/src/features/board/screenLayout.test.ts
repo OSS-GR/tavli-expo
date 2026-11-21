@@ -48,7 +48,7 @@ describe('screenLayoutFor (#185)', () => {
 
   it('draws the wide board in landscape (#611)', () => {
     expect(boardModeOf('landscape')).toBe('wide');
-    expect(boardModeOf('rows')).toBe('wide');
+    expect(boardModeOf('rows')).toBe('deep');
     expect(boardModeOf('classic')).toBe('classic');
     expect(boardModeOf('tall')).toBe('tall');
   });

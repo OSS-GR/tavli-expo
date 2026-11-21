@@ -23,19 +23,23 @@ export const THEME_ID = 'walnut-kafeneio';
 
 // Portrait board (turned 90°), 377 x 630 pt: a 393 pt wide phone minus 8 pt
 // on each side. See the "Orientation" section of the concept README.
-const W = 377;
+const DEPTH = 377;
 const LENGTH = 630;
 // The wide landscape board (`landscape-wide`, for a phone on its side) is
 // 10% longer: 693 x 377 pt. The extra length all goes to the points (#611);
 // height, frame, bar, trays and checkers keep their sizes in pt.
 export const WIDE_LENGTH = 693;
+// The deep landscape board (`landscape-deep`, for the open iPhone Duo, #659)
+// is the classic board 630 pt long made deeper: 630 x 425 pt, so it fills
+// the open Duo between the top row and the rail in the camera column. The extra depth
+// goes to the points and the space between their tips; frame, bar, trays
+// and checkers keep their sizes in pt.
+export const DEEP_DEPTH = 425;
 const FRAME = 13;
 const BAR = 34;
 const RAIL = 9;
 const TRAY = 46;
 const IX0 = FRAME;
-const IX1 = W - FRAME;
-const CX = W / 2;
 const TOP0 = FRAME;
 const POINT_LEN = 156;
 const CHECKER_D = 40;
@@ -43,7 +47,9 @@ const CHECKER_D = 40;
 /** Sizes that the layout block of theme.json needs, in pt. */
 export const SIZES = {
   pointLength: POINT_LEN,
-  pointDepth: CX - IX0,
+  // The points' length over their half of the board's depth: points grow
+  // with a deeper board (`landscape-deep`), so the ratio is what counts.
+  pointDepth: DEPTH / 2 - IX0,
   pointBaseInset: 0.2,
   seamWidth: 0.6,
   checkerRadius: CHECKER_D / 2,
@@ -57,7 +63,9 @@ export const SIZES = {
 };
 
 /** The portrait board: every shape the art and the layout need. */
-export function portraitGeometry(H = LENGTH) {
+export function portraitGeometry(H = LENGTH, W = DEPTH) {
+  const IX1 = W - FRAME;
+  const CX = W / 2;
   const PITCH = (H - 2 * FRAME - BAR - RAIL - TRAY) / 12; // 42.9 pt per point (48.2 wide)
   const BAR0 = TOP0 + 6 * PITCH;
   const BAR1 = BAR0 + BAR;
@@ -202,7 +210,7 @@ export function portraitGeometry(H = LENGTH) {
         [0, SEAM],
         [W, SEAM],
       ].map(([cx, cy]) => ({ cx, cy, r: 9 })),
-      coffeeRing: { cx: 324, cy: H - 4, r: 15 },
+      coffeeRing: { cx: W - 53, cy: H - 4, r: 15 },
       frameScratches,
       fieldRubs,
       fieldScratches,
@@ -307,8 +315,17 @@ export function wideGeometry() {
   };
 }
 
+/** The deep landscape board (#659): a wider portrait board, turned. */
+export function deepGeometry() {
+  return {
+    ...toLandscape(portraitGeometry(LENGTH, DEEP_DEPTH)),
+    id: 'landscape-deep',
+    art: 'landscape-deep',
+  };
+}
+
 export function geometries() {
-  return [portraitGeometry(), landscapeGeometry(), wideGeometry()];
+  return [portraitGeometry(), landscapeGeometry(), wideGeometry(), deepGeometry()];
 }
 
 // ------------------------------------------------------------------ SVG ---

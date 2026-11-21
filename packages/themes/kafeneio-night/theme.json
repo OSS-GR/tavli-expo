@@ -86,6 +86,18 @@
       "width": 693,
       "height": 377
     },
+    "boardLandscapeDeep": {
+      "file": "board-landscape-deep.webp",
+      "scales": [1, 2, 3],
+      "width": 630,
+      "height": 425
+    },
+    "shadeLandscapeDeep": {
+      "file": "shade-landscape-deep.webp",
+      "scales": [1, 2, 3],
+      "width": 630,
+      "height": 425
+    },
     "pointRosewood": {
       "file": "point-rosewood.webp",
       "scales": [1, 2, 3],
@@ -718,6 +730,219 @@
       },
       "dice": { "size": 0.047619, "tilt": [-11, 9] },
       "shadow": { "dx": 0, "dy": 0.007215, "blur": 0.007215, "color": "#000000", "opacity": 0.5 },
+      "overlay": {
+        "gradient": {
+          "type": "radial",
+          "cx": 0.5,
+          "cy": 0.4,
+          "rx": 0.8,
+          "ry": 1.1,
+          "stops": [
+            { "offset": 0, "color": "{light.lamp}", "opacity": 0.3 },
+            { "offset": 0.6, "color": "#FF8A30", "opacity": 0.08 },
+            { "offset": 1, "color": "#000000", "opacity": 0.4 }
+          ]
+        },
+        "blend": "softLight"
+      }
+    },
+    "landscape-deep": {
+      "orientation": "landscape",
+      "aspectRatio": 1.482353,
+      "referenceSize": { "width": 630, "height": 425 },
+      "layers": [
+        { "id": "board", "image": "boardLandscapeDeep", "z": "underPoints", "blend": "srcOver" },
+        { "id": "shade", "image": "shadeLandscapeDeep", "z": "overPoints", "blend": "srcOver" }
+      ],
+      "fields": [
+        { "x": 0.020635, "y": 0.030588, "w": 0.40873, "h": 0.938824 },
+        { "x": 0.483333, "y": 0.030588, "w": 0.40873, "h": 0.938824 }
+      ],
+      "points": [
+        {
+          "index": 1,
+          "rect": { "x": 0.823942, "y": 0.5, "w": 0.068121, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 2,
+          "rect": { "x": 0.75582, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 3,
+          "rect": { "x": 0.687698, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 4,
+          "rect": { "x": 0.619577, "y": 0.5, "w": 0.068121, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 5,
+          "rect": { "x": 0.551455, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 6,
+          "rect": { "x": 0.483333, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 7,
+          "rect": { "x": 0.361243, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 8,
+          "rect": { "x": 0.293122, "y": 0.5, "w": 0.068121, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 9,
+          "rect": { "x": 0.225, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 10,
+          "rect": { "x": 0.156878, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 11,
+          "rect": { "x": 0.088757, "y": 0.5, "w": 0.068121, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "light"
+        },
+        {
+          "index": 12,
+          "rect": { "x": 0.020635, "y": 0.5, "w": 0.068122, "h": 0.469412 },
+          "base": "bottom",
+          "tone": "dark"
+        },
+        {
+          "index": 13,
+          "rect": { "x": 0.020635, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 14,
+          "rect": { "x": 0.088757, "y": 0.030588, "w": 0.068121, "h": 0.469412 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 15,
+          "rect": { "x": 0.156878, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 16,
+          "rect": { "x": 0.225, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 17,
+          "rect": { "x": 0.293122, "y": 0.030588, "w": 0.068121, "h": 0.469412 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 18,
+          "rect": { "x": 0.361243, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 19,
+          "rect": { "x": 0.483333, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 20,
+          "rect": { "x": 0.551455, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 21,
+          "rect": { "x": 0.619577, "y": 0.030588, "w": 0.068121, "h": 0.469412 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 22,
+          "rect": { "x": 0.687698, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "dark"
+        },
+        {
+          "index": 23,
+          "rect": { "x": 0.75582, "y": 0.030588, "w": 0.068122, "h": 0.469412 },
+          "base": "top",
+          "tone": "light"
+        },
+        {
+          "index": 24,
+          "rect": { "x": 0.823942, "y": 0.030588, "w": 0.068121, "h": 0.469412 },
+          "base": "top",
+          "tone": "dark"
+        }
+      ],
+      "pointShape": {
+        "depth": 0.888889,
+        "baseInset": 0.00466,
+        "seam": { "color": "{board.point.seam}", "opacity": 0.85, "width": 0.001111 },
+        "tileSize": 0.253968,
+        "tileRotation": 90
+      },
+      "bar": {
+        "rect": { "x": 0.429365, "y": 0.030588, "w": 0.053968, "h": 0.938824 },
+        "player": {
+          "rect": { "x": 0.429365, "y": 0.030588, "w": 0.053968, "h": 0.469412 },
+          "base": "bottom"
+        },
+        "opponent": {
+          "rect": { "x": 0.429365, "y": 0.5, "w": 0.053968, "h": 0.469412 },
+          "base": "top"
+        }
+      },
+      "trays": {
+        "player": {
+          "rect": { "x": 0.906349, "y": 0.504706, "w": 0.073016, "h": 0.464706 },
+          "base": "bottom"
+        },
+        "opponent": {
+          "rect": { "x": 0.906349, "y": 0.030588, "w": 0.073016, "h": 0.464706 },
+          "base": "top"
+        }
+      },
+      "diceArea": { "x": 0.619577, "y": 0.382353, "w": 0.136243, "h": 0.235294 },
+      "checker": {
+        "radius": 0.031746,
+        "stackSpacing": 0.063492,
+        "stackInset": 0.001905,
+        "maxStackDepth": 0.945869,
+        "maxVisible": 5,
+        "trayThickness": 0.015873
+      },
+      "dice": { "size": 0.052381, "tilt": [-11, 9] },
+      "shadow": { "dx": 0, "dy": 0.007937, "blur": 0.007937, "color": "#000000", "opacity": 0.5 },
       "overlay": {
         "gradient": {
           "type": "radial",

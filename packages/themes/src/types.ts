@@ -221,9 +221,10 @@ export interface BoardLayout {
 /**
  * The layouts every theme has. `landscape-wide` is the landscape board made
  * 10% longer, for a phone on its side (#611); `landscape` (the classic
- * board) stays for the upright screens.
+ * board) stays for the upright screens. `landscape-deep` is the classic
+ * board made deeper, for the almost square open iPhone Duo (#659).
  */
-export type LayoutId = 'portrait-rotated' | 'landscape' | 'landscape-wide';
+export type LayoutId = 'portrait-rotated' | 'landscape' | 'landscape-wide' | 'landscape-deep';
 
 // --------------------------------------------------------------- styles ---
 

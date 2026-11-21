@@ -66,6 +66,8 @@ function forSide(layout: BoardLayout, side: HomeBoardSide): BoardLayout {
  *   from your seat. Your home is at the bottom right, as on a real board.
  * - `wide`: the classic board 10% longer (`landscape-wide`), for a phone on
  *   its side (#611): the extra width goes to the points.
+ * - `deep`: the classic board made deeper (`landscape-deep`), for the open
+ *   iPhone Duo (#659): the extra depth goes to the points.
  *
  * With `left` the layout is mirrored left to right (`mirrorLayout`): every
  * point, bar half and tray moves to the other side. The tall art fits both
@@ -76,6 +78,7 @@ const LAYOUT_OF: Readonly<Record<BoardShape, LayoutId>> = {
   tall: 'portrait-rotated',
   classic: 'landscape',
   wide: 'landscape-wide',
+  deep: 'landscape-deep',
 };
 
 export function boardLayout(

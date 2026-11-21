@@ -23,7 +23,11 @@ import type { BoardLayout, LayoutId, Rect, ThemeManifest, Vec } from './types';
 import { LAYOUT_IDS, validateTheme } from './validate';
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MAX_THEME_BYTES = 2 * 1024 * 1024;
+/**
+ * All files of one theme on disk, every scale. The deep board for the open
+ * iPhone Duo (#659) took it from 2 MB to 2.5 MB; a phone loads one scale.
+ */
+const MAX_THEME_BYTES = 2.5 * 1024 * 1024;
 /** All sounds of one theme together (issue #39). */
 const MAX_SOUND_BYTES = 500 * 1024;
 /** One sound file. Short effects only; nothing streams. */
@@ -446,7 +450,7 @@ for (const id of listThemeIds()) {
       expect(getPoint(l, 24).rect.x).toBeLessThan(0.5);
     });
 
-    for (const id of ['landscape', 'landscape-wide'] as const) {
+    for (const id of ['landscape', 'landscape-wide', 'landscape-deep'] as const) {
       it(`${id}: your home is bottom-right, trays on the right edge`, () => {
         const l = theme.layouts[id];
         expect(l.orientation).toBe('landscape');
@@ -492,6 +496,28 @@ for (const id of listThemeIds()) {
       );
       expect(pt(wide, getPoint(wide, 1).rect.w)).toBeGreaterThan(
         pt(classic, getPoint(classic, 1).rect.w) * 1.1,
+      );
+    });
+
+    // The board on the open iPhone Duo (#659): as long as the classic board
+    // and deeper. Checkers, bar, trays and the points' breadth keep their
+    // size; the points get longer.
+    it('landscape-deep: deeper than landscape, same length and checkers', () => {
+      const classic = theme.layouts.landscape;
+      const deep = theme.layouts['landscape-deep'];
+      expect(deep.referenceSize.width).toBe(classic.referenceSize.width);
+      expect(deep.referenceSize.height).toBeGreaterThan(classic.referenceSize.height * 1.05);
+      expect(deep.aspectRatio).toBeLessThan(1.6);
+      const pt = (l: typeof deep, v: number) => v * l.referenceSize.width;
+      const ptY = (l: typeof deep, v: number) => v * l.referenceSize.height;
+      expect(pt(deep, deep.checker.radius)).toBeCloseTo(pt(classic, classic.checker.radius), 1);
+      expect(pt(deep, deep.bar.rect.w)).toBeCloseTo(pt(classic, classic.bar.rect.w), 1);
+      expect(pt(deep, getPoint(deep, 1).rect.w)).toBeCloseTo(
+        pt(classic, getPoint(classic, 1).rect.w),
+        1,
+      );
+      expect(ptY(deep, getPoint(deep, 1).rect.h)).toBeGreaterThan(
+        ptY(classic, getPoint(classic, 1).rect.h) * 1.05,
       );
     });
   });
