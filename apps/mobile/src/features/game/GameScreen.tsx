@@ -21,6 +21,8 @@
  * iPhone Duo) keeps the portrait top row (menu, seats, score), draws the
  * deep board under it, and puts the round buttons on the right rail as in
  * landscape. The rail starts under the top row (`leadHeight`).
+ * The tall board on the closed iPhone Duo puts its buttons on the same
+ * rail, in the camera column under the clock (`sideRail`).
  *
  * Landscape (#185): when the phone lies on its side, the whole screen turns
  * with it (`useScreenLayout`). The classic board sits in the middle and
@@ -458,12 +460,15 @@ export function GameScreen({
   const tall = layout === 'tall';
   // The iPhone Duo keeps its camera in a column on the right (inset 84 pt,
   // top inset 0, on both screens). Under the clock that column is empty, so
-  // the classic board and the rows rail use it; only the top row keeps clear
-  // of it (#659). The tall board starts at the top, so it keeps the inset.
-  const cameraColumn =
-    !landscape && !tall && rt.insets.top === 0 && rt.insets.right > 0 ? rt.insets.right : 0;
-  // Landscape and rows put the round buttons on a rail: rail sizes.
-  const railLayout = landscape || rows;
+  // the classic board and the button rail use it; only the top row keeps
+  // clear of it (#659).
+  const duoColumn = !landscape && rt.insets.top === 0 && rt.insets.right > 0;
+  const cameraColumn = duoColumn ? rt.insets.right : 0;
+  // Rows, and the tall board on the closed Duo, put the round buttons on a
+  // rail in that column, so the board gets the height of the button row.
+  const sideRail = rows || (tall && duoColumn);
+  // Landscape and the side rail use the rail button sizes.
+  const railLayout = landscape || sideRail;
 
   const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
@@ -2433,7 +2438,7 @@ export function GameScreen({
     lead = (
       <View
         style={styles.lead(rows, cameraColumn)}
-        onLayout={rows ? (e) => setLeadHeight(e.nativeEvent.layout.height) : undefined}>
+        onLayout={sideRail ? (e) => setLeadHeight(e.nativeEvent.layout.height) : undefined}>
         <View style={styles.topRow(rows)}>
           {menuButton}
           {strip(viewer, 'strip-bottom')}
@@ -2451,15 +2456,17 @@ export function GameScreen({
   // circle, the hint. Both keep their size in every state, so the board
   // never moves. In portrait the main circle sits in the middle of the screen.
   const trail =
-    landscape || rows ? (
-      // Scrolls when a large font makes the rail taller than the screen. In
-      // rows it sits on the right, under the top row (#659).
+    landscape || sideRail ? (
+      // Scrolls when a large font makes the rail taller than the screen. The
+      // side rail sits on the right, under the top row (#659).
       <ScrollView
         testID="game-right"
         style={
-          rows ? styles.rowsRail(rails.right, leadHeight, cameraColumn) : styles.rail(rails.right)
+          sideRail
+            ? styles.rowsRail(rails.right, leadHeight, cameraColumn)
+            : styles.rail(rails.right)
         }
-        contentContainerStyle={styles.railButtons(rows)}
+        contentContainerStyle={styles.railButtons(sideRail)}
         alwaysBounceVertical={false}>
         {undoButton ?? <View style={styles.railSlot(true)} />}
         {/* The main place is as tall as Roll with its subtitle in every state,
@@ -2528,10 +2535,10 @@ export function GameScreen({
           <View
             testID="game-middle"
             style={
-              tall
-                ? styles.boardArea
-                : rows
-                  ? styles.middleBesideRail(Math.max(rails.right, cameraColumn))
+              sideRail
+                ? styles.middleBesideRail(Math.max(rails.right, cameraColumn))
+                : tall
+                  ? styles.boardArea
                   : styles.middle
             }
             collapsable={false}
@@ -2555,11 +2562,11 @@ export function GameScreen({
               }}>
               {boardLayer}
             </View>
-            {landscape || rows ? moveList : null}
+            {landscape || sideRail ? moveList : null}
             {hints}
             {cardOverlay ?? inlay}
           </View>
-          {landscape || rows ? null : moveList}
+          {landscape || sideRail ? null : moveList}
           {trail}
         </View>
       </GestureDetector>

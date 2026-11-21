@@ -98,7 +98,7 @@ Point numbers are from the view of the player at the **bottom** of the screen. T
 | `portrait-rotated` (default) | 377 × 630 pt | bottom-left  | bottom edge | Phone in portrait (wireframe option B) |
 | `landscape`                  | 630 × 377 pt | bottom-right | right edge  | The classic board, phone upright       |
 | `landscape-wide`             | 693 × 377 pt | bottom-right | right edge  | Phone on its side (#611): wider points |
-| `landscape-deep`             | 630 × 405 pt | bottom-right | right edge  | The open iPhone Duo (#659): deeper     |
+| `landscape-deep`             | 630 × 425 pt | bottom-right | right edge  | The open iPhone Duo (#659): deeper     |
 
 Portrait order: the left column holds 12 → 7, the bar, then 6 → 1. The right column holds 13 → 18, the bar, then 19 → 24.
 

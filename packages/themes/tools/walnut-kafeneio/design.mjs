@@ -30,11 +30,11 @@ const LENGTH = 630;
 // height, frame, bar, trays and checkers keep their sizes in pt.
 export const WIDE_LENGTH = 693;
 // The deep landscape board (`landscape-deep`, for the open iPhone Duo, #659)
-// is the classic board 630 pt long made deeper: 630 x 405 pt, so it fills
+// is the classic board 630 pt long made deeper: 630 x 425 pt, so it fills
 // the open Duo between the top row and the rail in the camera column. The extra depth
 // goes to the points and the space between their tips; frame, bar, trays
 // and checkers keep their sizes in pt.
-export const DEEP_DEPTH = 405;
+export const DEEP_DEPTH = 425;
 const FRAME = 13;
 const BAR = 34;
 const RAIL = 9;
