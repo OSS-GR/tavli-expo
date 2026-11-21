@@ -1,105 +1,63 @@
-# Store screenshots plan
+# Store screenshots
 
-> Which screenshots to take for the App Store and Google Play, the sizes, and how to take them. Issue #137. Last review: 2026-10-27.
+> Which screenshots go on the App Store page, their sizes, and how to take them. Issues #137, #682. Last review: 2026-11-21.
 
-Take every shot twice: once with the app in **English** and once in **Greek** (Settings → Language). Each store localization gets its own set.
-
-## The six shots
-
-The first two or three matter most: the stores show them first, in search results too. Captions are optional text to put above the picture (keep them short).
-
-| # | Screen | Game and mode | State to show | Caption (en) | Caption (el) |
-|---|--------|---------------|---------------|--------------|--------------|
-| 1 | Board | Portes, vs bot (Medium) | Your turn, in the middle of a move: dice shown, one die used, a checker picked up and its target lit (like `apps/mobile/docs/screenshots/play-moving.png`, but with the strips and buttons) | Greek tavli, kafeneio style | Ελληνικό τάβλι, όπως στο καφενείο |
-| 2 | New game | vs bot | The game picker with all five cards (Portes, Plakoto, Fevga, Tavli, Asodio), match length 3, level Medium | Portes, Plakoto, Fevga, Asodio | Πόρτες, Πλακωτό, Φεύγα, Ασόδιο |
-| 3 | Board | Plakoto, pass-and-play, names "Maria" and "Nikos" | One or two pinned checkers on the board, the pill says "Maria's turn". Other option: the "Your mother is pinned" dialog (wireframe 17). | Pin, don't hit | Πλακώνεις, δεν χτυπάς |
-| 4 | Board | Asodio, vs bot | Loading: both "to enter" stacks with counts, a few checkers entered after a 1-2 or a double | Roll a 1-2 to open the board | Φέρε ασόδυο για να ανοίξει το ταμπλό |
-| 5 | Learn to play | Portes lesson (tutorial) | Lesson 5 of 7, "Hit a lone checker": the lesson text, the lit checker and its target ring. Open it from Settings → Help → **Learn to play**. | Learn in one minute | Μάθε να παίζεις σε ένα λεπτό |
-| 6 | Match end | Tavli, pass-and-play, first to 5 | The cup and the final score, one row per game: Portes, Plakoto, Fevga, with Mono / Diplo chips | Two players, one phone | Δύο παίκτες, ένα κινητό |
-
-Spare shots, if you want more (the App Store allows 10, Google Play 8): **Fevga** vs bot in mid-game (caption "Play the bot, even offline" / "Παίξε με τον υπολογιστή, και χωρίς internet"); the **How to play** page of Plakoto with its start picture; **Home** with the Continue card.
-
-Do not show: "coming soon" items (Play a friend, Face-to-face), the welcome consent screen, dev screens. Hard works in every game (#164), so New game with Hard picked is fine.
+The shots come from the live app on the iOS Simulator. The full-size PNGs stay out of the repo (they are large). **Owner:** keep them in your own storage.
 
 ## Sizes
 
-| Store | What | Size | Notes |
-|-------|------|------|-------|
-| App Store | iPhone 6.9" screenshots | **1320 × 2868** portrait (1290 × 2796 also works) | Required. Apple scales them down for smaller iPhones. 1 to 10 per language. |
-| App Store | iPhone 6.5" screenshots | 1284 × 2778 or 1242 × 2688 | Only needed if you do not upload 6.9" ones |
-| App Store | iPad | none | The app is iPhone only (`ios.supportsTablet` is not set in `app.json`, and Expo's default is `false`). |
-| Google Play | Phone screenshots | **1080 × 1920** portrait (9:16) | 2 to 8. PNG or JPEG, no transparency. Each side 320–3,840 px, and the long side at most **2 ×** the short side. Use at least 4 shots of 1080 px or more to be shown in more places on Play. |
-| Google Play | Feature graphic | **1024 × 500** | Required. **Owner:** make it from the app icon and a board picture (`pnpm --filter @tavli/mobile screenshots` renders `board-start.png`). No small text: Play may crop it. |
-| Google Play | App icon | 512 × 512, 32-bit PNG | From `apps/mobile/assets/icon/` (see [App icon and splash](../design/app-icon.md)) |
+App Store Connect asks for these (v1.0 page, 2026-11-21):
 
-**Owner:** check the current sizes in App Store Connect and the Play Console before you upload. Both stores change them from time to time.
+| Set | Size | Simulator | Notes |
+|-----|------|-----------|-------|
+| iPhone 6.3" | **1206 × 2622** portrait | iPhone 17 Pro | Required. Apple scales it for other iPhones. Up to 10 per language. |
+| iPhone Duo | **2853 × 2007** landscape (the open inner screen) | iPhone Duo, posture open | The app supports the open Duo (#649, #659). |
+| Header image (optional) | 5244 × 2950 or 3840 × 1646 | none | **Owner:** make it from a board picture (`pnpm --filter @tavli/mobile screenshots`) and the app icon, or skip it. |
+| iPad | none | | The app is iPhone only (`ios.supportsTablet` is not set). |
 
-Modern Android phones are taller than 2 : 1 (for example 1080 × 2400). Play rejects those shots. Use an emulator with a 1080 × 1920 screen, or crop.
+**Owner:** check the sizes in App Store Connect before you upload. Apple changes them from time to time.
+
+## iPhone 6.3" shots
+
+The first three matter most: the store shows them in search results too.
+
+| # | File | Screen | State | Caption (en) | Caption (el) |
+|---|------|--------|-------|--------------|--------------|
+| 1 | `01-board.png` | Game, Portes vs Hard | Double 4s, a checker picked, its targets lit, a blot to hit | Greek tavli, kafeneio style | Ελληνικό τάβλι, όπως στο καφενείο |
+| 2 | `02-home.png` | Home | Hero board, Play vs bot, Learn to play | Play the computer, friends or ranked | Με τον υπολογιστή, με φίλους ή με κατάταξη |
+| 3 | `03-games.png` | Play vs bot setup | Portes, Plakoto, Fevga, Asodio and Tavli; 5 points; Hard | Four Greek games | Και τα τέσσερα ελληνικά παιχνίδια |
+| 4 | `04-online.png` | Online game, Plakoto | Your turn, the turn clock ring, Roll dice | Play a friend online | Παίξε με φίλο online |
+| 5 | `05-hint.png` | Game, opening 4-2 | The hint line and the lit checkers | A hint when you need it | Υπόδειξη όποτε τη θες |
+| 6 | `06-lesson.png` | Learn Plakoto, lesson 3 of 4 | "The mother", lesson text on the real board | Learn on the real board | Μάθε στο κανονικό ταμπλό |
+| 7 | `07-boards.png` | Settings → Board & look | The three boards, Kafeneio Night picked | Three boards, your colors | Τρία ταμπλό, τα χρώματά σου |
+
+## iPhone Duo shots
+
+| # | File | Screen | State | Caption (en) | Caption (el) |
+|---|------|--------|-------|--------------|--------------|
+| 1 | `duo-01-board.png` | Online game, Portes (rows layout) | Your turn, dice on the board, Undo and Confirm on the rail | Made for the open Duo | Φτιαγμένο για το ανοιχτό Duo |
+| 2 | `duo-02-home.png` | Home, two columns | The saved game and More ways to play | Every way to play, side by side | Όλοι οι τρόποι, δίπλα δίπλα |
+
+The Duo shots use the Olive Inlay board, so the set shows a second look.
+
+## What a shot must not show
+
+- Real players: no real usernames, ratings of real people, or leaderboards from the dev server. The online shots use the dev in-memory game (`tavlaki://dev/online`), where the other side is a bot named "Guest" + 4 digits.
+- Dev things: the Expo tools button, the dev menu, "Dev" text.
+- Things that do not exist yet (see "Do not claim" in [listing.en.md](listing.en.md#what-the-text-may-claim)).
 
 ## How to take them
 
-### 1. Use a release build
-
-Dev builds show the dev menu and other dev things. Use the **`preview`** EAS profile: it is a release build, and for iOS it is a simulator build (`apps/mobile/eas.json`).
-
-```bash
-cd apps/mobile
-eas build --profile preview --platform ios      # simulator .app
-eas build --profile preview --platform android  # .apk for the emulator
-```
-
-Or build locally in release mode: `npx expo run:ios --configuration Release` and `npx expo run:android --variant release`. See [Running the app](../process/running-the-app.md).
-
-On the first launch, pick the language, tap **Don't allow**, then pick the board and tap **Continue**. So the screenshot sessions send no usage data or crash reports.
-
-### 2. iOS simulator
-
-1. Open an iPhone Pro Max simulator (6.9", 1320 × 2868), for example **iPhone 17 Pro Max**, and install the build.
+1. Use an iPhone 17 Pro simulator for the 6.3" set (its screenshots are 1206 × 2622) and the iPhone Duo simulator, opened, for the Duo set.
 2. Clean the status bar:
 
    ```bash
    xcrun simctl status_bar booted override --time "9:41" --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
    ```
 
-3. Get the app to the state in the table, then take the shot:
+3. A dev build works if you turn off the Expo **Tools button** in the dev menu. A `preview` build has no dev parts at all (`eas build --profile preview --platform ios`).
+4. Open the states with links: `tavlaki://dev/online` (online game vs the bot), `tavlaki://tutorial?from=home&game=plakoto&start=2` (lesson 3), `tavlaki://settings/board` (boards).
+5. Take the shot: `xcrun simctl io <device> screenshot shot.png`. On the open Duo, `simctl` fails; take the screenshot with the simulator's own screenshot command instead.
+6. `xcrun simctl status_bar booted clear` when you are done.
 
-   ```bash
-   xcrun simctl io booted screenshot shot-1-en.png
-   ```
-
-4. `xcrun simctl status_bar booted clear` when you are done.
-
-### 3. Android emulator
-
-1. Make an emulator (AVD) with a **1080 × 1920** screen (Android Studio → Device Manager → New hardware profile), and install the APK.
-2. Clean the status bar with demo mode:
-
-   ```bash
-   adb shell settings put global sysui_demo_allowed 1
-   adb shell am broadcast -a com.android.systemui.demo -e command enter
-   adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941
-   adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
-   adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false
-   ```
-
-3. Take the shot: `adb exec-out screencap -p > shot-1-en.png`
-4. `adb shell am broadcast -a com.android.systemui.demo -e command exit` when you are done.
-
-### 4. Getting each state
-
-The dice are random, so you play to each state (the tutorial is the exception: its dice are fixed). Tips:
-
-- **Pins (shot 3):** use pass-and-play, so you move both sides and can leave a lone checker to pin.
-- **Asodio loading (shot 4):** it is the start of every Asodio game. Roll until a 1-2 or a double opens the board.
-- **Match end (shot 6):** pass-and-play, Tavli, first to 5. You can resign games from the game menu to move fast, but play the **last** game to the end, so the screen does not say "resigned".
-- **Plan a position:** the dev route `/dev/board` (dev builds only) shows fixed positions: Plakoto pins, Asodio loading, Asodio frozen army, bear-off. It has a dev picker on screen, so it is not for store shots, but it shows what a state looks like.
-- `pnpm --filter @tavli/mobile screenshots` renders the board only (no buttons or strips). Use those pictures for the feature graphic or a website, not as store screenshots.
-
-### 5. Before you upload
-
-- [ ] No "Dev" or "Preview" text on screen, and no dev menu.
-- [ ] Set the simulator or emulator to **light appearance** before every shot. `userInterfaceStyle` is `automatic` in `app.json`, so the system bars and dialogs follow the device setting; dark mode would mix with the app's light screens.
-- [ ] Only the sample names "Maria" and "Nikos" (no real people).
-- [ ] English shots in English, Greek shots in Greek, including the names on the board strips ("Bot" / "Υπολογιστής").
-- [ ] Same order in both stores and both languages.
-- [ ] Keep the full-size PNGs out of the repo (they are large). **Owner:** keep them in your own storage.
+Greek shots: set Settings → Language → Ελληνικά and take the same states again.
