@@ -83,6 +83,94 @@
   };
   st(beat, 0);
 
+  // What the page asked of the graphics card in this frame. A slow frame
+  // with shader work or a big upload points at the graphics side.
+  const gl = { draws: 0, links: 0, texMb: 0, fbos: 0, sync: 0, ctx: 0, glMs: 0 };
+  const glProtos = [
+    (globalThis as { WebGL2RenderingContext?: { prototype: object } }).WebGL2RenderingContext
+      ?.prototype,
+    (globalThis as { WebGLRenderingContext?: { prototype: object } }).WebGLRenderingContext
+      ?.prototype,
+  ].filter((x): x is object => x !== undefined) as Record<string, unknown>[];
+  const wrapGl = (names: string[], note: (args: unknown[]) => void): void => {
+    for (const proto of glProtos) {
+      for (const name of names) {
+        const orig = proto[name];
+        if (typeof orig !== 'function') continue;
+        proto[name] = function (this: unknown, ...args: unknown[]) {
+          const t0 = performance.now();
+          try {
+            return (orig as (...a: unknown[]) => unknown).apply(this, args);
+          } finally {
+            gl.glMs += performance.now() - t0;
+            note(args);
+          }
+        };
+      }
+    }
+  };
+  wrapGl(
+    [
+      'drawElements',
+      'drawArrays',
+      'drawElementsInstanced',
+      'drawArraysInstanced',
+      'drawRangeElements',
+    ],
+    () => {
+      gl.draws += 1;
+    },
+  );
+  wrapGl(['linkProgram'], () => {
+    gl.links += 1;
+  });
+  wrapGl(['texImage2D', 'texSubImage2D', 'compressedTexImage2D'], (a) => {
+    const src = a[a.length - 1] as { width?: number; height?: number; byteLength?: number } | null;
+    const bytes =
+      src && typeof src.byteLength === 'number'
+        ? src.byteLength
+        : src && src.width && src.height
+          ? src.width * src.height * 4
+          : typeof a[3] === 'number' && typeof a[4] === 'number' && a.length >= 9
+            ? (a[3] as number) * (a[4] as number) * 4
+            : 0;
+    gl.texMb += bytes / 1048576;
+  });
+  wrapGl(['bindFramebuffer'], () => {
+    gl.fbos += 1;
+  });
+  // Calls that make the page wait for the graphics process to answer.
+  wrapGl(
+    [
+      'getError',
+      'finish',
+      'readPixels',
+      'getProgramParameter',
+      'getShaderParameter',
+      'checkFramebufferStatus',
+      'clientWaitSync',
+      'getSyncParameter',
+      'getParameter',
+      'getProgramInfoLog',
+      'getShaderInfoLog',
+      'getUniformLocation',
+      'getAttribLocation',
+    ],
+    () => {
+      gl.sync += 1;
+    },
+  );
+  const getCtx = HTMLCanvasElement.prototype.getContext;
+  const seenCanvas = new WeakSet<HTMLCanvasElement>();
+  HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args: unknown[]) {
+    const out = (getCtx as (...a: unknown[]) => unknown).apply(this, args);
+    if (out && String(args[0]).startsWith('webgl') && !seenCanvas.has(this)) {
+      seenCanvas.add(this);
+      gl.ctx += 1;
+    }
+    return out;
+  } as typeof HTMLCanvasElement.prototype.getContext;
+
   const add = EventTarget.prototype.addEventListener;
   const INPUT = /^(pointer|touch|mouse|click|key)/;
   EventTarget.prototype.addEventListener = function (
@@ -104,16 +192,18 @@
     input: number;
     timer: number;
     busy: number;
+    gl: string;
   }
   const recent: Frame[] = [];
   const worstEver: Frame[] = [];
   // Totals since the page was 4 s old, for a test that reads them
   // (`window.__spikeReport()`).
   const totals = { frames: 0, over34: 0, over50: 0, over100: 0, ms: 0, slowMs: 0 };
+  const sums = { draws: 0, links: 0, texMb: 0, sync: 0, ctx: 0, glMs: 0 };
   const line = (f: Frame): string => {
     const r = (n: number): number => Math.round(n);
     const busyMs = Math.min(f.gap, f.busy);
-    return `${r(f.gap)}ms: busy ${r(busyMs)} free ${r(f.gap - busyMs)} | js: anim ${r(f.anim)} react ${r(f.react)} micro ${r(f.micro)} input ${r(f.input)} timer ${r(f.timer)}`;
+    return `${r(f.gap)}ms: busy ${r(busyMs)} free ${r(f.gap - busyMs)} | js: anim ${r(f.anim)} react ${r(f.react)} micro ${r(f.micro)} input ${r(f.input)} timer ${r(f.timer)} | gl: ${f.gl}`;
   };
   const box = document.createElement('div');
   box.style.cssText =
@@ -142,10 +232,12 @@
     ].join('\n');
   (window as unknown as Record<string, unknown>).__spikeReport = () => ({
     totals: { ...totals },
+    gl: { ...sums },
     worst: worstEver.map((f) => `at ${(f.at / 1000).toFixed(0)}s  ${line(f)}`),
   });
   (window as unknown as Record<string, unknown>).__spikeReset = () => {
     totals.frames = totals.over34 = totals.over50 = totals.over100 = totals.ms = totals.slowMs = 0;
+    sums.draws = sums.links = sums.texMb = sums.sync = sums.ctx = sums.glMs = 0;
     worstEver.length = 0;
   };
   const open = (e: Event): void => {
@@ -167,7 +259,20 @@
   let last = performance.now();
   let shown = 0;
   const tick = (t: number): void => {
-    const f: Frame = { at: t, gap: t - last, ...spent, busy };
+    const f: Frame = {
+      at: t,
+      gap: t - last,
+      ...spent,
+      busy,
+      gl: `draws ${gl.draws} links ${gl.links} tex ${gl.texMb.toFixed(1)}MB fbo ${gl.fbos} sync ${gl.sync} newctx ${gl.ctx} ms ${Math.round(gl.glMs)}`,
+    };
+    sums.draws += gl.draws;
+    sums.links += gl.links;
+    sums.texMb += gl.texMb;
+    sums.sync += gl.sync;
+    sums.ctx += gl.ctx;
+    sums.glMs += gl.glMs;
+    gl.draws = gl.links = gl.texMb = gl.fbos = gl.sync = gl.ctx = gl.glMs = 0;
     spent.anim = 0;
     spent.react = 0;
     spent.micro = 0;
@@ -197,7 +302,7 @@
       const sec = recent.filter((x) => t - x.at <= 1000).length;
       const worst = recent.reduce((m, x) => (x.gap > m.gap ? x : m), f);
       const slow = recent.filter((x) => x.gap > 34).length;
-      box.textContent = `${sec} fps  slow(5s) ${slow}  tap for the list\n${line(worst)}`;
+      box.textContent = `${sec} fps  slow(5s) ${slow}  tap for the list\n${line(worst).split(' | gl:')[0]}`;
       box.style.color = worst.gap > 100 ? '#f66' : worst.gap > 34 ? '#fd0' : '#0f0';
     }
     raf(tick);
