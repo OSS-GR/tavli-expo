@@ -107,6 +107,9 @@
   }
   const recent: Frame[] = [];
   const worstEver: Frame[] = [];
+  // Totals since the page was 4 s old, for a test that reads them
+  // (`window.__spikeReport()`).
+  const totals = { frames: 0, over34: 0, over50: 0, over100: 0, ms: 0, slowMs: 0 };
   const line = (f: Frame): string => {
     const r = (n: number): number => Math.round(n);
     const busyMs = Math.min(f.gap, f.busy);
@@ -137,6 +140,14 @@
         ? ['No slow frame yet. Play a turn first.']
         : worstEver.map((f) => `at ${(f.at / 1000).toFixed(0)}s  ${line(f)}`)),
     ].join('\n');
+  (window as unknown as Record<string, unknown>).__spikeReport = () => ({
+    totals: { ...totals },
+    worst: worstEver.map((f) => `at ${(f.at / 1000).toFixed(0)}s  ${line(f)}`),
+  });
+  (window as unknown as Record<string, unknown>).__spikeReset = () => {
+    totals.frames = totals.over34 = totals.over50 = totals.over100 = totals.ms = totals.slowMs = 0;
+    worstEver.length = 0;
+  };
   const open = (e: Event): void => {
     e.preventDefault();
     e.stopPropagation();
@@ -166,6 +177,16 @@
     last = t;
     recent.push(f);
     while (recent.length > 0 && t - (recent[0]?.at ?? t) > 5000) recent.shift();
+    if (t > 4000) {
+      totals.frames += 1;
+      totals.ms += f.gap;
+      if (f.gap > 34) {
+        totals.over34 += 1;
+        totals.slowMs += f.gap;
+      }
+      if (f.gap > 50) totals.over50 += 1;
+      if (f.gap > 100) totals.over100 += 1;
+    }
     if (f.gap > 40 && t > 4000) {
       worstEver.push(f);
       worstEver.sort((x, y) => y.gap - x.gap);
