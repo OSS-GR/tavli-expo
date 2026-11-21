@@ -158,7 +158,12 @@ try {
     }
     await page.waitForTimeout(2000);
   }
-  if (!moved) problems.push('the game: no move was played in 14 steps');
+  // The walk plays through the move list. It shows by itself in a browser,
+  // because react-native-web reports a screen reader as on (the web plan,
+  // "What else we saw"). If phase 2 changes that, turn the list on here.
+  if (!moved) {
+    problems.push('the game: no move was played in 14 steps (is the move list still showing?)');
+  }
   await canvases('game');
   const audio = await page.evaluate(() => window.__smoke);
   console.log(`audio: ${JSON.stringify(audio)}`);

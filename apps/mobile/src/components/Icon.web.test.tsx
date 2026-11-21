@@ -51,6 +51,6 @@ describe('Icon in a browser (SVG)', () => {
     const all = await drawn(Object.keys(ICONS)[0] as IconName);
     const box = all[0];
     expect(box?.props['aria-hidden']).toBe(true);
-    expect(box?.props.pointerEvents).toBe('none');
+    expect(box?.props.style).toMatchObject({ pointerEvents: 'none' });
   });
 });
