@@ -266,34 +266,40 @@ export const friendsBoard = query({
 export const globalBoard = query({
   args: {},
   returns: v.array(boardRow),
-  handler: async (ctx): Promise<BoardRow[]> => {
-    const playerId = await savedCaller(ctx);
-    const blocked = new Set(
-      (
-        await ctx.db
-          .query('blocks')
-          .withIndex('by_blocker', (q) => q.eq('blockerId', playerId))
-          .take(MAX_BLOCKS)
-      ).map((row) => row.blockedId),
-    );
-    const top: BoardPlayer[] = [];
-    let visible = 0;
-    let read = 0;
-    for await (const row of ctx.db
-      .query('ratings')
-      .withIndex('by_board', (q) => q.eq('boardable', true))
-      .order('desc')) {
-      read += 1;
-      const name = await usernameOf(ctx, row.playerId);
-      if (name !== null) {
-        top.push({ playerId: row.playerId, name, rating: row.rating, matches: row.matches });
-        if (!blocked.has(row.playerId)) visible += 1;
-      }
-      if (visible === GLOBAL_BOARD_ROWS || read === GLOBAL_BOARD_READ) break;
-    }
-    return globalBoardRows(top, playerId, (id) => blocked.has(id));
-  },
+  handler: async (ctx): Promise<BoardRow[]> => await globalBoardFor(ctx, await savedCaller(ctx)),
 });
+
+/**
+ * The global board as `playerId` sees it: the top `GLOBAL_BOARD_ROWS`,
+ * with the players they block left out. `globalBoard` and the player card
+ * (#651, `friends.ts`) read it.
+ */
+export async function globalBoardFor(ctx: QueryCtx, playerId: string): Promise<BoardRow[]> {
+  const blocked = new Set(
+    (
+      await ctx.db
+        .query('blocks')
+        .withIndex('by_blocker', (q) => q.eq('blockerId', playerId))
+        .take(MAX_BLOCKS)
+    ).map((row) => row.blockedId),
+  );
+  const top: BoardPlayer[] = [];
+  let visible = 0;
+  let read = 0;
+  for await (const row of ctx.db
+    .query('ratings')
+    .withIndex('by_board', (q) => q.eq('boardable', true))
+    .order('desc')) {
+    read += 1;
+    const name = await usernameOf(ctx, row.playerId);
+    if (name !== null) {
+      top.push({ playerId: row.playerId, name, rating: row.rating, matches: row.matches });
+      if (!blocked.has(row.playerId)) visible += 1;
+    }
+    if (visible === GLOBAL_BOARD_ROWS || read === GLOBAL_BOARD_READ) break;
+  }
+  return globalBoardRows(top, playerId, (id) => blocked.has(id));
+}
 
 /** Turns "Show me on the global board" on or off. */
 export const setShowOnBoard = mutation({

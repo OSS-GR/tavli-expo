@@ -63,6 +63,7 @@ import { saveFriendInviteSetup } from '@/features/invites/friendInviteSetup';
 import { sendInviteCreated } from '@/features/invites/inviteAnalytics';
 import { gameScore } from '@/features/online/gameText';
 import { listTickMs, useMyOnlineGames, usePhoneClock } from '@/features/online/myGames';
+import { cachedFor } from '@/features/online/shownCache';
 import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlock } from '@/features/safety/ReportOrBlock';
 
@@ -78,7 +79,14 @@ import {
   type ActiveRowText,
 } from './friendPage';
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { friendsStyles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
+import {
+  friendsStyles,
+  MatchesSkeleton,
+  ListSkeleton,
+  NotReady,
+  RefreshFailed,
+  useProblemText,
+} from './FriendsParts';
 import { SheetRow } from './FriendsScreen';
 
 export interface FriendPageScreenProps {
@@ -97,8 +105,14 @@ export interface FriendPageScreenProps {
   /** Report or block. `undefined`: the menu has no such row. */
   safety?: Safety;
   onBack: () => void;
-  /** Opens an online game (in play or finished). */
+  /** Opens an online game in play (the board). */
   onOpenGame: (gameId: string) => void;
+  /**
+   * Opens a finished match: its end screen with the score and a Review for
+   * each game, never the board (a board route of a finished match showed an
+   * empty board before it moved on).
+   */
+  onOpenFinished: (gameId: string) => void;
   /** Opens a friend invite to you (the invite screen). */
   onOpenInvite: (code: string) => void;
   /** Opens the full game setup for a friend invite. */
@@ -109,6 +123,12 @@ export interface FriendPageScreenProps {
   onHistory: () => void;
   /** Opens Settings → Account (a guest saves the account there). */
   onAccount: () => void;
+}
+
+/** What the Friends list keeps in `shownCache` (the parts read here). */
+interface ListShown {
+  readonly friends: readonly Friend[];
+  readonly invites: readonly InviteView[];
 }
 
 interface PageData {
@@ -132,6 +152,7 @@ export function FriendPageScreen({
   safety,
   onBack,
   onOpenGame,
+  onOpenFinished,
   onOpenInvite,
   onInvite,
   onInvited,
@@ -153,7 +174,23 @@ export function FriendPageScreen({
       rating: row === undefined || row.matches === 0 ? null : row.rating,
     };
   }, [friends, ratings, playerId]);
-  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit, usernames);
+  // A first visit opens with what the Friends list already showed of this
+  // friend (#672), not a spinner: the name, the record and their invites.
+  const pageKey = `friendPage:${playerId}`;
+  const seed = (): PageData | undefined => {
+    const list = cachedFor<ListShown>(auth, 'friends');
+    const friend = list?.friends.find((f) => f.playerId === playerId);
+    if (list === undefined || friend === undefined) return undefined;
+    return { friend, invites: invitesFrom(list.invites, playerId), rating: null };
+  };
+  const { state, reload, retry, sessionLost } = useFriendsData(
+    auth,
+    load,
+    visit,
+    usernames,
+    pageKey,
+    seed,
+  );
   const ready = state.kind === 'ready' && state.data.friend !== null;
   const active = useMyOnlineGames(ready ? auth : undefined, games, 'active');
   const finished = useMyOnlineGames(ready ? auth : undefined, games, 'finished');
@@ -246,7 +283,9 @@ export function FriendPageScreen({
   };
 
   let body: ReactNode;
-  if (state.kind !== 'ready') {
+  if (state.kind === 'loading') {
+    body = <ListSkeleton testID="friend-page" />;
+  } else if (state.kind !== 'ready') {
     body = (
       <NotReady
         state={state}
@@ -278,7 +317,11 @@ export function FriendPageScreen({
       })),
     ];
     const recent = pastGames.slice(0, FRIEND_RECENT_ROWS);
-    const nothing = rows.length === 0 && pastGames.length === 0;
+    // Until the finished matches load, the page cannot know Rematch from
+    // Invite, or that there is no match at all (#672): placeholders show.
+    const pastWaiting = finished.state.status === 'loading';
+    const nothing =
+      finished.state.status === 'loaded' && rows.length === 0 && pastGames.length === 0;
     body = (
       <>
         <Heading
@@ -322,7 +365,9 @@ export function FriendPageScreen({
             </CardFrame>
           </View>
         ) : null}
-        {setup === null ? (
+        {pastWaiting ? (
+          <MatchesSkeleton />
+        ) : setup === null ? (
           <ActionButton
             testID="friend-page-invite"
             icon="send"
@@ -370,7 +415,11 @@ export function FriendPageScreen({
               {recent.map((game, i) => (
                 <View key={game.gameId}>
                   {i > 0 ? <RowDivider /> : null}
-                  <RecentRow game={game} locale={locale} onPress={() => onOpenGame(game.gameId)} />
+                  <RecentRow
+                    game={game}
+                    locale={locale}
+                    onPress={() => onOpenFinished(game.gameId)}
+                  />
                 </View>
               ))}
             </CardFrame>

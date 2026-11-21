@@ -3,11 +3,12 @@ import {
   type createRecordingSoundPlayer,
   type GameTransport,
   type OnlineGameChoice,
+  type Friends,
   type Safety,
 } from '@tavli/contracts';
 import { applyMatchAction, createSeededRng, type MatchFlow } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
-import { closedOut, guestNumberOf, lastBearOff } from '@tavli/online/testing';
+import { closedOut, guestNumberOf, lastBearOff, markNamed } from '@tavli/online/testing';
 import { getLayout, getTheme } from '@tavli/themes';
 import { themes } from '@tavli/ui';
 import { act, fireEvent, screen } from '@testing-library/react-native';
@@ -105,8 +106,14 @@ async function openGame(
   playOpening = true,
   /** The `Safety` port for the menu's Report or block (#435). None: no such row. */
   safetyOf?: (server: MemoryGameServer) => Safety,
-  /** A Play ranked game (#529): two time outs in a row lose the match. */
-  options: { readonly ranked?: boolean } = {},
+  /**
+   * `ranked`: a Play ranked game (#529), two time outs in a row lose the
+   * match. `friendsOf`: the `Friends` port for the opponent card (#651).
+   */
+  options: {
+    readonly ranked?: boolean;
+    readonly friendsOf?: (server: MemoryGameServer) => Friends;
+  } = {},
 ): Promise<Game> {
   const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
   const gameId = server.createGame(
@@ -115,7 +122,7 @@ async function openGame(
     choice,
     targetPoints,
     turnTimeMinutes,
-    options,
+    options.ranked === undefined ? {} : { ranked: options.ranked },
   );
   prepare?.(server, gameId);
   bot = startOnlineBot({
@@ -140,6 +147,7 @@ async function openGame(
       onMatchOver={onMatchOver}
       onReview={onReview}
       {...(safetyOf ? { safety: safetyOf(server) } : {})}
+      {...(options.friendsOf ? { friends: options.friendsOf(server) } : {})}
     />,
   );
   const board = await screen.findByTestId('game-board', { includeHiddenElements: true });
@@ -1267,6 +1275,110 @@ describe('<OnlineMatchScreen /> (#255)', () => {
       await openGame();
       await user.press(screen.getByRole('button', { name: 'Game menu' }));
       expect(screen.queryByTestId('menu-report-block')).toBeNull();
+    });
+  });
+  describe('the opponent card (#651)', () => {
+    /** `me` and the bot saved and named, the bot rated 1612. */
+    const openWithCard = (opts: { saved?: boolean } = {}) =>
+      openGame(
+        'portes',
+        1,
+        5,
+        BOT_THINK_MS,
+        undefined,
+        (server) => {
+          if (opts.saved === false) return;
+          void markNamed(server, 'me');
+          void markNamed(server, 'bot', 'Bob_Plays');
+          server.setRatingForTest('bot', 1612.4);
+        },
+        true,
+        (server) => server.safetyFor('me'),
+        { friendsOf: (server) => server.friendsFor('me') },
+      );
+    const settle = async () => {
+      await act(async () => {
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      });
+    };
+
+    it('shows the rating on the seat, and a tap opens the card', async () => {
+      const user = setupUser();
+      await openWithCard();
+      await settle();
+      const seat = screen.getByTestId('strip-top');
+      expect(seat).toHaveTextContent(/1612 ›/);
+      expect(seat.props.accessibilityHint).toBe('Opens their profile');
+      await user.press(seat);
+      expect(screen.getByRole('header', { name: 'Bob_Plays' })).toBeOnTheScreen();
+      expect(screen.getByText('Your opponent in this match')).toBeOnTheScreen();
+      expect(screen.getByTestId('opponent-card-stats')).toHaveTextContent(/1612/);
+      expect(screen.getByTestId('opponent-card-stats')).toHaveTextContent(/—/);
+      expect(
+        screen.getByLabelText('Rating 1612, not on the global board, 0 rated matches'),
+      ).toBeOnTheScreen();
+    });
+
+    it('sends a friend request and takes it back', async () => {
+      const user = setupUser();
+      const game = await openWithCard();
+      await settle();
+      await user.press(screen.getByTestId('strip-top'));
+      await user.press(screen.getByTestId('opponent-card-add'));
+      await settle();
+      expect(screen.getByTestId('opponent-card-sent')).toHaveTextContent('✓ Friend request sent');
+      const sent = await game.server.friendsFor('bot').listRequests();
+      expect(sent.incoming.map((r) => r.playerId)).toEqual(['me']);
+      await user.press(screen.getByTestId('opponent-card-cancel'));
+      await settle();
+      expect(screen.getByTestId('opponent-card-add')).toBeOnTheScreen();
+      expect((await game.server.friendsFor('bot').listRequests()).incoming).toEqual([]);
+    });
+
+    it('accepts their request, then shows the record', async () => {
+      const user = setupUser();
+      const game = await openWithCard();
+      await game.server.friendsFor('bot').sendRequest('me');
+      await settle();
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      await user.press(screen.getByTestId('menu-opponent-card'));
+      await settle();
+      await user.press(screen.getByTestId('opponent-card-accept'));
+      await settle();
+      expect(screen.getByText('Friends')).toBeOnTheScreen();
+      expect(screen.getByTestId('opponent-card-record')).toHaveTextContent(
+        /Even · 0 matches together/,
+      );
+    });
+
+    it('a guest opponent gets two lines and no button', async () => {
+      const user = setupUser();
+      await openWithCard({ saved: false });
+      await settle();
+      const seat = screen.getByTestId('strip-top');
+      expect(seat).not.toHaveTextContent(/Online/);
+      await user.press(seat);
+      expect(screen.getByText('Guest account')).toBeOnTheScreen();
+      expect(screen.getByText('Only saved accounts can be friends.')).toBeOnTheScreen();
+      expect(screen.queryByTestId('opponent-card-add')).toBeNull();
+    });
+
+    it('Report or block from the card opens the safety dialog', async () => {
+      const user = setupUser();
+      await openWithCard();
+      await settle();
+      await user.press(screen.getByTestId('strip-top'));
+      await user.press(screen.getByTestId('opponent-card-report'));
+      expect(screen.getByRole('header', { name: 'Report or block Bob_Plays' })).toBeOnTheScreen();
+    });
+
+    it('a screen with no Friends port keeps a plain seat and no menu row', async () => {
+      const user = setupUser();
+      await openGame();
+      expect(screen.getByTestId('strip-top')).toHaveTextContent(/Online/);
+      expect(screen.getByTestId('strip-top')).not.toHaveTextContent(/›/);
+      await user.press(screen.getByRole('button', { name: 'Game menu' }));
+      expect(screen.queryByTestId('menu-opponent-card')).toBeNull();
     });
   });
 });

@@ -35,7 +35,13 @@ interface GestureEvent {
   y: number;
 }
 
-interface EndEvent extends GestureEvent {
+interface GestureEventWithMove extends GestureEvent {
+  /** Pan only: the move since touch down, as Gesture Handler gives it. */
+  translationX?: number;
+  translationY?: number;
+}
+
+interface EndEvent extends GestureEventWithMove {
   canceled: boolean;
 }
 
@@ -43,8 +49,8 @@ interface Callbacks {
   testID?: string;
   enabled?: boolean;
   onBegin?: (e: GestureEvent) => void;
-  onActivate?: (e: GestureEvent) => void;
-  onUpdate?: (e: GestureEvent) => void;
+  onActivate?: (e: GestureEventWithMove) => void;
+  onUpdate?: (e: GestureEventWithMove) => void;
   onDeactivate?: (e: EndEvent) => void;
   onFinalize?: (e: EndEvent) => void;
 }
@@ -148,7 +154,15 @@ export async function touch(
   const gestures = [...ids]
     .flatMap((id) => latest.get(id) ?? [])
     .filter((g) => g.config.enabled !== false);
-  const [first, ...rest] = path;
+  const start = path[0];
+  if (start === undefined) throw new Error('A touch needs a point');
+  // Native pan events also carry the move since touch down.
+  const points = path.map((p) => ({
+    ...p,
+    translationX: p.x - start.x,
+    translationY: p.y - start.y,
+  }));
+  const [first, ...rest] = points;
   if (first === undefined) throw new Error('A touch needs a point');
   const last = rest[rest.length - 1] ?? first;
   const states = new Map<Gesture, State>();

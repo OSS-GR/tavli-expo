@@ -31,6 +31,7 @@ import { sideWood } from '@/components/avatar';
 import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { EmptyMedallion } from '@/components/EmptyMedallion';
 import { Screen } from '@/components/Screen';
+import { RoundButton } from '@/components/RoundButton';
 import { CardFrame, RowDivider } from '@/components/SectionCard';
 import { Celebration } from '@/features/game/Celebration';
 import { isHumanWin } from '@/features/game/gameFeedback';
@@ -86,6 +87,12 @@ export type MatchEndScreenProps = (LocalMatchEnd | OnlineEnd) & {
   onReview?: () => void;
   onHome: () => void;
   /**
+   * The screen was opened on top of another one (a friend's recent
+   * matches): a back button goes there. At the end of a match there is
+   * nothing to go back to, so none.
+   */
+  onBack?: () => void;
+  /**
    * Names this match for this app run (`matchKey` of its game store, #216):
    * the result is read once, and a remount does not read it again. Without
    * it, every time the screen mounts.
@@ -126,6 +133,7 @@ export function MatchEndScreen({
   onReview,
   onChangeSettings,
   onHome,
+  onBack,
   announceKey,
   supportAsk,
 }: MatchEndScreenProps) {
@@ -222,6 +230,16 @@ export function MatchEndScreen({
     <Screen testID="match-end-screen">
       <SupportAskCover covered={ask.open} fill="flex">
         <ScrollView contentContainerStyle={styles.content}>
+          {onBack !== undefined ? (
+            <View style={styles.backRow}>
+              <RoundButton
+                testID="match-end-back"
+                icon="chevronLeft"
+                accessibilityLabel={t('common.back')}
+                onPress={onBack}
+              />
+            </View>
+          ) : null}
           <View testID="match-hero" style={styles.hero}>
             {celebrate ? (
               <Celebration
@@ -398,6 +416,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.space.lg,
     paddingTop: theme.space.xl,
     paddingBottom: Math.max(rt.insets.bottom, theme.space.lg),
+  },
+  backRow: {
+    flexDirection: 'row',
   },
   hero: {
     alignItems: 'center',

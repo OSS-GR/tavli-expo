@@ -276,7 +276,9 @@ describe('gameRecord (#604)', () => {
       as(t, ALICE).query(api.games.gameRecord, { gameId, gameNumber: games.length + 1 }),
       'ILLEGAL_ACTION',
     );
-  });
+    // A whole match with real dice: its length varies, and the CI runner is
+    // slower than a laptop, so 5 s is not enough (#662).
+  }, 30_000);
 
   it('answers only the two players, and only a signed-in caller', async () => {
     const t = setup();

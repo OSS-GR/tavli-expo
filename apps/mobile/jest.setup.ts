@@ -67,6 +67,7 @@ jest.mock('@/services', () => {
     gameTransportFor: onlineFake.transportFor,
     invitesFor: onlineFake.invitesFor,
     devSafetyFor: onlineFake.devSafetyFor,
+    devFriendsFor: onlineFake.devFriendsFor,
   };
 });
 

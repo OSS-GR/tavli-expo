@@ -18,11 +18,12 @@ import {
   checkSaved,
   friendStatusOf,
   planRequest,
+  playerCardOf,
   recentOpponents,
   recordAfter,
   recordOf,
 } from './friends';
-import type { PlanRequestInput } from './friends';
+import type { PlanRequestInput, PlayerCardInput } from './friends';
 
 const NOW = Date.UTC(2026, 10, 9, 12, 0, 0);
 
@@ -189,5 +190,53 @@ describe('records and recent players', () => {
       { playerId: 'b', playedAt: 5 },
       { playerId: 'c', playedAt: 3 },
     ]);
+  });
+});
+
+describe('playerCardOf (#651)', () => {
+  const input: PlayerCardInput = {
+    callerId: 'a',
+    playerId: 'b',
+    met: true,
+    blockedEither: false,
+    name: { kind: 'username', name: 'Bob' },
+    saved: true,
+    rating: { rating: 1611.6, experience: 40, matches: 48 },
+    rank: 12,
+    status: 'friends',
+    record: { wins: 12, losses: 9 },
+  };
+
+  it('gives the rounded rating, the place and the record of a friend', () => {
+    expect(playerCardOf(input)).toEqual({
+      name: { kind: 'username', name: 'Bob' },
+      rating: 1612,
+      matches: 48,
+      rank: 12,
+      status: 'friends',
+      record: { wins: 12, losses: 9 },
+    });
+  });
+
+  it('a saved player with no rated match starts at the first rating', () => {
+    const card = playerCardOf({ ...input, rating: null, rank: null, status: 'none', record: null });
+    expect([card.rating, card.matches, card.rank, card.record]).toEqual([1500, 0, null, null]);
+  });
+
+  it('a guest has no rating, no place and cannot be asked', () => {
+    const card = playerCardOf({ ...input, saved: false, status: 'none', record: null });
+    expect([card.rating, card.matches, card.rank, card.status]).toEqual([null, 0, null, 'none']);
+  });
+
+  it('refuses the caller, a stranger and a block, with codes that hide the block', () => {
+    expect(() => playerCardOf({ ...input, playerId: 'a' })).toThrow(
+      expect.objectContaining({ code: 'BAD_REQUEST' }),
+    );
+    expect(() => playerCardOf({ ...input, met: false })).toThrow(
+      expect.objectContaining({ code: 'NOT_FOUND' }),
+    );
+    expect(() => playerCardOf({ ...input, blockedEither: true })).toThrow(
+      expect.objectContaining({ code: 'NOT_FOUND' }),
+    );
   });
 });

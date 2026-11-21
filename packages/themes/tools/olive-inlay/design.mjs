@@ -18,6 +18,7 @@ import {
   landscapeGeometry as baseLandscapeGeometry,
   portraitGeometry as basePortraitGeometry,
   wideGeometry as baseWideGeometry,
+  deepGeometry as baseDeepGeometry,
   SIZES,
 } from '../walnut-kafeneio/design.mjs';
 import {
@@ -40,10 +41,13 @@ const INLAY = {
   band: 4.4,
   /** Meander (Greek key) band height. Two bands, one on each half of the fold. */
   meander: 9,
-  /** Core of each point: gap from the base, gap from each side, length. */
+  /**
+   * Core of each point: gap from the base, gap from each side, and how much
+   * shorter than the point it is (the point grows on the deep board, #659).
+   */
   coreBase: 3.2,
   coreSide: 7.5,
-  coreLength: SIZES.pointLength - 30,
+  coreShort: 30,
   /** Maple stringing around the core. */
   stringing: 1,
   /** Size of one wood tile in the cores and the field. */
@@ -54,7 +58,7 @@ const INLAY = {
 };
 
 export function geometries() {
-  return [basePortraitGeometry(), baseLandscapeGeometry(), baseWideGeometry()];
+  return [basePortraitGeometry(), baseLandscapeGeometry(), baseWideGeometry(), baseDeepGeometry()];
 }
 
 /** The `layouts.<id>` block of theme.json. Same as Walnut Kafeneio, with daylight instead of a lamp. */
@@ -146,9 +150,18 @@ function meanderBands(p) {
   return [bar.y + 3.5, bar.y + bar.h - 3.5 - h].map((y) => ({ x, y, w, h }));
 }
 
+/**
+ * The portrait board that `g` turns from: the inlay is placed in portrait.
+ * Its length and depth follow `g`, so the wide and the deep boards get
+ * their own (#659).
+ */
+function portraitOf(g) {
+  return g.orientation === 'portrait' ? g : basePortraitGeometry(g.width, g.height);
+}
+
 function defs(g, tex) {
   const portrait = g.orientation === 'portrait';
-  const p = basePortraitGeometry();
+  const p = portraitOf(g);
   const bands = meanderBands(p);
   const b = INLAY.band;
   // Grain: the field runs along the long side, the frame along each member.
@@ -180,7 +193,7 @@ function defs(g, tex) {
 
 /** Dog-tooth banding round the outer frame and meander bands on the bar, in portrait pt. */
 function inlaySVG(g) {
-  const p = basePortraitGeometry();
+  const p = portraitOf(g);
   const s = [];
   const t = INLAY.band;
   const frame = p.fields[0].x; // frame width
@@ -273,11 +286,14 @@ function coreTriangle(pt) {
         return [r.x + across, r.y + r.h - along];
     }
   };
-  const breadth = pt.base === 'left' || pt.base === 'right' ? r.h : r.w;
+  const across = pt.base === 'left' || pt.base === 'right';
+  const breadth = across ? r.h : r.w;
+  // The point is drawn this long: its share of its half of the board.
+  const length = (SIZES.pointLength / SIZES.pointDepth) * (across ? r.w : r.h);
   return [
     map(INLAY.coreBase, INLAY.coreSide),
     map(INLAY.coreBase, breadth - INLAY.coreSide),
-    map(INLAY.coreLength, breadth / 2),
+    map(length - INLAY.coreShort, breadth / 2),
   ];
 }
 

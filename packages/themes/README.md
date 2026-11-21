@@ -67,20 +67,20 @@ Multiply normalized values by the drawn board size: `x * boardWidth`, `y * board
 
 `src/types.ts` has the full type, with a comment on every field. `src/validate.ts` checks it at load time.
 
-| Key                     | What                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------- |
-| `id`, `version`, `name` | Folder name, semver, name in `en` and `el`                                               |
-| `description`, `kind`   | Short text in both languages; `image` (image layers + vector points) or `vector`         |
-| `license`               | Short license notes and the file with the full list (`LICENSES.md`)                      |
-| `palette`               | Color tokens (from `docs/design/style/palette.md`). Other fields use them as `{token}`.  |
-| `images`                | Every image: file name, scales, @1x size                                                 |
-| `layouts`               | Board geometry for `portrait-rotated` (default), `landscape` and `landscape-wide`        |
-| `points`                | Dark and light point woods: fallback color and texture tile                              |
-| `checkers`              | Light and dark checker styles (fill, rim, highlight, ring, dish, grooves), shadow, badge |
-| `highlights`            | Selected checker ring and legal target ring                                              |
-| `dice`                  | Face, pips (red ace pip), corner radius, shading, shadow                                 |
-| `sounds`, `haptics`     | Per game event (`FeedbackEvent`): sound file(s) in `sounds/` and a haptic pattern        |
-| `accessibility`         | Checker contrast (the tests compute it again) and the color-blind checks done            |
+| Key                     | What                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `id`, `version`, `name` | Folder name, semver, name in `en` and `el`                                                       |
+| `description`, `kind`   | Short text in both languages; `image` (image layers + vector points) or `vector`                 |
+| `license`               | Short license notes and the file with the full list (`LICENSES.md`)                              |
+| `palette`               | Color tokens (from `docs/design/style/palette.md`). Other fields use them as `{token}`.          |
+| `images`                | Every image: file name, scales, @1x size                                                         |
+| `layouts`               | Board geometry for `portrait-rotated` (default), `landscape`, `landscape-wide`, `landscape-deep` |
+| `points`                | Dark and light point woods: fallback color and texture tile                                      |
+| `checkers`              | Light and dark checker styles (fill, rim, highlight, ring, dish, grooves), shadow, badge         |
+| `highlights`            | Selected checker ring and legal target ring                                                      |
+| `dice`                  | Face, pips (red ace pip), corner radius, shading, shadow                                         |
+| `sounds`, `haptics`     | Per game event (`FeedbackEvent`): sound file(s) in `sounds/` and a haptic pattern                |
+| `accessibility`         | Checker contrast (the tests compute it again) and the color-blind checks done                    |
 
 ### Units
 
@@ -98,6 +98,7 @@ Point numbers are from the view of the player at the **bottom** of the screen. T
 | `portrait-rotated` (default) | 377 × 630 pt | bottom-left  | bottom edge | Phone in portrait (wireframe option B) |
 | `landscape`                  | 630 × 377 pt | bottom-right | right edge  | The classic board, phone upright       |
 | `landscape-wide`             | 693 × 377 pt | bottom-right | right edge  | Phone on its side (#611): wider points |
+| `landscape-deep`             | 630 × 425 pt | bottom-right | right edge  | The open iPhone Duo (#659): deeper     |
 
 Portrait order: the left column holds 12 → 7, the bar, then 6 → 1. The right column holds 13 → 18, the bar, then 19 → 24.
 
@@ -138,7 +139,7 @@ The "shade" layer then puts wear and the frame shadow over the points, so they s
 
 - WebP, file names in the React Native style: `board.webp` (@1x), `board@2x.webp`, `board@3x.webp`. Metro picks the right scale. `scales` lists the files on disk.
 - @1x pixels = points at the layout's `referenceSize`. For a bigger board, pass `pixelRatio × drawnWidth / referenceWidth` to `pickScale`.
-- Budget: **under 2 MB per theme** (a test checks it). Each bundled theme is about 0.9–1.1 MB with its sounds.
+- Budget: **under 2.5 MB per theme** on disk, all scales (a test checks it). Each bundled theme is about 2.3–2.4 MB with its sounds; a phone loads one scale.
 - Every bundled theme ships in the app (Metro bundles each `require` in `themeImages.ts`), even when the player never picks it. Keep themes small. A much bigger theme (a Blender skin) should be a download, loaded on demand, not a bundled theme.
 
 ## Scripts
@@ -188,5 +189,5 @@ To change a Walnut Kafeneio sound, edit and run `tools/walnut-kafeneio/build_sou
 2. Add the id to `THEMES` in `tools/build-assets.mjs` and run `build:assets`. Or, for a Blender skin, export the images and the layout block from Blender (`docs/design/art-pipeline.md` §4.2).
 3. Write the rest of `<id>/theme.json` by hand: name, palette, points, checkers, highlights, dice, sounds, haptics.
 4. Add it to `BUNDLED` in `src/registry.ts` and to `exports` in `package.json`. In the app, add its images to `apps/mobile/src/features/board/themeImages.ts` and its sounds to `apps/mobile/src/features/feedback/themeSounds.ts` (tests check both). Settings → Board lists it by itself.
-5. Run `pnpm test`. The tests check every bundled theme: the manifest, 24 points with no overlaps, every rect inside 0..1, every file on disk at the right size, every sound file, no unused files, the 2 MB budget, the 500 KB sound budget, the same geometry as the default theme, and contrast (checkers ≥ 7:1; checker vs point and checker vs field ≥ 3:1 by fill or outline; one checker fill ≥ 3:1 from the field; highlight ring or halo ≥ 3:1 from the field and both points; dice pips ≥ 3:1; badge text and UI text ≥ 4.5:1).
+5. Run `pnpm test`. The tests check every bundled theme: the manifest, 24 points with no overlaps, every rect inside 0..1, every file on disk at the right size, every sound file, no unused files, the 2.5 MB budget, the 500 KB sound budget, the same geometry as the default theme, and contrast (checkers ≥ 7:1; checker vs point and checker vs field ≥ 3:1 by fill or outline; one checker fill ≥ 3:1 from the field; highlight ring or halo ≥ 3:1 from the field and both points; dice pips ≥ 3:1; badge text and UI text ≥ 4.5:1).
 6. Run `preview` and look at the PNG. Then list every new file in `LICENSES.md`.

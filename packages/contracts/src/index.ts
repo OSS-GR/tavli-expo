@@ -158,6 +158,7 @@ export type {
   Friends,
   FriendsErrorCode,
   FriendsErrorData,
+  PlayerCard,
   RecentPlayer,
 } from './friends';
 export {

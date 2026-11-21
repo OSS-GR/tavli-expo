@@ -11,7 +11,12 @@ import { isHexColor, tokenRef } from './color';
 import { rectInsideUnit, rectsOverlap } from './geometry';
 import type { FeedbackEvent, HapticKey, LayoutId, Rect, SoundKey, ThemeManifest } from './types';
 
-export const LAYOUT_IDS: readonly LayoutId[] = ['portrait-rotated', 'landscape', 'landscape-wide'];
+export const LAYOUT_IDS: readonly LayoutId[] = [
+  'portrait-rotated',
+  'landscape',
+  'landscape-wide',
+  'landscape-deep',
+];
 /** Every game event a theme can give a sound and a haptic (see `FeedbackEvent`). */
 export const FEEDBACK_EVENTS = [
   'checkerPickUp',

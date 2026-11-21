@@ -89,7 +89,14 @@ import { playerNameText } from '@/features/online/playerName';
 import { ReportOrBlock, type SafetyPlayer } from '@/features/safety/ReportOrBlock';
 
 import { friendsProblem, useFriendsData, type FriendsProblem } from './friendsData';
-import { Footnote, friendsStyles, NotReady, RefreshFailed, useProblemText } from './FriendsParts';
+import {
+  Footnote,
+  friendsStyles,
+  ListSkeleton,
+  NotReady,
+  RefreshFailed,
+  useProblemText,
+} from './FriendsParts';
 import { takeInviteSent, type SentInvite } from './inviteSent';
 import { recordText } from './record';
 
@@ -164,7 +171,13 @@ export function FriendsScreen({
     ]);
     return { friends: list, requests, invites: invites.filter((i) => i.status === 'open') };
   }, [friends]);
-  const { state, reload, retry, sessionLost } = useFriendsData(auth, load, visit, usernames);
+  const { state, reload, retry, sessionLost } = useFriendsData(
+    auth,
+    load,
+    visit,
+    usernames,
+    'friends',
+  );
   // The player whose call is on its way.
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ kind: FriendsProblem; n: number } | null>(null);
@@ -300,7 +313,9 @@ export function FriendsScreen({
   );
 
   let body: ReactNode;
-  if (state.kind !== 'ready') {
+  if (state.kind === 'loading') {
+    body = <ListSkeleton testID="friends" />;
+  } else if (state.kind !== 'ready') {
     body = (
       <NotReady
         state={state}
@@ -628,8 +643,8 @@ function PersonRow({ testID, playerKey, name, title, hint, children, below }: Pe
 /**
  * One friend (#644, Figma 31 "After B"): the name has the whole width; the
  * record, Invite and "…" share the line under it, so a long name never
- * squeezes the buttons. With `onOpen` the avatar and the name open the
- * friend page; screen readers hear one button with the name and the record.
+ * squeezes the buttons. With `onOpen` the whole row opens the friend page
+ * (a chevron after the name says so); screen readers hear one button with the name and the record.
  */
 function FriendRow({
   testID,
@@ -647,17 +662,18 @@ function FriendRow({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const { theme } = useUnistyles();
   return (
-    <View testID={testID} style={styles.personRow}>
+    // The whole row opens the friend page (#670): a tap on the record line
+    // or the padding used to miss. Screen readers use the name button.
+    <Pressable
+      testID={testID}
+      onPress={onOpen}
+      disabled={onOpen === undefined}
+      accessible={false}
+      style={({ pressed }) => [styles.personRow, pressed && styles.rowPressed]}>
       <View style={styles.person}>
-        <Pressable
-          onPress={onOpen}
-          disabled={onOpen === undefined}
-          accessible={false}
-          importantForAccessibility="no-hide-descendants"
-          accessibilityElementsHidden>
-          <CheckerAvatar playerKey={playerKey} name={name} />
-        </Pressable>
+        <CheckerAvatar playerKey={playerKey} name={name} />
         <View style={styles.texts}>
           <Pressable
             testID={`${testID}-open`}
@@ -668,6 +684,15 @@ function FriendRow({
             {...(onOpen ? { accessibilityHint: t('friends.page.openHint') } : {})}
             style={({ pressed }) => [styles.nameLine, pressed && styles.pressed]}>
             <Text style={[styles.name, styles.nameFlex]}>{name}</Text>
+            {onOpen ? (
+              // Says there is a page behind the row, like the Leaderboards row.
+              <Icon
+                testID={`${testID}-chevron`}
+                name="chevronRight"
+                size={18}
+                color={theme.colors.textDim}
+              />
+            ) : null}
           </Pressable>
           <View style={styles.friendLine}>
             <Text
@@ -680,7 +705,7 @@ function FriendRow({
           </View>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -1000,6 +1025,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   pressed: {
     opacity: 0.7,
+  },
+  rowPressed: {
+    backgroundColor: theme.colors.surfaceSunken,
   },
   ratings: {
     ...surfaceStyle(theme, 'tray'),

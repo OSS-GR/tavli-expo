@@ -84,5 +84,6 @@ export function createConvexFriends(options: ConvexFriendsOptions): Friends {
         }),
       ),
     listFriendInvites: () => run(() => client.query(fn.listFriendInvites, {})),
+    playerCard: (playerId) => run(() => client.query(fn.playerCard, { playerId })),
   };
 }

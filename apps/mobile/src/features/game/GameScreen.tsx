@@ -17,8 +17,12 @@
  * (or Fast forward) left of it, the hint right of it. The board layout
  * comes from one place (`boardLayout`), so touches and flights follow it.
  *
- * Rows (#649): a landscape window that is almost square (the open iPhone
- * Duo) keeps the classic portrait rows, with the wide board.
+ * Rows (#649, #659): a landscape window that is almost square (the open
+ * iPhone Duo) keeps the portrait top row (menu, seats, score), draws the
+ * deep board under it, and puts the round buttons on the right rail as in
+ * landscape. The rail starts under the top row (`leadHeight`).
+ * The tall board on the closed iPhone Duo puts its buttons on the same
+ * rail, in the camera column under the clock (`sideRail`).
  *
  * Landscape (#185): when the phone lies on its side, the whole screen turns
  * with it (`useScreenLayout`). The classic board sits in the middle and
@@ -443,15 +447,28 @@ export function GameScreen({
   const showMoveList = useMoveListShown();
   const { layout, rails, spaceKey } = useScreenLayout();
   // The app's colors (the board theme is `theme`).
-  const { theme: ui } = useUnistyles();
+  const { theme: ui, rt } = useUnistyles();
   const landscape = layout === 'landscape';
   // On its side the wide board takes the margin away from the island (#611).
   const island = useIslandSide();
-  // Rows (#649, the open iPhone Duo) is the classic portrait layout with
-  // the wide board.
+  // Rows (#649, #659, the open iPhone Duo): the portrait top row, the deep
+  // board and the landscape button rail.
   const rows = layout === 'rows';
+  // The top row's height: the rail in rows starts under it.
+  const [leadHeight, setLeadHeight] = useState(0);
   const classic = layout === 'classic' || rows;
   const tall = layout === 'tall';
+  // The iPhone Duo keeps its camera in a column on the right (inset 84 pt,
+  // top inset 0, on both screens). Under the clock that column is empty, so
+  // the classic board and the button rail use it; only the top row keeps
+  // clear of it (#659).
+  const duoColumn = !landscape && rt.insets.top === 0 && rt.insets.right > 0;
+  const cameraColumn = duoColumn ? rt.insets.right : 0;
+  // Rows, and the tall board on the closed Duo, put the round buttons on a
+  // rail in that column, so the board gets the height of the button row.
+  const sideRail = rows || (tall && duoColumn);
+  // Landscape and the side rail use the rail button sizes.
+  const railLayout = landscape || sideRail;
 
   const view = useMemo(() => turnView(flow), [flow]);
   const { game, phase } = view;
@@ -1445,8 +1462,8 @@ export function GameScreen({
   let rollAside: string | null = null;
   // Undo, Fast forward and the hint have one size. In portrait every circle
   // sits in a box as tall as the main one, so the three share a center line.
-  const sideSize = landscape ? RAIL_LANDSCAPE_SECONDARY : RAIL_SECONDARY;
-  const circleBox = landscape ? undefined : RAIL_PRIMARY;
+  const sideSize = railLayout ? RAIL_LANDSCAPE_SECONDARY : RAIL_SECONDARY;
+  const circleBox = railLayout ? undefined : RAIL_PRIMARY;
   if (phase === 'opening-roll') {
     mainButton = null;
   } else if (remoteStatus !== null) {
@@ -1510,7 +1527,7 @@ export function GameScreen({
         testID="roll-button"
         label={t('game.roll.dice')}
         subtitle={t('game.roll.orSwipeBoard')}
-        subtitleBeside={!landscape}
+        subtitleBeside={!railLayout}
         icon="dices"
         circleBox={circleBox}
         onPress={() => roll()}
@@ -1584,7 +1601,7 @@ export function GameScreen({
     ) : null);
   const statusText =
     status !== null ? (
-      <Text testID={status.testID} style={styles.statusText(landscape)}>
+      <Text testID={status.testID} style={styles.statusText(railLayout)}>
         {status.text}
       </Text>
     ) : null;
@@ -2113,6 +2130,9 @@ export function GameScreen({
       turnLabel={seats[player].turnLabel}
       checker={theme.checkers[toneOf(player)]}
       avatar={seats[player].avatar ?? null}
+      {...(seats[player].press
+        ? { onPress: seats[player].press.onPress, pressHint: seats[player].press.hint }
+        : {})}
       status={seatStatus(player)}
       note={asodioNote(player)}
       clock={seatClock(player)}
@@ -2419,8 +2439,10 @@ export function GameScreen({
     // Portrait: the menu, then both seats side by side with the score once
     // between them.
     lead = (
-      <View style={styles.lead}>
-        <View style={styles.topRow}>
+      <View
+        style={styles.lead(rows, cameraColumn)}
+        onLayout={sideRail ? (e) => setLeadHeight(e.nativeEvent.layout.height) : undefined}>
+        <View style={styles.topRow(rows)}>
           {menuButton}
           {strip(viewer, 'strip-bottom')}
           {scoreBlock}
@@ -2436,57 +2458,63 @@ export function GameScreen({
   // rail in landscape, in the same order: Undo (or Fast forward), the main
   // circle, the hint. Both keep their size in every state, so the board
   // never moves. In portrait the main circle sits in the middle of the screen.
-  const trail = landscape ? (
-    // Scrolls when a large font makes the rail taller than the screen.
-    <ScrollView
-      testID="game-right"
-      style={styles.rail(rails.right)}
-      contentContainerStyle={styles.railButtons}
-      alwaysBounceVertical={false}>
-      {undoButton ?? <View style={styles.railSlot(true)} />}
-      {/* The main place is as tall as Roll with its subtitle in every state,
+  const trail =
+    landscape || sideRail ? (
+      // Scrolls when a large font makes the rail taller than the screen. The
+      // side rail sits on the right, under the top row (#659).
+      <ScrollView
+        testID="game-right"
+        style={
+          sideRail
+            ? styles.rowsRail(rails.right, leadHeight, cameraColumn)
+            : styles.rail(rails.right)
+        }
+        contentContainerStyle={styles.railButtons(sideRail)}
+        alwaysBounceVertical={false}>
+        {undoButton ?? <View style={styles.railSlot(true)} />}
+        {/* The main place is as tall as Roll with its subtitle in every state,
           and the status text sits in it, so Undo and the hint never move. */}
-      <View testID="rail-main" style={styles.railMain}>
-        {statusText}
-        {mainButton}
+        <View testID="rail-main" style={styles.railMain}>
+          {statusText}
+          {mainButton}
+        </View>
+        {hintSlot ?? <View style={styles.railSlot(false)} />}
+      </ScrollView>
+    ) : (
+      <View
+        testID="game-controls"
+        style={[
+          styles.controls,
+          (status === null || mainButton !== null) && styles.controlsTop,
+          raceRoom && styles.controlsRaceRoom,
+        ]}>
+        {status !== null && mainButton === null ? (
+          statusText
+        ) : (
+          <>
+            <View style={styles.controlSide('end')}>
+              {undoButton !== null ? (
+                <View style={styles.sideSlot}>{undoButton}</View>
+              ) : (
+                (statusText ??
+                (rollAside !== null ? (
+                  <Text
+                    style={styles.rollAside}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no">
+                    {rollAside}
+                  </Text>
+                ) : null))
+              )}
+            </View>
+            {mainButton ?? <View style={styles.mainSpacer} />}
+            <View style={styles.controlSide('start')}>
+              {hintSlot !== null ? <View style={styles.sideSlot}>{hintSlot}</View> : null}
+            </View>
+          </>
+        )}
       </View>
-      {hintSlot ?? <View style={styles.railSlot(false)} />}
-    </ScrollView>
-  ) : (
-    <View
-      testID="game-controls"
-      style={[
-        styles.controls,
-        (status === null || mainButton !== null) && styles.controlsTop,
-        raceRoom && styles.controlsRaceRoom,
-      ]}>
-      {status !== null && mainButton === null ? (
-        statusText
-      ) : (
-        <>
-          <View style={styles.controlSide('end')}>
-            {undoButton !== null ? (
-              <View style={styles.sideSlot}>{undoButton}</View>
-            ) : (
-              (statusText ??
-              (rollAside !== null ? (
-                <Text
-                  style={styles.rollAside}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no">
-                  {rollAside}
-                </Text>
-              ) : null))
-            )}
-          </View>
-          {mainButton ?? <View style={styles.mainSpacer} />}
-          <View style={styles.controlSide('start')}>
-            {hintSlot !== null ? <View style={styles.sideSlot}>{hintSlot}</View> : null}
-          </View>
-        </>
-      )}
-    </View>
-  );
+    );
 
   // Every layout keeps the board at the same place in the tree (the second
   // child, then the board frame), so turning the phone or changing the
@@ -2494,7 +2522,7 @@ export function GameScreen({
   // the board never flatten (`collapsable={false}`), so the canvases keep
   // their native parent too (#173).
   return (
-    <View style={styles.screen(landscape, island)}>
+    <View style={styles.screen(landscape, island, cameraColumn)}>
       <GestureDetector gesture={swipeArea}>
         <View
           testID="game-content"
@@ -2509,7 +2537,13 @@ export function GameScreen({
             swipe area (#183, #625) covers the whole content around it. */}
           <View
             testID="game-middle"
-            style={tall ? styles.boardArea : styles.middle}
+            style={
+              sideRail
+                ? styles.middleBesideRail(Math.max(rails.right, cameraColumn))
+                : tall
+                  ? styles.boardArea
+                  : styles.middle
+            }
             collapsable={false}
             onLayout={(e) => {
               middleX.set(e.nativeEvent.layout.x);
@@ -2520,7 +2554,7 @@ export function GameScreen({
               style={
                 classic
                   ? styles.classicBoard(
-                      boxRatioWithShadow(theme.layouts[rows ? 'landscape-wide' : 'landscape']),
+                      boxRatioWithShadow(theme.layouts[rows ? 'landscape-deep' : 'landscape']),
                     )
                   : styles.boardArea
               }
@@ -2531,11 +2565,11 @@ export function GameScreen({
               }}>
               {boardLayer}
             </View>
-            {landscape ? moveList : null}
+            {landscape || sideRail ? moveList : null}
             {hints}
             {cardOverlay ?? inlay}
           </View>
-          {landscape ? null : moveList}
+          {landscape || sideRail ? null : moveList}
           {trail}
         </View>
       </GestureDetector>
@@ -2586,7 +2620,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   // iOS gives the same inset on both sides; the side away from the island
   // needs less (`sideMargins`), and the wide board gets the rest (#611).
   // Upright keeps a side inset too: the iPhone Duo's camera column.
-  screen: (landscape: boolean, island: IslandSide | null) => ({
+  screen: (landscape: boolean, island: IslandSide | null, column: number) => ({
     flex: 1,
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
@@ -2594,7 +2628,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : rt.insets.left,
     paddingRight: landscape
       ? sideMargins(rt.insets, island, theme.space.xs).right
-      : rt.insets.right,
+      : rt.insets.right - column,
   }),
   content: (landscape: boolean) => ({
     flex: 1,
@@ -2605,6 +2639,18 @@ const styles = StyleSheet.create((theme, rt) => ({
   rail: (width: number) => ({
     width,
     flexGrow: 0,
+  }),
+  // The rail in rows (#659): on the right, from under the top row down,
+  // in the iPhone Duo's camera column (`column`) when there is one. The
+  // screen does not pad that column, so the rail stays inside its parent.
+  // Until the top row is measured it hides, so it never shows over the seats.
+  rowsRail: (width: number, top: number, column: number) => ({
+    position: 'absolute',
+    right: 0,
+    top: top + theme.space.xs,
+    bottom: 0,
+    width: Math.max(width, column),
+    opacity: top > 0 ? 1 : 0,
   }),
   // The left rail: the menu at the top, then the other seat, the score and
   // your seat, spread over the height.
@@ -2622,13 +2668,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.space.sm,
   },
   // The right rail: Undo, the main circle, the hint, spread over the height.
-  railButtons: {
+  // Rows (#659): the buttons sit together around the main circle, in the
+  // middle of the tall column, not spread over it.
+  railButtons: (rows: boolean) => ({
     flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    gap: theme.space.sm,
+    justifyContent: rows ? 'center' : 'space-around',
+    gap: rows ? theme.space.lg : theme.space.sm,
     paddingVertical: theme.space.xs,
-  },
+  }),
   // An empty place for Undo (circle and label) or the hint (circle only),
   // so the other buttons stay put.
   railSlot: (label: boolean) => ({
@@ -2643,17 +2691,25 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: 'center',
     gap: theme.space.sm,
   },
-  lead: {
+  // Rows (#659): a little room above the menu, away from the round corner.
+  // `column`: the camera column the screen no longer pads; the top row keeps
+  // clear of the clock in it.
+  lead: (rows: boolean, column: number) => ({
     gap: theme.space.xxs,
-  },
+    paddingTop: rows ? theme.space.sm : 0,
+    paddingRight: column,
+  }),
   // The menu, your seat, the score, the other seat. The seats stretch to
   // the same height.
-  topRow: {
+  // Rows: the open iPhone Duo has no left inset, so the menu keeps clear
+  // of the screen's round top-left corner (#659).
+  topRow: (rows: boolean) => ({
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: theme.space.xs,
-    paddingHorizontal: theme.space.sm,
-  },
+    paddingLeft: rows && rt.insets.left === 0 ? theme.space.xl : theme.space.sm,
+    paddingRight: theme.space.sm,
+  }),
   score: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -2705,6 +2761,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: 'center',
     gap: theme.space.xs,
   },
+  // Rows (#659): the board's space keeps clear of the rail on the right.
+  // Rows: the board ends where the rail starts.
+  middleBesideRail: (rail: number) => ({
+    flex: 1,
+    justifyContent: 'center',
+    gap: theme.space.xs,
+    marginRight: rail + theme.space.xxs,
+  }),
   // As wide as the screen, as tall as the board needs. A large font may
   // squeeze it; the board then fits the space it has.
   classicBoard: (ratio: number) => ({

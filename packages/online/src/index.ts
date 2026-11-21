@@ -162,6 +162,7 @@ export {
   pickFriendToken,
   pickFriendTokenNow,
   planRequest,
+  playerCardOf,
   recentOpponents,
   recordAfter,
   recordOf,
@@ -170,6 +171,7 @@ export {
 export type {
   FriendRequestRecord,
   PlanRequestInput,
+  PlayerCardInput,
   RecentGame,
   RecordGame,
   RequestPlan,
