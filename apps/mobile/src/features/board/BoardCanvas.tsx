@@ -20,7 +20,7 @@ import {
   type ThemeManifest,
 } from '@tavli/themes';
 import { useCallback, useState, type ReactNode } from 'react';
-import type { LayoutChangeEvent } from 'react-native';
+import { View, type LayoutChangeEvent } from 'react-native';
 
 import type { HomeBoardSide } from '@/features/settings/settings';
 import { useSettings } from '@/features/settings/store';
@@ -30,6 +30,7 @@ import type { BoardShape } from './screenLayout';
 import { checkerRadius, type BoardGeometry } from './geometry';
 import { BoardScene, type BoardHighlights } from './skia/BoardScene';
 import { useBoardImages, useNumberFont } from './useBoardAssets';
+import { SPIKE } from '@/spikeFlags';
 
 /** The board theme picked in Settings → Board (the default theme for an unknown id). */
 export function useBoardTheme(): ThemeManifest {
@@ -132,6 +133,29 @@ export function BoardCanvas({
 }: BoardCanvasProps) {
   const images = useBoardImages(theme, geo.layout);
   const font = useNumberFont(theme.checkers.badge.fontSize * checkerRadius(geo));
+  if (SPIKE.split) {
+    // SPIKE (#640): two canvases. Safari is slow per drawing call, and the
+    // board is about 280 calls; an animation must not repeat them per frame.
+    const box = { width: size.width, height: size.height };
+    return (
+      <View style={box} collapsable={false}>
+        <Canvas testID={testID} style={box}>
+          <BoardScene
+            theme={theme}
+            geo={geo}
+            images={images}
+            picture={picture}
+            font={font}
+            {...(hidden ? { hidden } : {})}
+            {...(highlights ? { highlights } : {})}
+          />
+        </Canvas>
+        <View style={[box, { position: 'absolute', left: 0, top: 0 }]} pointerEvents="none">
+          <Canvas style={box}>{children}</Canvas>
+        </View>
+      </View>
+    );
+  }
   return (
     <Canvas testID={testID} style={{ width: size.width, height: size.height }}>
       <BoardScene

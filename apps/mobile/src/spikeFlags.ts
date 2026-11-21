@@ -14,13 +14,20 @@ function knob(name: string): string | null {
   }
 }
 
-const fx = knob('fx');
+// Several switches join with a dot: `?fx=split.flat`.
+const fx = new Set((knob('fx') ?? '').split('.'));
 
 export const SPIKE = {
   /** No blurred shadows under checkers, dice and the board. */
-  noblur: fx === 'noblur' || fx === 'flat',
+  noblur: fx.has('noblur') || fx.has('flat'),
   /** Checkers are two plain circles: no gradients, no grooves. */
-  flat: fx === 'flat',
+  flat: fx.has('flat'),
+  /**
+   * The moving parts (flights, the dragged checker, the dice throw) draw on
+   * their own canvas over the board, so the board itself is not drawn again
+   * on each frame of an animation.
+   */
+  split: fx.has('split'),
   /** A frame meter in the corner. */
   hud: knob('hud') === '1',
 };
