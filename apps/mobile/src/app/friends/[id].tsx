@@ -37,7 +37,7 @@ export default function FriendPageRoute() {
       {...(safety === undefined ? {} : { safety })}
       onBack={() => (router.canGoBack() ? router.back() : router.replace(FRIENDS_HREF))}
       onOpenGame={(gameId) => router.push(gameHref(gameId))}
-      onOpenFinished={(gameId) => router.push(matchEndHref(gameId))}
+      onOpenFinished={(gameId) => router.push(matchEndHref(gameId, true))}
       onOpenInvite={(code) => router.push(inviteHref(code))}
       onInvite={(id) => router.push(friendInviteHref(id))}
       onInvited={() => {

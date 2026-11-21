@@ -122,6 +122,27 @@ describe('<MatchEndScreen />', () => {
     expect(screen.getByRole('button', { name: 'Change settings' })).toBeOnTheScreen();
   });
 
+  it('shows a back button only when opened from a list (a friend page)', async () => {
+    const user = userEvent.setup();
+    const onBack = jest.fn();
+    const props = { onRematch: jest.fn(), onChangeSettings: jest.fn(), onHome: jest.fn() };
+    const view = await renderWithRoot(
+      <MatchEndScreen setup={botSetup} match={playedMatch([['white', 3]])} {...props} />,
+    );
+    expect(screen.queryByTestId('match-end-back')).toBeNull();
+
+    await view.rerender(
+      <MatchEndScreen
+        setup={botSetup}
+        match={playedMatch([['white', 3]])}
+        onBack={onBack}
+        {...props}
+      />,
+    );
+    await user.press(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('offers a rematch where the last winner starts, change settings and home', async () => {
     const user = userEvent.setup();
     const { props, view } = show(
