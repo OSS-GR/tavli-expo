@@ -364,8 +364,8 @@ importers:
         specifier: ~4.30.1
         version: 4.30.1(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       react-native-unistyles:
-        specifier: 3.6.0
-        version: 3.6.0(25b6981c87ffc38858aa8fcd0138c6e2)
+        specifier: 3.8.2
+        version: 3.8.2(25b6981c87ffc38858aa8fcd0138c6e2)
       react-native-worklets:
         specifier: 0.13.0
         version: 0.13.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)(supports-color@8.1.1)
@@ -5655,13 +5655,13 @@ packages:
   react-native-skia-apple-tvos@154.0.0:
     resolution: {integrity: sha512-W06tUa+O3TJTYg5G+Lly/pwxE+2zKsmwJ/23yeR+25zSu7VmfdSz3VqFN3BM0jEioN4ASMm/0cMECocV7vxbMQ==}
 
-  react-native-unistyles@3.6.0:
-    resolution: {integrity: sha512-eYqixPy6auBj6k/ica9fCYIPgFQsLzUwRoxGZ04hX3hkANTNjaz3/LzNfXPfgJbwF/fQrhaK0qII4nhtSqUPfA==}
+  react-native-unistyles@3.8.2:
+    resolution: {integrity: sha512-FYylauMyM9REZ9LVGmIFUInpcHI4+wi1Jp7+8jZ+87gcUdysPxxF/X4Ro4JuFARhvU8bI4ukedMr19QqD/ZNdQ==}
     engines: {node: '>= 20.18.0'}
     peerDependencies:
       '@react-native/normalize-colors': '*'
       react: '*'
-      react-native: '>=0.81.0'
+      react-native: '>=0.85.0'
       react-native-edge-to-edge: '*'
       react-native-nitro-modules: '*'
       react-native-reanimated: '*'
@@ -12376,7 +12376,7 @@ snapshots:
 
   react-native-skia-apple-tvos@154.0.0: {}
 
-  react-native-unistyles@3.6.0(25b6981c87ffc38858aa8fcd0138c6e2):
+  react-native-unistyles@3.8.2(25b6981c87ffc38858aa8fcd0138c6e2):
     dependencies:
       '@babel/types': 7.29.8
       '@react-native/normalize-colors': 0.88.1
