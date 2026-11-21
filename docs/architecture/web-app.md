@@ -188,7 +188,7 @@ Phase 0 ran on 2026-11-19, on a local spike branch (`spike/web-phase0`, not merg
 | # | Question | Result |
 |---|----------|--------|
 | 0.1 | Does the app start? | **Yes.** The web export built on the first try. With three small fixes (below) all 25 routes open with no crash: the welcome flow, Home, New game, a game, Settings, How to play, the tutorial, the tour, History, What's new, Support, the online screens |
-| 0.2 | Is the Skia board fast enough? | **Open.** The board draws right and a full turn vs the bot works. Speed on a real phone and in Safari is not measured |
+| 0.2 | Is the Skia board fast enough? | **Yes in Safari, after one fix.** The first build froze for 300 to 700 ms many times per game in Safari (Mac and iPhone). The cause was sound, not the board: see [The Safari freezes](#the-safari-freezes). With the fix the owner called it much smoother (2026-11-21). Firefox and Android are not tested |
 | 0.3 | Is the download small enough? | **At the limit.** First screen: 4.6 MB with Brotli (CanvasKit 2.85 MB, JavaScript 1.7 MB). Up to a game: 5.2 MB (0.5 MB images, 0.06 MB sound). Raw: 16.7 MB. CanvasKit starts in about 90 ms once it is there |
 | 0.4 | Do styles and themes work? | **Yes** for the board theme switch and the app colors on the welcome step. The language switch in Settings is not checked |
 | 0.5 | Do gestures work? | **Yes.** A checker moves by mouse drag, mouse taps, touch drag and touch taps. Roll, Undo, Confirm and Hint work |
@@ -197,7 +197,7 @@ Phase 0 ran on 2026-11-19, on a local spike branch (`spike/web-phase0`, not merg
 | 0.8 | Which adapters work as they are? | Storage: **works** (MMKV uses `localStorage`; the saved game and settings come back after a reload). Sound: loads, no error (not heard). Sentry and PostHog: **start and send** to their hosts (test keys, so no real event was checked). Haptics, pushes: nothing happens, no crash |
 | 0.9 | Can we send a web push from Convex? | **The hard part works.** A Convex action made a Web Push message (RFC 8291) and a VAPID token (RFC 8292) with Web Crypto only, and the check decrypted and verified them. A real push to a real browser is not tested |
 
-The stop rule did not trigger: nothing failed without a fix. 0.2 and the Safari parts stay open until someone tests on real devices.
+The stop rule did not trigger: nothing failed without a fix. Firefox, Android and the Safari parts of 0.4 to 0.9 stay open (#640).
 
 ### What the spike had to change
 
@@ -209,6 +209,28 @@ Phase 1 does these properly:
 4. **Icons cannot be Skia canvases on the web.** A browser allows about 16 WebGL contexts and each Skia canvas uses one. Home had 18 canvases, and the first ones went blank. The spike drew `Icon` as inline SVG from the same path data (no icon package); Home then has 2 canvases. Every screen needs a count: the board step of the welcome flow and the board settings show many small boards.
 5. **The server needs CORS** on the sign-in routes (`registerRoutes(http, createAuth, { cors: … })`) and the web address in `trustedOrigins`.
 6. **The session** needs a web twin of the client (0.7) and of `createSecureSessionStorage`.
+
+7. **Sound needs a web twin on the Web Audio API** (see the next section). `expo-audio` on the web plays each sound with an `<audio>` element.
+8. **The dice canvas must stay mounted.** A new canvas per roll is a new WebGL context each time.
+9. **The stack numbers need a font file.** On the web Skia has no system font: `useFont` with the bundled Piazzolla file.
+10. **The dice throw speed must follow the board size.** On a large board the fixed speeds looked weak.
+
+### The Safari freezes
+
+The owner saw lag in Safari on a Mac, and more on an iPhone (2026-11-20). What we measured, in real Safari 27.2 on a GitHub Mac runner (the **Safari check** workflow, one game, 8 moves):
+
+| Build | Time in slow frames | Frames over 100 ms | Frames per second |
+|-------|--------------------|--------------------|-------------------|
+| Sound through `<audio>` (expo-audio) | 13.1 s | 44 | 46 |
+| Sound through one `AudioContext` | 3.4 s | 2 | 57 |
+| The same, with plain checkers (2 circles each) | 1.3 s | 3 | 59 |
+
+- **The cause.** Each time an `<audio>` element starts while no other sound plays, Safari turns its audio session on with a blocking call to another process (`MediaSessionManagerInterface::maybeActivateAudioSession`). The page's main thread waits 300 to 700 ms. No JavaScript runs and nothing is drawn, so a JavaScript profile shows nothing. A native sample of the page process (macOS `sample`) found it: 5.2 s of 10.9 s of main thread work.
+- **The fix.** One `AudioContext` that stays open, started on the first tap, with every sound decoded once into a buffer. Safari turns the audio session on one time. Phase 1 builds this as the web twin of the `SoundPlayer` adapter.
+- **Two smaller fixes, tried on the spike (2026-11-21).** (1) Each checker draws from one ready image (made once with `drawAsImage`) in place of about 9 shapes with gradients. One board redraw fell from about 280 draw calls to 70 to 110, and the average per frame from 19 to 5. (2) The dice roll once out of sight when a canvas starts (under the board art, or in a canvas with opacity 0), so Safari compiles their drawing programs (shaders) before the first roll: 21 programs during play became 3 or 4. A small clip does not work for this: Skia then draws simpler shapes. In the same Safari run: 9.2 s in slow frames and 18 frames over 100 ms without the two fixes, 3.7 to 3.8 s and 5 to 7 frames with them. The runner is noisy (the build without them measured 3.4 s in an earlier run), so read this as "not worse, fewer and smaller GPU stalls", not as an exact gain. Phase 1 builds both properly.
+- **What is left.** The slow frames that remain (60 to 120 ms, and one of about 250 ms per game) are JavaScript: React work after a move or a roll. They are not Safari only. Phase 2 looks at them with the React profiler.
+- **Wrong leads, so nobody tries them again.** A lower pixel density did not help. Blur, the number of canvases and the phone's speed were not the cause. Headless Chromium without a graphics card gives no useful speed numbers.
+- **How to test speed.** Use the Safari check workflow (`docs/process/running-the-app.md`). The spike's frame meter (`?hud=1`) and its switches (`?fx=`) are on the spike branch only.
 
 ### What else we saw
 
