@@ -54,3 +54,7 @@ credentials/
 *.aab
 *.ipa
 *.tar.gz
+
+# The web build (#669): CanvasKit is copied in, the export is output
+public/canvaskit.wasm
+web-dist/

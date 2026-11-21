@@ -226,6 +226,17 @@ eas build --profile production --platform ios --auto-submit
 
 The Sentry token is a secret EAS variable, and a local build cannot read one. Add a `SENTRY_AUTH_TOKEN` repo secret to get the Sentry upload. Without it the workflow skips the upload (`SENTRY_DISABLE_AUTO_UPLOAD`), and crash reports of that build do not point to our source.
 
+### Run in a browser (#669)
+
+The app builds for the web from the same code. The web version is not public yet, and it has no sound fix, online play or web layouts so far: see [the web plan](../architecture/web-app.md), phase 1.
+
+```bash
+pnpm --filter @tavli/mobile web          # dev server, opens http://localhost:8081
+pnpm --filter @tavli/mobile web:export   # a static site in apps/mobile/web-dist
+```
+
+Both scripts first copy `canvaskit.wasm` (Skia for the web, 8 MB) into `apps/mobile/public/`. Git ignores that file and `web-dist/`. The web entry is `apps/mobile/index.web.ts`: it loads CanvasKit, then starts Expo Router. To look at an export, serve `web-dist` with any static server that answers unknown paths with `index.html`.
+
 ### Web preview
 
 The **Web preview** workflow (`.github/workflows/web-preview.yml`, #637) builds the web version from a branch and puts it on the dev site, the Cloudflare Worker `tavlaki-play-dev` (`apps/mobile/web/wrangler.jsonc`). Use it to test the web version on a real phone and in Safari. The web version is a plan, not a product yet: see [the web plan](../architecture/web-app.md).

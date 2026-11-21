@@ -156,10 +156,32 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec jest --shard=${{ matrix.shard }}/2
 
+  # The web app builds (#669). A change that breaks the browser build then
+  # blocks the merge. The job has no secrets: it only bundles.
+  web:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+
+      - name: Build the web app
+        run: pnpm --filter @tavli/mobile web:export
+
+      # The site answers a missing file with the app page, so a missing
+      # CanvasKit would only show as a broken board in the browser.
+      - name: Check the build
+        working-directory: apps/mobile
+        run: test -s web-dist/index.html && test -s web-dist/canvaskit.wasm
+
   # The required check. It fails when any job above failed or was cancelled.
   # A skipped job (docs-only change) counts as passed.
   checks:
-    needs: [changes, static, test-packages, test-bot, test-app]
+    needs: [changes, static, test-packages, test-bot, test-app, web]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
