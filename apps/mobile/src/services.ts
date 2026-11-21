@@ -62,6 +62,8 @@ import { t } from 'i18next';
 import type { ComponentType } from 'react';
 import { Platform } from 'react-native';
 
+import { createWebSoundPlayer, spikeSoundMode } from './spikeWebSound';
+
 import { APP_SCHEME, convexServer } from '@/convexUrl';
 import { botLevelsByGame } from '@/features/bot/levels';
 import type { GameLevels } from '@/features/match/setup';
@@ -107,7 +109,12 @@ function createAnalytics(): Analytics {
   });
 }
 /** Sound effects. Use `appSound` (features/feedback), which follows the Sound setting. */
-export const sound: SoundPlayer = createExpoSoundPlayer();
+export const sound: SoundPlayer =
+  Platform.OS !== 'web' || spikeSoundMode() === 'old'
+    ? createExpoSoundPlayer()
+    : spikeSoundMode() === 'none'
+      ? { load: () => undefined, play: () => undefined, unload: () => undefined }
+      : createWebSoundPlayer();
 
 /** A fresh 32-bit seed: from `crypto` when the runtime has it, else from the clock. */
 function randomSeed(): number {
