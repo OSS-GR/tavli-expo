@@ -29,6 +29,7 @@ import type { BoardPicture } from './boardModel';
 import type { BoardShape } from './screenLayout';
 import { checkerRadius, type BoardGeometry } from './geometry';
 import { BoardScene, type BoardHighlights } from './skia/BoardScene';
+import { useWarming, WarmDice } from './skia/WarmDice';
 import { useBoardImages, useNumberFont } from './useBoardAssets';
 
 /** The board theme picked in Settings → Board (the default theme for an unknown id). */
@@ -135,6 +136,16 @@ export function BoardCanvas({
 }: BoardCanvasProps) {
   const images = useBoardImages(theme, geo.layout);
   const font = useNumberFont(theme.checkers.badge.fontSize * checkerRadius(geo));
+  // The web's dice warm-up (#679): under the board art, in the middle.
+  const warming = useWarming();
+  const warm = warming ? (
+    <WarmDice
+      style={theme.dice}
+      size={geo.layout.dice.size * geo.width}
+      x={size.width / 2}
+      y={size.height / 2}
+    />
+  ) : null;
   return (
     <Canvas testID={testID} style={{ width: size.width, height: size.height }}>
       <BoardScene
@@ -143,6 +154,7 @@ export function BoardCanvas({
         images={images}
         picture={picture}
         font={font}
+        under={warm}
         {...(hidden ? { hidden } : {})}
         {...(highlights ? { highlights } : {})}>
         {children}

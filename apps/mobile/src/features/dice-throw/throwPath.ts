@@ -231,6 +231,30 @@ export function swipeFloor(tuning: ThrowTuning = THROW_TUNING): number {
  */
 export const PAIR_GAP = 0.62;
 
+/** The long side of the playing surface that the tuning's speeds were made for, in points. */
+export const TUNED_SURFACE = 600;
+
+/**
+ * The tuning for a larger playing surface (#679). The speeds are in points
+ * per second, made for a phone board. In a wide browser window the board is
+ * two or three times as large, and the same speeds look weak: the dice stop
+ * early. This scales every speed with the long side of the surface, so a
+ * throw crosses the same share of the board. Rates, shares and times stay.
+ * A surface up to `TUNED_SURFACE` keeps the tuning as it is.
+ */
+export function tuningForSurface(box: Box, tuning: ThrowTuning = THROW_TUNING): ThrowTuning {
+  const k = Math.max(box.right - box.left, box.bottom - box.top) / TUNED_SURFACE;
+  if (!(k > 1)) return tuning;
+  return {
+    ...tuning,
+    minSpeed: tuning.minSpeed * k,
+    maxSpeed: tuning.maxSpeed * k,
+    friction: tuning.friction * k,
+    quietHit: tuning.quietHit * k,
+    hopSpeed: tuning.hopSpeed * k,
+  };
+}
+
 /**
  * The throw for a swipe. The touch decides where the dice come in: from the
  * wall of the field closest to where the finger went down, straight into

@@ -31,6 +31,8 @@ import { ActionButton } from '@/components/ActionButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { DIE_SIZE } from '@/features/board/diceMotion';
 import { AnimatedDie } from '@/features/board/skia/AnimatedDie';
+import { useWarming, WarmDice } from '@/features/board/skia/WarmDice';
+import { WEB_BOARD } from '@/features/board/webBoard';
 
 import { CountdownLine } from './CountdownLine';
 import { openingDice, type OpeningStatus } from './opening';
@@ -102,34 +104,45 @@ function OpeningDie({
   onLand?: () => void;
 }) {
   const tilt = theme.layouts['portrait-rotated'].dice.tilt[index] ?? 0;
+  // The web's dice warm-up (#679), while the die is not rolled yet.
+  const warming = useWarming() && value === null;
+  const dieCanvas = (
+    <Canvas
+      testID={testID}
+      style={styles.dieBox}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={label}>
+      {warming ? <WarmDice style={theme.dice} size={SIZE} x={BOX / 2} y={BOX / 2} /> : null}
+      {value === null ? null : (
+        <AnimatedDie
+          key={rollKey}
+          style={theme.dice}
+          x={BOX / 2}
+          y={BOX / 2}
+          size={SIZE}
+          value={value}
+          index={index}
+          tilt={tilt}
+          used={false}
+          rollKey={rollKey}
+          {...(onLand ? { onLand } : {})}
+        />
+      )}
+    </Canvas>
+  );
   return (
     // One canvas for the whole card life, always in this native view
     // (`collapsable={false}`): on iOS a canvas that moves to another native
     // parent loses its drawing (#173). The empty slot comes after it, so the
     // canvas keeps its place.
     <View collapsable={false} style={styles.dieBox}>
-      <Canvas
-        testID={testID}
-        style={styles.dieBox}
-        accessible
-        accessibilityRole="image"
-        accessibilityLabel={label}>
-        {value === null ? null : (
-          <AnimatedDie
-            key={rollKey}
-            style={theme.dice}
-            x={BOX / 2}
-            y={BOX / 2}
-            size={SIZE}
-            value={value}
-            index={index}
-            tilt={tilt}
-            used={false}
-            rollKey={rollKey}
-            {...(onLand ? { onLand } : {})}
-          />
-        )}
-      </Canvas>
+      {WEB_BOARD ? (
+        // Invisible while the warm-up rolls in it. A wrapper: the web canvas takes no style list.
+        <View style={warming ? styles.warming : undefined}>{dieCanvas}</View>
+      ) : (
+        dieCanvas
+      )}
       {value === null ? (
         // Not rolled yet: an empty slot with a brass outline. The canvas says it.
         <View
@@ -333,6 +346,9 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     gap: theme.space.xs,
     maxWidth: 140,
+  },
+  warming: {
+    opacity: 0,
   },
   dieBox: {
     width: BOX,

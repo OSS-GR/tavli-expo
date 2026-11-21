@@ -20,6 +20,8 @@ import {
   swipeToThrow,
   tapThrow,
   throwBox,
+  tuningForSurface,
+  TUNED_SURFACE,
   type Box,
   type PlanThrowInput,
   type SettleTarget,
@@ -633,5 +635,61 @@ describe('offBar', () => {
     // Straight up still starts at the near wall, away from the bar.
     const upward = swipeToThrow(undefined, { x: 0, y: -90 }, { x: 0, y: -900 }, BOX, DIE, BAR);
     expect(upward.at).toEqual({ x: 180, y: 520 });
+  });
+});
+
+describe('tuningForSurface', () => {
+  it('keeps the tuning on a phone board', () => {
+    expect(tuningForSurface(BOX)).toBe(THROW_TUNING);
+    const edge: Box = { left: 0, top: 0, right: TUNED_SURFACE, bottom: 300 };
+    expect(tuningForSurface(edge)).toBe(THROW_TUNING);
+  });
+
+  it('scales the speeds with the long side of a larger surface, and nothing else', () => {
+    const wide: Box = { left: 100, top: 50, right: 100 + 2 * TUNED_SURFACE, bottom: 700 };
+    const tuned = tuningForSurface(wide);
+    expect(tuned.minSpeed).toBe(2 * THROW_TUNING.minSpeed);
+    expect(tuned.maxSpeed).toBe(2 * THROW_TUNING.maxSpeed);
+    expect(tuned.friction).toBe(2 * THROW_TUNING.friction);
+    expect(tuned.quietHit).toBe(2 * THROW_TUNING.quietHit);
+    expect(tuned.hopSpeed).toBe(2 * THROW_TUNING.hopSpeed);
+    expect({
+      ...tuned,
+      minSpeed: 0,
+      maxSpeed: 0,
+      friction: 0,
+      quietHit: 0,
+      hopSpeed: 0,
+    }).toEqual({
+      ...THROW_TUNING,
+      minSpeed: 0,
+      maxSpeed: 0,
+      friction: 0,
+      quietHit: 0,
+      hopSpeed: 0,
+    });
+  });
+
+  it('uses the long side, whichever it is', () => {
+    const tall: Box = { left: 0, top: 0, right: 400, bottom: 3 * TUNED_SURFACE };
+    expect(tuningForSurface(tall).maxSpeed).toBe(3 * THROW_TUNING.maxSpeed);
+  });
+
+  it('a button throw on a board twice as large goes twice as far', () => {
+    const small: Box = { left: 0, top: 0, right: 600, bottom: 400 };
+    const large: Box = { left: 0, top: 0, right: 1200, bottom: 800 };
+    const reach = (box: Box, die: number) => {
+      const tuning = tuningForSurface(box);
+      const start = buttonThrow(box, 0, tuning);
+      const plan = planThrow({ box, start, dieSize: die, values: [5, 3], tilts: [-11, 9], tuning });
+      return Math.max(
+        ...plan.dice.map((d) =>
+          Math.hypot((last(d.x) ?? 0) - (d.x[0] ?? 0), (last(d.y) ?? 0) - (d.y[0] ?? 0)),
+        ),
+      );
+    };
+    const ratio = reach(large, 60) / reach(small, 30);
+    expect(ratio).toBeGreaterThan(1.6);
+    expect(ratio).toBeLessThan(2.4);
   });
 });

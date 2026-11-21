@@ -20,6 +20,7 @@ import type { DieView } from '@/features/game/gameStore';
 
 import { DIE_SIZE, dicePlaces, doublePlaces, type DicePlace } from './diceMotion';
 import { AnimatedDie } from './skia/AnimatedDie';
+import { useWarming, WarmDice } from './skia/WarmDice';
 
 export interface DiceRowProps {
   theme: ThemeManifest;
@@ -69,6 +70,10 @@ export function DiceRow({
   testID,
 }: DiceRowProps) {
   const { t } = useTranslation();
+  // The web's dice warm-up (#679). Only a row that starts empty warms up:
+  // its canvas is invisible meanwhile, and real dice must never hide.
+  const [startedEmpty] = useState(dice.length === 0);
+  const warming = useWarming() && startedEmpty;
   const double = dice.length === 4;
   // Dice at rest (no roll) always show all four of a double. A thrown roll
   // (`rest`) keeps the reveal of a double: only its tumble is off.
@@ -117,7 +122,8 @@ export function DiceRow({
         accessible
         accessibilityRole="image"
         accessibilityLabel={label}
-        style={{ width, height }}>
+        style={warming ? { width, height, opacity: 0 } : { width, height }}>
+        {warming ? <WarmDice style={theme.dice} size={size} x={width / 2} y={height / 2} /> : null}
         {dice.map((d, i) => {
           const slot = slots[i];
           if (slot === undefined) return null;
