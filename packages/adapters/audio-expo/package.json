@@ -2,7 +2,7 @@
   "name": "@tavli/audio-expo",
   "version": "0.0.0",
   "private": true,
-  "description": "SoundPlayer port adapter backed by expo-audio.",
+  "description": "SoundPlayer port adapter: expo-audio on a phone, the Web Audio API in a browser.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -17,9 +17,11 @@
     "@tavli/contracts": "workspace:*"
   },
   "peerDependencies": {
+    "expo-asset": "~58.0.21",
     "expo-audio": "~58.0.11"
   },
   "devDependencies": {
+    "expo-asset": "~58.0.21",
     "expo-audio": "~58.0.11"
   }
 }

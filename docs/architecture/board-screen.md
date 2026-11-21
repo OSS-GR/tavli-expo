@@ -225,7 +225,7 @@ The owner's play test said the bot moved too fast to follow. Now each step of th
 ## Sound and haptics
 
 - One call per game event: `feedback.event('checkerPlace')`. `features/feedback/feedback.ts` (`createGameFeedback`) looks up the theme's `sounds[event]` and `haptics[event]` and plays both. It drops an event that comes too soon after the same one (`MIN_GAP_MS`, e.g. 70 ms for checker clicks).
-- Two ports: `SoundPlayer` (adapter `@tavli/audio-expo`, expo-audio) and `Feedback` (haptics, adapter `@tavli/haptics-expo`). `appSound` follows Settings → Sound, `appFeedback` follows Settings → Haptics.
+- Two ports: `SoundPlayer` (adapter `@tavli/audio-expo`: expo-audio on a phone, the Web Audio API in a browser, #675) and `Feedback` (haptics, adapter `@tavli/haptics-expo`). `appSound` follows Settings → Sound, `appFeedback` follows Settings → Haptics.
 - `features/game/gameFeedback.ts` (`useGameFeedback`, used by `GameScreen`) reads the engine's event log after each store change: a roll plays `diceRoll`; a move plays `checkerPlace`, `checkerHit` (hit or pin) or `bearOff`; the next player's turn plays `turnStart`; the end plays `gameWin` or `matchWin`. An action the engine refuses plays `invalidMove`. So drag, tap, bot and replay all sound the same, and screens need no extra calls. An online game reads the server's views instead (`eventsOf`, see [Online mode](#online-mode-255)); an event with `at` plays that many ms later.
 - UI-only events (`diceLand`, `checkerPickUp`) use the `event` function that `useGameFeedback` returns.
 - The theme's sounds are preloaded when the game screen opens. Sounds mix with other apps' audio and follow the phone's silent switch.
