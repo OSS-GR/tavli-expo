@@ -25,7 +25,7 @@
     "@edge-runtime/vm": "5.0.0",
     "@tavli/auth-better-auth": "workspace:*",
     "@tavli/backend-convex": "workspace:*",
-    "convex-test": "0.0.61",
+    "convex-test": "0.0.71",
     "typescript": "~6.0.3"
   }
 }
