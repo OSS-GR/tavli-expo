@@ -1,13 +1,22 @@
 /**
  * Loads what the Skia board needs from a theme: its images and the badge font.
  */
-import { Skia, loadData, matchFont, type SkFont, type SkImage } from '@shopify/react-native-skia';
+import {
+  Skia,
+  loadData,
+  matchFont,
+  useFont,
+  type SkFont,
+  type SkImage,
+} from '@shopify/react-native-skia';
 import type { BoardLayout, ThemeManifest } from '@tavli/themes';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
 import type { BoardImages } from './skia/BoardScene';
 import { THEME_IMAGES } from './themeImages';
+
+import { WEB_BOARD } from './webBoard';
 
 /** The image keys one layout draws: its layers and the two point woods. */
 export function layoutImageKeys(theme: ThemeManifest, layout: BoardLayout): string[] {
@@ -155,7 +164,7 @@ export function useBoardImages(theme: ThemeManifest, layout: BoardLayout): Board
 }
 
 /** A bold system font for numbers drawn on the board (count badges). */
-export function useNumberFont(size: number): SkFont | null {
+function useSystemNumberFont(size: number): SkFont | null {
   const rounded = Math.max(6, Math.round(size));
   return useMemo(() => {
     try {
@@ -169,3 +178,20 @@ export function useNumberFont(size: number): SkFont | null {
     }
   }, [rounded]);
 }
+
+/**
+ * The same on the web (#679): CanvasKit has no system fonts, so `matchFont`
+ * finds nothing and the badges would show no number. The web loads the
+ * app's own bold font file. `null` until it is loaded.
+ */
+function useFileNumberFont(size: number): SkFont | null {
+  return useFont(
+    require('../../../assets/fonts/Piazzolla-Bold.ttf'),
+    Math.max(6, Math.round(size)),
+  );
+}
+
+/** A bold font for numbers drawn on the board (count badges). */
+export const useNumberFont: (size: number) => SkFont | null = WEB_BOARD
+  ? useFileNumberFont
+  : useSystemNumberFont;

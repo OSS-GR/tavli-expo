@@ -70,6 +70,8 @@ export interface BoardSceneProps {
   highlights?: BoardHighlights;
   /** Drawn over the checkers and highlights, under the lamp (moving checkers). */
   children?: ReactNode;
+  /** Drawn first, under the board art: the web's dice warm-up (`WarmDice`, #679). */
+  under?: ReactNode;
 }
 
 const NO_HIGHLIGHTS: BoardHighlights = { select: null, targets: [] };
@@ -103,6 +105,7 @@ export function BoardScene({
   hidden,
   highlights = NO_HIGHLIGHTS,
   children,
+  under,
 }: BoardSceneProps) {
   const { layout } = geo;
   const W = geo.width;
@@ -131,6 +134,7 @@ export function BoardScene({
 
   return (
     <Group>
+      {under}
       {/* 1. Board shadow on the table. */}
       <RoundedRect
         x={board.x + layout.shadow.dx * W}

@@ -28,7 +28,7 @@ export interface IconProps {
 export function Icon({ name, color, size = 24, strokeWidth = 2, testID }: IconProps) {
   const shape: { strokes: readonly string[]; fills?: readonly string[] } = ICONS[name];
   return (
-    <View testID={testID} style={{ width: size, height: size }} pointerEvents="none" aria-hidden>
+    <View testID={testID} style={{ width: size, height: size, pointerEvents: 'none' }} aria-hidden>
       {createElement(
         'svg',
         { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', focusable: 'false' },

@@ -136,6 +136,7 @@ import { markMatchIntroPlayed, matchIntroDue } from '@/features/intro/introRuns'
 import { TableScene } from '@/features/intro/TableScene';
 import { TABLE_SCENE_MS } from '@/features/intro/tableMotion';
 import { useBoardTheme } from '@/features/board/BoardCanvas';
+import { WEB_BOARD } from '@/features/board/webBoard';
 import {
   armyFrozen,
   asodioMarks,
@@ -1609,7 +1610,11 @@ export function GameScreen({
   // does not start again), but hide until they have their new place.
   const placeGeo = freshGeo ?? boardGeo?.geo ?? null;
   const diceBox = showDice && placeGeo !== null ? boardDiceBox(placeGeo, dice.length) : null;
-  const diceHidden = freshGeo === null || throwPlaying;
+  // On the web the dice canvas stays mounted between rolls, hidden (#679):
+  // a new canvas is a new WebGL context, and its first draws block the page.
+  const diceMountBox =
+    diceBox ?? (WEB_BOARD && placeGeo !== null ? boardDiceBox(placeGeo, 2) : null);
+  const diceHidden = freshGeo === null || throwPlaying || diceBox === null;
   // The hand-over of the throw (#183): the dice row lies on the board,
   // inside the canvas, so the thrown dice glide into it.
   const settle =
@@ -2262,7 +2267,7 @@ export function GameScreen({
           ) : null
         }
       />
-      {diceBox ? (
+      {diceMountBox ? (
         // The dice lie on the board, in the theme's dice area (#184), in
         // every layout. Touches go through. The dice canvas keeps its
         // own native view (`DiceRow`, #173), and this box is a native view
@@ -2274,7 +2279,7 @@ export function GameScreen({
           collapsable={false}
           style={[
             styles.boardDice,
-            { left: diceBox.left, top: diceBox.top },
+            { left: diceMountBox.left, top: diceMountBox.top },
             diceHidden && styles.diceHidden,
           ]}>
           <DiceRow
@@ -2285,8 +2290,8 @@ export function GameScreen({
             rest={thrownRest}
             split={reveal.split}
             onLanded={onDiceLanded}
-            size={diceBox.size}
-            pairSize={diceBox.pairSize}
+            size={diceMountBox.size}
+            pairSize={diceMountBox.pairSize}
             lostReason={
               dice === view.dice && lost !== null && lostRoll !== null
                 ? lostReason(t, lost, lostRoll)

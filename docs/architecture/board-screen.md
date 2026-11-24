@@ -58,6 +58,19 @@ The real route is `app/game/[id]/index.tsx`; match end is `app/game/[id]/match-e
 
 **Game flow and ADR-0003.** The engine's turn flow (#25) is already a pure reducer with every phase in it, so the app wraps it in a small Zustand store and adds no second state machine. ADR-0003 records this (updated in #29).
 
+
+## The board in a browser (#679)
+
+The same Skia code draws the board on the web (CanvasKit). A few parts take their own path there, all behind the constant `WEB_BOARD` (`features/board/webBoard.ts`), so a phone draws exactly as before:
+
+- **Numbers:** CanvasKit has no system font. `useNumberFont` loads the bundled Piazzolla file on the web.
+- **Checkers:** `CheckerShape` draws one ready image per look (`skia/checkerSprite.ts`, made once with `drawAsImage`), and the full art until the image is there. Safari is slow per draw call.
+- **Dice warm-up:** `WarmDice` (`skia/WarmDice.tsx`) draws the dice once, out of sight, when the board, the dice row or an opening die canvas starts, so the browser builds their shaders before the first roll.
+- **The dice canvas** stays mounted between rolls (`GameScreen`): a new canvas is a new WebGL context.
+- **Throw speed:** `tuningForSurface` (`dice-throw/throwPath.ts`) scales the throw speeds with the board size, so a throw crosses a large board too.
+
+The reasons and the numbers are in [the web plan](web-app.md), "The Safari freezes".
+
 ## Board themes
 
 - Three boards ship: **Walnut Kafeneio** (default), **Olive Inlay** and **Kafeneio Night** (dark, #144) (`packages/themes`). All have the same geometry, so only the art changes.

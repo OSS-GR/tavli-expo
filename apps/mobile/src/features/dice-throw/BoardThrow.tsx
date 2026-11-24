@@ -21,6 +21,7 @@ import { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import type { BoardGeometry } from '@/features/board/geometry';
+import { WEB_BOARD } from '@/features/board/webBoard';
 import type { GameFeedback } from '@/features/feedback/feedback';
 
 import { boardThrowBox, throwBar, throwDieSize } from './throwField';
@@ -32,11 +33,13 @@ import {
   settlePlan,
   swipeToThrow,
   tapThrow,
+  tuningForSurface,
   type Box,
   type SettleTarget,
   type ThrowBar,
   type ThrowPlan,
   type ThrowStart,
+  type ThrowTuning,
 } from './throwPath';
 import { ThrownDie } from './ThrownDie';
 
@@ -99,8 +102,9 @@ function throwStart(
   bar: ThrowBar | undefined,
   nearEnd: 'top' | 'bottom',
   wall: 'top' | 'bottom',
+  tuning: ThrowTuning,
 ): ThrowStart {
-  if (swipe === null) return buttonThrow(box, buttonTurns++, THROW_TUNING, wall);
+  if (swipe === null) return buttonThrow(box, buttonTurns++, tuning, wall);
   if (swipe.dx !== undefined && swipe.dy !== undefined) {
     return swipeToThrow(
       swipe.x === undefined || swipe.y === undefined ? undefined : { x: swipe.x, y: swipe.y },
@@ -109,12 +113,13 @@ function throwStart(
       box,
       dieSize,
       bar,
+      tuning,
     );
   }
   if (swipe.x !== undefined && swipe.y !== undefined) {
-    return tapThrow({ x: swipe.x, y: swipe.y }, box, dieSize, THROW_TUNING, nearEnd);
+    return tapThrow({ x: swipe.x, y: swipe.y }, box, dieSize, tuning, nearEnd);
   }
-  return buttonThrow(box, buttonTurns++);
+  return buttonThrow(box, buttonTurns++, tuning);
 }
 
 export function BoardThrow({
@@ -133,8 +138,18 @@ export function BoardThrow({
     const box = boardThrowBox(geo);
     const dieSize = throwDieSize(geo);
     const bar = throwBar(geo);
-    const start = throwStart(swipe, box, dieSize, bar, nearEnd, wall);
-    const plan = planThrow({ box, bar, start, dieSize, values, tilts: geo.layout.dice.tilt });
+    // On the web the board can be much larger than a phone's (#679).
+    const tuning = WEB_BOARD ? tuningForSurface(box) : THROW_TUNING;
+    const start = throwStart(swipe, box, dieSize, bar, nearEnd, wall, tuning);
+    const plan = planThrow({
+      box,
+      bar,
+      start,
+      dieSize,
+      values,
+      tilts: geo.layout.dice.tilt,
+      tuning,
+    });
     return settle ? settlePlan(plan, settle, dieSize) : plan;
   });
   const clock = useSharedValue(0);
