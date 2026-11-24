@@ -12,7 +12,7 @@ App Store Connect asks for these (v1.0 page, 2026-11-21):
 |-----|------|-----------|-------|
 | iPhone 6.3" | **1206 × 2622** portrait | iPhone 17 Pro | Required. Apple scales it for other iPhones. Up to 10 per language. |
 | iPhone Duo | **2853 × 2007** landscape (the open inner screen) | iPhone Duo, posture open | The app supports the open Duo (#649, #659). |
-| Header image (optional) | 3840 × 1646 | none | Made (2026-11-21): the icon, the name and three phone shots on the walnut colors. A second version has the phones only. Walnut, Olive Inlay and Kafeneio Night, left to right. |
+| Header image (optional) | 3840 × 1646 | none | Made (2026-11-21): the icon, the name and three phone shots on the walnut colors. A second version has the phones only. Walnut, Olive Inlay and Kafeneio Night, left to right. On an iPhone the store shows only the middle 2,490 px or so, so all of it sits in the middle 2,300 px. |
 | iPad | none | | The app is iPhone only (`ios.supportsTablet` is not set). |
 
 **Owner:** check the sizes in App Store Connect before you upload. Apple changes them from time to time.
