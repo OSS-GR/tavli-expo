@@ -24,12 +24,13 @@
 
 | Doc | What it holds |
 |-----|---------------|
-| [Store listing (English)](store/listing.en.md) | App name, subtitle, keywords, descriptions, "What's new", with character counts |
+| [Store listing (English)](store/listing.en.md) | App name, subtitle, keywords, descriptions, "What's new", App Review notes, with character counts |
 | [Store listing (Greek)](store/listing.el.md) | The same texts in Greek |
 | [App Store privacy labels](store/app-privacy.md) | App Privacy answers, what leaves the phone, points to check |
 | [Google Play data safety](store/play-data-safety.md) | Data safety form and other App content forms |
 | [Age rating](store/age-rating.md) | App Store age rating, IARC content rating, Play target audience |
-| [Screenshots plan](store/screenshots.md) | Six shots, sizes, how to take them on the simulator and emulator |
+| [App Store accessibility](store/accessibility.md) | App Accessibility answers (VoiceOver, Larger Text, ...) and why |
+| [Screenshots plan](store/screenshots.md) | iPhone 6.3" and iPhone Duo shots, captions, how to take them |
 
 ## Game rules (the engine spec)
 
