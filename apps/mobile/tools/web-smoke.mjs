@@ -10,16 +10,20 @@
 //   never drops a WebGL context (it keeps about 16; each canvas is one);
 // - sounds use one AudioContext and no <audio> element (#675);
 // - the table intro shows at game start (#681);
-// - a roll and a move work on the board.
-import { createReadStream, existsSync, statSync } from 'node:fs';
+// - a roll and a move work on the board;
+// - the first screen downloads at most MAX_FIRST_BYTES with Brotli (#690).
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { brotliCompressSync } from 'node:zlib';
 
 import { chromium } from 'playwright';
 
 /** A browser keeps about 16 WebGL contexts. Stay well under it. */
 const MAX_CANVASES = 12;
+/** The goal for the first screen (the web plan, phase 1): 4 MB with Brotli, as the site sends it. */
+const MAX_FIRST_BYTES = 4_000_000;
 const ROUTES = [
   '/new-game',
   '/settings',
@@ -52,11 +56,13 @@ if (!existsSync(path.join(root, 'index.html'))) {
 }
 
 // A static server that answers an unknown path with the app page, as the site does.
+const served = new Set();
 const server = createServer((req, res) => {
   let file = path.join(root, decodeURIComponent((req.url ?? '/').split('?')[0]));
   if (!file.startsWith(root) || !existsSync(file) || statSync(file).isDirectory()) {
     file = path.join(root, 'index.html');
   }
+  served.add(file);
   res.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' });
   createReadStream(file).pipe(res);
 });
@@ -117,7 +123,19 @@ try {
 
   // The welcome flow.
   await page.goto(base);
-  await tap('welcome-language-continue', 60000);
+  await byId('welcome-language-continue').waitFor({ timeout: 60000 });
+  // What the browser fetched up to the first screen, as Brotli makes it.
+  const first = [...served].map((file) => brotliCompressSync(readFileSync(file)).length);
+  const firstBytes = first.reduce((sum, n) => sum + n, 0);
+  console.log(
+    `first screen: ${(firstBytes / 1e6).toFixed(2)} MB with Brotli, ${first.length} files`,
+  );
+  if (firstBytes > MAX_FIRST_BYTES) {
+    problems.push(
+      `the first screen downloads ${(firstBytes / 1e6).toFixed(2)} MB with Brotli (at most ${MAX_FIRST_BYTES / 1e6} MB)`,
+    );
+  }
+  await tap('welcome-language-continue');
   await tap('welcome-consent-deny');
   await byId('welcome-board-continue').waitFor();
   await page.waitForTimeout(800);

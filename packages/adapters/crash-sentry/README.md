@@ -95,4 +95,6 @@ Dev builds send nothing (the no-op reporter). Before an answer only JS errors go
 
 ## Tests
 
+The adapter is `src/sentry.ts`. In a browser Metro picks `src/sentry.web.ts`, which does nothing: the web gets crash reports in phase 4 of `docs/architecture/web-app.md` (#690).
+
 `src/index.test.ts` mocks `@sentry/react-native` (Node cannot load React Native code). It runs the shared port contract (`runCrashReporterContract` from `@tavli/contracts/testing`) and checks the options, the opt-out and the privacy scrub.
