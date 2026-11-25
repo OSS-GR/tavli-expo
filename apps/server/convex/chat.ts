@@ -312,7 +312,8 @@ export const deleteChatRows = internalMutation({
 /**
  * Moves up to `CHAT_DELETE_PAGE` chat rows of guest `source` to account
  * `target` (#403), and runs again while there may be more. A mute the
- * account has already is dropped. Scheduled by `startGuestMove`, after
+ * account has already is dropped. A ban of the guest follows the person:
+ * the account gets it, unless the account's own ban lasts longer. Scheduled by `startGuestMove`, after
  * the guest is deleted, so no new row can name it.
  */
 export const moveGuestChat = internalMutation({
@@ -338,6 +339,21 @@ export const moveGuestChat = internalMutation({
         await ctx.db.patch(row._id, { playerId: target });
       } else {
         await ctx.db.delete(row._id);
+      }
+    }
+    // A guest cannot chat, so a ban of one is rare; it must not be lost in
+    // a move, and no row may point at the deleted guest.
+    const ban = await banRow(ctx, source);
+    if (ban !== null) {
+      const own = await banRow(ctx, target);
+      if (own === null) {
+        await ctx.db.patch(ban._id, { playerId: target });
+      } else {
+        // The longer ban stays: no end beats any end.
+        const longer =
+          own.until === null || ban.until === null ? null : Math.max(own.until, ban.until);
+        await ctx.db.patch(own._id, { until: longer });
+        await ctx.db.delete(ban._id);
       }
     }
     if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
