@@ -55,6 +55,8 @@ describe('useOnlineConnection', () => {
       safety: expect.objectContaining({ report: expect.any(Function) }),
       // The opponent card (#651) on the same in-memory server.
       friends: onlineFake.devFriendsFor('me'),
+      // The chat (#692) on the same in-memory server.
+      chat: onlineFake.devChatFor('me'),
       me: 'me',
     });
     // The same ports on each render.
@@ -79,6 +81,7 @@ describe('useOnlineConnection', () => {
       transport: onlineFake.games,
       safety: onlineFake.safety,
       friends: onlineFake.friends,
+      chat: onlineFake.chat,
       me: 'guest-1',
     });
     expect(onlineFake.authStore.guests).toBe(0);

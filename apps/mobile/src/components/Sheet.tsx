@@ -23,7 +23,7 @@
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
  * Android resizes the window.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -83,6 +83,16 @@ export interface SheetProps {
   look?: SheetLook;
   /** The screen under it turns with the phone (the game screen): the sheet turns too. */
   turns?: boolean;
+  /**
+   * A part under the scrolling content that stays in place (the chat's
+   * text field, #692): the content scrolls above it.
+   */
+  footer?: ReactNode;
+  /**
+   * The content is a list that grows at its end (the chat): the sheet
+   * scrolls to the end when it opens and when the content grows.
+   */
+  stickToEnd?: boolean;
   children: ReactNode;
   testID?: string;
 }
@@ -94,9 +104,12 @@ export function Sheet({
   ownCloseButton = false,
   look = 'sheet',
   turns = false,
+  footer,
+  stickToEnd = false,
   children,
   testID,
 }: SheetProps) {
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   // Keep the last look while the Modal fades out: a caller that picks the
   // look from what it shows (Settings → Account) must not restyle a
   // closing sheet.
@@ -179,11 +192,18 @@ export function Sheet({
               </GestureDetector>
             ) : null}
             <ScrollView
+              ref={scroll}
               style={styles.scroll}
-              contentContainerStyle={styles.content(shown)}
-              keyboardShouldPersistTaps="handled">
+              contentContainerStyle={styles.content(shown, footer != null)}
+              keyboardShouldPersistTaps="handled"
+              {...(stickToEnd
+                ? {
+                    onContentSizeChange: () => scroll.current?.scrollToEnd({ animated: false }),
+                  }
+                : {})}>
               {children}
             </ScrollView>
+            {footer != null ? <View style={styles.footer(shown)}>{footer}</View> : null}
           </Animated.View>
         </KeyboardAvoidingView>
       </GestureHandlerRootView>
@@ -267,16 +287,24 @@ const styles = StyleSheet.create((theme, rt) => ({
     flexGrow: 0,
   },
   // One object for every look, so a theme change repaints it (#539).
-  content: (look: SheetLook) => ({
+  content: (look: SheetLook, hasFooter: boolean) => ({
     gap: look === 'bare' ? 0 : theme.space.sm,
     paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
     // `raised`: the handle area above already gives the space.
     paddingTop: look === 'bare' ? 0 : look === 'raised' ? theme.space.xxs : theme.space.xl,
-    paddingBottom:
-      look === 'bare'
+    // With a footer, the footer keeps clear of the bottom edge.
+    paddingBottom: hasFooter
+      ? theme.space.sm
+      : look === 'bare'
         ? 0
         : look === 'sheet' || look === 'raised'
           ? rt.insets.bottom + theme.space.lg
           : theme.space.xl,
+  }),
+  footer: (look: SheetLook) => ({
+    paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
+    paddingTop: theme.space.sm,
+    paddingBottom:
+      look === 'sheet' || look === 'raised' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
   }),
 }));

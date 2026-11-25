@@ -19,6 +19,7 @@ import { onlineFake } from '../test/onlineFake';
 import {
   createOnlineServices,
   lazyFriends,
+  lazyChat,
   lazyMatchmaking,
   lazyRatings,
   once,
@@ -152,6 +153,10 @@ function memoryAdapters() {
         if (user !== null && !user.isGuest) server.markSaved(user.id);
         return server.matchmakingFor(user?.id ?? null);
       });
+    },
+    createChat: ({ auth }) => {
+      made.push('chat');
+      return lazyChat(() => server.chatFor(auth.currentUser()?.id ?? null));
     },
   };
   return { adapters, authStore, server, made, phone, updates };

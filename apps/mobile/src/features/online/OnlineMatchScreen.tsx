@@ -28,6 +28,10 @@
  * - There is no game resign online: Resign match goes to the server.
  * - Report or block (#435): the menu opens the dialog for the other
  *   player (`features/safety`), in the same sheet.
+ * - Chat (ADR-0011, #692): a game with a chat for this player shows the
+ *   chat button beside the other seat, with a dot for new messages. It
+ *   opens the chat in the same sheet (`features/chat`); the text field is
+ *   the sheet's footer. A report from the chat names the game.
  * - The game-end sheet has Review (#604): the review screen asks the
  *   server for the record of that game (`GameTransport.gameRecord`). There
  *   is no Hint online, and nothing goes to the save slot or History: the
@@ -37,10 +41,12 @@
  */
 import {
   turnDeadlineMs,
+  type Chat,
   type Friends,
   type GameTransport,
   type PlayerCard,
   type Safety,
+  type Usernames,
 } from '@tavli/contracts';
 import { opponent, type PlayerId, type PresetId } from '@tavli/engine';
 import { mayRollOpening } from '@tavli/online';
@@ -51,8 +57,12 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ChatComposer, ChatSheet, type ChatFix } from '@/features/chat/ChatSheet';
+import { chatSeen, newestSentAt, unreadCount } from '@/features/chat/chatSeen';
+import { chatOffered, useChat } from '@/features/chat/useChat';
 import { Sheet } from '@/components/Sheet';
 import { useGameStore } from '@/features/game/gameStore';
+import { useAnnouncement } from '@/features/game/useAnnouncement';
 import {
   GameScreen,
   type OnlineEndedGame,
@@ -91,6 +101,12 @@ export interface OnlineMatchScreenProps {
   safety?: Safety;
   /** The other player's card (#651). Without it their name is not a button. */
   friends?: Friends;
+  /** The chat of the game (#692). Without it there is no chat button. */
+  chat?: Chat;
+  /** Accepts new terms from the chat (#692). Without it the chat sends the player to the username screen. */
+  usernames?: Usernames;
+  /** Opens the screen that lets this player chat (save the account, pick a username, accept the terms). */
+  onChatFix?: (status: ChatFix) => void;
   /** The player id of this phone. */
   me: string;
   /** Another screen is on top (Settings). */
@@ -156,8 +172,10 @@ type Overlay =
   | { readonly kind: 'resignMatch' }
   /** The other player's card (#651). */
   | { readonly kind: 'card' }
-  /** Report or block (#435), with the player as the menu named them. */
-  | { readonly kind: 'safety'; readonly player: SafetyPlayer };
+  /** Report or block (#435), with the player as the menu named them. `fromChat`: opened from the chat. */
+  | { readonly kind: 'safety'; readonly player: SafetyPlayer; readonly fromChat?: boolean }
+  /** The chat of the game (#692). */
+  | { readonly kind: 'chat' };
 
 const NO_OVERLAY: Overlay = { kind: 'none' };
 
@@ -207,6 +225,9 @@ function OnlineBoard({
   gameId,
   safety,
   friends,
+  chat,
+  usernames,
+  onChatFix,
   paused = false,
   covered = false,
   onExit,
@@ -233,6 +254,19 @@ function OnlineBoard({
   // A report or block on its way keeps its dialog open (`onHold`).
   const [held, setHeld] = useState(false);
   const close = () => setOverlay(NO_OVERLAY);
+
+  // The chat (#692): live while the screen is open. What this phone has
+  // read is kept on the phone (`chatSeen`); the dot counts what is newer.
+  const chatView = useChat(chat, gameId);
+  const [seenAt, setSeenAt] = useState(() => chatSeen.seenAt(gameId));
+  const [rulesSeen, setRulesSeen] = useState(() => chatSeen.rulesSeen());
+  const chatOpen = overlay.kind === 'chat';
+  const newest = chatView === null ? 0 : newestSentAt(chatView);
+  // An open chat is a read chat. The phone keeps what was read.
+  if (chatOpen && newest > seenAt) setSeenAt(newest);
+  useEffect(() => {
+    chatSeen.markSeen(gameId, seenAt);
+  }, [gameId, seenAt]);
 
   // Resign match while your turn is on its way: the store takes no action
   // then, so the resign waits and goes as soon as the call is done.
@@ -283,6 +317,17 @@ function OnlineBoard({
       : { ...plainSeats, [opponentSide]: cardSeat(plainSeats[opponentSide], loaded, openCard, t) };
   const named = playerNameText(opponentName, t);
   const name = (player: PlayerId) => seats[player].name;
+  // A new message from the other player is read to screen readers once
+  // (#692), also while the chat is closed. Old messages are not read again.
+  const heard = chatView?.messages.findLast(
+    (message) => message.from !== side && message.sentAt > seenAt,
+  );
+  useAnnouncement(
+    heard === undefined
+      ? null
+      : t('chat.newMessage', { name: name(opponentSide), text: heard.text }),
+    heard === undefined ? undefined : `chat:${gameId}:${heard.id}`,
+  );
   if (view === null) return null;
 
   const finished = view.status === 'finished';
@@ -493,9 +538,53 @@ function OnlineBoard({
     );
   } else if (overlay.kind === 'safety' && safety) {
     content = (
-      <ReportOrBlock player={overlay.player} safety={safety} onClose={close} onHold={setHeld} />
+      <ReportOrBlock
+        player={overlay.player}
+        safety={safety}
+        onClose={close}
+        onHold={setHeld}
+        {...(overlay.fromChat ? { chatGameId: gameId } : {})}
+      />
+    );
+  } else if (overlay.kind === 'chat' && chat && chatOffered(chatView)) {
+    content = (
+      <ChatSheet
+        chat={chat}
+        view={chatView}
+        me={side}
+        opponentName={name(opponentSide)}
+        rulesSeen={rulesSeen}
+        {...(usernames ? { usernames } : {})}
+        onRulesSeen={() => {
+          chatSeen.markRulesSeen();
+          setRulesSeen(true);
+        }}
+        onFix={(status) => {
+          close();
+          onChatFix?.(status);
+        }}
+        onSettings={() => {
+          close();
+          onSettings();
+        }}
+        {...(safety && opponentId !== undefined
+          ? {
+              onReportOrBlock: () =>
+                setOverlay({
+                  kind: 'safety',
+                  player: { id: opponentId, name: opponentName },
+                  fromChat: true,
+                }),
+            }
+          : {})}
+        onClose={close}
+      />
     );
   }
+  // The text field stays in place under the messages.
+  const composing =
+    overlay.kind === 'chat' && chat && chatView?.status === 'open' && rulesSeen && content !== null;
+  const unread = unreadCount(chatView, side, seenAt);
 
   return (
     <>
@@ -506,6 +595,19 @@ function OnlineBoard({
         paused={paused || covered || overlay.kind !== 'none'}
         covered={covered || content !== null}
         onOpenMenu={() => setOverlay({ kind: 'menu' })}
+        {...(chat && chatOffered(chatView)
+          ? {
+              chat: {
+                unread,
+                label:
+                  unread > 0
+                    ? t('chat.openUnread', { name: name(opponentSide), count: unread })
+                    : t('chat.openLabel', { name: name(opponentSide) }),
+                hint: t('chat.openHint'),
+                onOpen: () => setOverlay({ kind: 'chat' }),
+              },
+            }
+          : {})}
         onHome={onExit}
         onMatchOver={onMatchOver}
         // The game that ended is the last one in the match so far.
@@ -519,7 +621,14 @@ function OnlineBoard({
           if (!held) close();
         }}
         closeLabel={t('game.menu.resume')}
-        look={overlay.kind === 'menu' || overlay.kind === 'card' ? 'raised' : 'dialog'}
+        look={
+          overlay.kind === 'menu' || overlay.kind === 'card' || overlay.kind === 'chat'
+            ? 'raised'
+            : 'dialog'
+        }
+        {...(composing
+          ? { footer: <ChatComposer chat={chat} gameId={gameId} />, stickToEnd: true }
+          : {})}
         // The game screen turns with the phone (#185); its menu and dialog too.
         turns>
         {content}

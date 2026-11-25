@@ -34,9 +34,11 @@ import {
 } from '@/features/match/routes';
 import { useTurnPushOffering } from '@/features/notifications/appTurnPushes';
 import { stopDevGame } from '@/features/online/devGame';
+import { isDevGame } from '@/features/online/devGameIds';
 import { OnlineConnect } from '@/features/online/OnlineConnect';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
 import { useOnlineGameShowing } from '@/features/update/updateCheck';
+import { usernames } from '@/services';
 
 /** Back to Home: pops to it, or opens it when the board was the first screen. */
 function goHome() {
@@ -67,12 +69,18 @@ export default function GameRoute() {
     return (
       <View style={styles.screen}>
         <OnlineConnect gameId={id} onHome={goHome}>
-          {({ transport, safety, friends, me }) => (
+          {({ transport, safety, friends, chat, me }) => (
             <OnlineMatchScreen
               gameId={id}
               transport={transport}
               safety={safety}
               {...(friends ? { friends } : {})}
+              {...(chat ? { chat } : {})}
+              // The terms are accepted on the real server, never for a dev game.
+              {...(usernames && !isDevGame(id) ? { usernames } : {})}
+              onChatFix={(status) =>
+                router.push(status === 'needs-account' ? '/account' : '/username')
+              }
               me={me}
               paused={!focused}
               covered={offering}

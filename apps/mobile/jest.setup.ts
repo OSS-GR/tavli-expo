@@ -61,6 +61,7 @@ jest.mock('@/services', () => {
     friends: onlineFake.friends,
     ratings: onlineFake.ratings,
     matchmaking: onlineFake.matchmaking,
+    chat: onlineFake.chat,
     appBuild: onlineFake.appBuild,
     onlineServer: onlineFake.server,
     onlinePlayerId: 'me',
@@ -68,6 +69,7 @@ jest.mock('@/services', () => {
     invitesFor: onlineFake.invitesFor,
     devSafetyFor: onlineFake.devSafetyFor,
     devFriendsFor: onlineFake.devFriendsFor,
+    devChatFor: onlineFake.devChatFor,
   };
 });
 

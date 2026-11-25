@@ -52,7 +52,8 @@ export type WhatsNewEntryId =
   | 'quickFriends'
   | 'foldable'
   | 'friendPage'
-  | 'opponentCard';
+  | 'opponentCard'
+  | 'chat';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -68,6 +69,10 @@ export interface WhatsNewRelease {
 
 /** Every release, newest first. */
 export const RELEASES: readonly WhatsNewRelease[] = [
+  {
+    date: '2026-11-25',
+    entries: [{ id: 'chat', icon: 'messageCircle' }],
+  },
   {
     date: '2026-11-21',
     entries: [
