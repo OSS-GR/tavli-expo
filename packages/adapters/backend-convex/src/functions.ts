@@ -27,6 +27,9 @@ import type {
   AppUpdatePolicy,
   BlockedPlayer,
   BoardRow,
+  ChatMessage,
+  ChatSettings,
+  ChatView,
   FoundPlayer,
   Friend,
   FriendRequests,
@@ -294,6 +297,47 @@ export const SAFETY_FUNCTIONS: SafetyFunctions = {
   unblockPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.unblockPlayer),
   listMyBlocks: makeFunctionReference(SAFETY_FUNCTION_NAMES.listMyBlocks),
   reportPlayer: makeFunctionReference(SAFETY_FUNCTION_NAMES.reportPlayer),
+};
+
+/** The chat functions in `apps/server/convex/chat.ts` (ADR-0011, #692). */
+export interface ChatFunctions {
+  readonly getChat: FunctionReference<'query', 'public', { gameId: string }, ChatView>;
+  readonly sendChat: FunctionReference<
+    'mutation',
+    'public',
+    { gameId: string; text: string },
+    ChatMessage
+  >;
+  readonly setChatMuted: FunctionReference<
+    'mutation',
+    'public',
+    { gameId: string; muted: boolean },
+    null
+  >;
+  readonly myChatSettings: FunctionReference<
+    'query',
+    'public',
+    Record<string, never>,
+    ChatSettings
+  >;
+  readonly setChatEnabled: FunctionReference<'mutation', 'public', { enabled: boolean }, null>;
+}
+
+/** The Convex function names (`module:function`) of the chat calls. */
+export const CHAT_FUNCTION_NAMES = {
+  getChat: 'chat:getChat',
+  sendChat: 'chat:sendChat',
+  setChatMuted: 'chat:setChatMuted',
+  myChatSettings: 'chat:myChatSettings',
+  setChatEnabled: 'chat:setChatEnabled',
+} as const satisfies { readonly [K in keyof ChatFunctions]: string };
+
+export const CHAT_FUNCTIONS: ChatFunctions = {
+  getChat: makeFunctionReference(CHAT_FUNCTION_NAMES.getChat),
+  sendChat: makeFunctionReference(CHAT_FUNCTION_NAMES.sendChat),
+  setChatMuted: makeFunctionReference(CHAT_FUNCTION_NAMES.setChatMuted),
+  myChatSettings: makeFunctionReference(CHAT_FUNCTION_NAMES.myChatSettings),
+  setChatEnabled: makeFunctionReference(CHAT_FUNCTION_NAMES.setChatEnabled),
 };
 
 /** What `requestByUsername` returns: a failed request is a value, so the search stays counted. */

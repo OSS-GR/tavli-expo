@@ -80,6 +80,11 @@ describe('cleanChatText', () => {
     expect(cleanChatText(' \n ')).toBe('');
   });
 
+  it('keeps the joiners, so a joined emoji stays one sign', () => {
+    const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}';
+    expect(cleanChatText(`hi ${family}`)).toBe(`hi ${family}`);
+  });
+
   it('keeps one composed form', () => {
     expect(cleanChatText('é')).toBe('é');
   });
@@ -128,6 +133,7 @@ describe('hasBadWord', () => {
     'a cocktail after the game',
     'καλή επιτυχία',
     'a raccoon and a spice rack',
+    'do not niggle',
   ])('allows %s', (text) => {
     expect(hasBadWord(text)).toBe(false);
   });

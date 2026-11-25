@@ -14,6 +14,7 @@ import type * as appleTokens from "../appleTokens.js";
 import type * as auth from "../auth.js";
 import type * as authKeys from "../authKeys.js";
 import type * as caller from "../caller.js";
+import type * as chat from "../chat.js";
 import type * as emailCodes from "../emailCodes.js";
 import type * as friendEdges from "../friendEdges.js";
 import type * as friends from "../friends.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authKeys: typeof authKeys;
   caller: typeof caller;
+  chat: typeof chat;
   emailCodes: typeof emailCodes;
   friendEdges: typeof friendEdges;
   friends: typeof friends;

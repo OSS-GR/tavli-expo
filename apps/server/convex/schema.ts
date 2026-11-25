@@ -200,6 +200,8 @@ export default defineSchema({
     /** The terms of use version the player accepted (`TERMS_VERSION`), and when. */
     termsVersion: v.optional(v.string()),
     termsAcceptedAt: v.optional(v.number()),
+    /** Chat turned off in all games (ADR-0011, `chat.ts`). Absent: on. */
+    chatOff: v.optional(v.boolean()),
   })
     .index('by_player', ['playerId'])
     .index('by_username_key', ['usernameKey'])
@@ -238,6 +240,37 @@ export default defineSchema({
     .index('by_reporter', ['reporterId', 'createdAt'])
     .index('by_pair', ['reporterId', 'reportedId'])
     .index('by_reported', ['reportedId']),
+
+  /**
+   * Chat messages (ADR-0011, `chat.ts`): one row per message of an online
+   * game. Not part of the stored game or its record. The text never goes
+   * to analytics, pushes or logs.
+   */
+  chatMessages: defineTable({
+    gameId: v.id('games'),
+    /** The sender's player id, for the account delete and the rate limit. */
+    senderId: v.string(),
+    /** The sender's side in the game. */
+    from: side,
+    /** The clean text (`cleanChatText`), at most `CHAT_MAX_LENGTH` characters. */
+    text: v.string(),
+    /** When the server took it, epoch ms (server clock). */
+    sentAt: v.number(),
+    /** Sent by a player the other blocked then: only the sender sees it. */
+    hidden: v.boolean(),
+  })
+    .index('by_game', ['gameId', 'sentAt'])
+    .index('by_game_sender', ['gameId', 'senderId', 'sentAt'])
+    .index('by_sender', ['senderId']),
+
+  /**
+   * Chat mutes (ADR-0011, `chat.ts`): `playerId` hides the chat of
+   * `gameId`. One row per player and game. Deleted with the account.
+   */
+  chatMutes: defineTable({
+    playerId: v.string(),
+    gameId: v.id('games'),
+  }).index('by_player', ['playerId', 'gameId']),
 
   /**
    * Friends (#406, `friends.ts`): two rows per friendship, one from each
