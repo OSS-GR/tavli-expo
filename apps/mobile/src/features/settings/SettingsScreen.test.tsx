@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 /** Settings with every way out, as the route gives them. */
-function allProps(): Required<Omit<SettingsScreenProps, 'turnPushes' | 'visit'>> {
+function allProps(): Required<Omit<SettingsScreenProps, 'turnPushes' | 'visit' | 'chat'>> {
   return {
     onBack: jest.fn(),
     onPage: jest.fn(),

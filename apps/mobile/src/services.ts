@@ -15,6 +15,7 @@ import {
 import { createBetterAuthProvider, createSecureSessionStorage } from '@tavli/auth-better-auth';
 import {
   createConvexAppUpdates,
+  createConvexChat,
   createConvexClient,
   createConvexFriends,
   createConvexRatings,
@@ -34,6 +35,7 @@ import {
   type AppleSheet,
   type AppUpdates,
   type AuthProvider,
+  type Chat,
   type BotRunner,
   type CrashReporter,
   type Feedback,
@@ -180,6 +182,7 @@ const online = createOnlineServices(convexServer(), {
   createAppUpdates: (client) => createConvexAppUpdates({ client }),
   createUsernames: (client) => createConvexUsernames({ client }),
   createSafety: (client) => createConvexSafety({ client }),
+  createChat: (client) => createConvexChat({ client }),
   createFriends: (client) => createConvexFriends({ client }),
   createRatings: (client) => createConvexRatings({ client }),
   createMatchmaking: (client) => createConvexMatchmaking({ client }),
@@ -336,6 +339,25 @@ export function devSafetyFor(playerId: string): Safety {
   if (port === undefined) {
     port = onlineServer().safetyFor(playerId);
     safetyPorts.set(playerId, port);
+  }
+  return port;
+}
+
+/**
+ * The chat of an online game (ADR-0011, #692), on the same client as
+ * `games`. The chat sheet (`features/chat/`) and Settings use it. A dev
+ * game uses `devChatFor` instead (`useOnlineConnection`).
+ */
+export const chat: Chat | undefined = online?.chat;
+
+const chatPorts = new Map<string, Chat>();
+
+/** Dev games' chat for `playerId`, on the in-memory server. One port per player. */
+export function devChatFor(playerId: string): Chat {
+  let port = chatPorts.get(playerId);
+  if (port === undefined) {
+    port = onlineServer().chatFor(playerId);
+    chatPorts.set(playerId, port);
   }
   return port;
 }

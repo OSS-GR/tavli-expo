@@ -269,6 +269,12 @@
       "label": "Leaderboards",
       "hint": "Your rating, your friends and the top players"
     },
+    "chat": {
+      "label": "Chat in online games",
+      "hint": "Off: no chat in any of your games. Other players are not told why.",
+      "problemTitle": "The switch did not change",
+      "problemText": "We could not save it. Try again."
+    },
     "blocked": {
       "label": "Blocked players",
       "hint": "Players you blocked or reported"
@@ -1128,6 +1134,11 @@
     "new": "New",
     "where": "Find it: {{where}}",
     "entries": {
+      "chat": {
+        "title": "Chat with your opponent",
+        "body": "Write short messages to the other player in an online game, with a friend or in Play ranked. You can mute a chat, turn chat off for all games, and report or block a player. Chat needs a saved account with a username.",
+        "where": "Online game › the chat button beside your opponent"
+      },
       "onlineReview": {
         "title": "Review your online games",
         "body": "After an online game, Review shows your biggest mistakes and the best moves, as after a game vs the computer. It looks at your own turns only.",
@@ -2420,6 +2431,70 @@
       "support": "Support Tavlaki",
       "notNow": "Not now",
       "never": "Don't ask again"
+    }
+  },
+  "chat": {
+    "title": "Chat",
+    "with": "with {{name}}",
+    "open": "Chat",
+    "openLabel": "Chat with {{name}}",
+    "openUnread_one": "Chat with {{name}}, {{count}} new message",
+    "openUnread_other": "Chat with {{name}}, {{count}} new messages",
+    "openHint": "Opens the chat of this game",
+    "empty": "No messages yet. Say hello to {{name}}.",
+    "placeholder": "Write a message",
+    "inputLabel": "Message",
+    "send": "Send",
+    "close": "Close the chat",
+    "left_one": "{{count}} character left",
+    "left_other": "{{count}} characters left",
+    "over_one": "{{count}} character too long",
+    "over_other": "{{count}} characters too long",
+    "youSaid": "You: {{text}}",
+    "theySaid": "They: {{text}}",
+    "newMessage": "{{name}} wrote: {{text}}",
+    "mute": "Mute",
+    "muteHint": "Hides the chat of this game. The other player is not told.",
+    "unmute": "Show the chat again",
+    "report": "Report",
+    "reportHint": "Report or block {{name}}",
+    "status": {
+      "needsAccount": "Chat is for saved accounts. Save your account to chat with other players.",
+      "needsUsername": "Pick a username to chat with other players.",
+      "needsTerms": "The terms of use changed. Accept them to chat.",
+      "turnedOff": "You turned chat off for all games.",
+      "muted": "You muted this chat. New messages do not show.",
+      "banned": "You cannot chat now. We stopped your chat after a report.",
+      "unavailable": "This game has no chat."
+    },
+    "fix": {
+      "account": "Save my account",
+      "username": "Pick a username",
+      "terms": "Read and accept",
+      "settings": "Open Settings"
+    },
+    "terms": {
+      "read": "Read the terms",
+      "accept": "I accept the terms",
+      "failed": "We could not save it. Try again."
+    },
+    "rules": {
+      "title": "Before you chat",
+      "kind": "Be kind. Swearing is fine; attacks on people are not.",
+      "noLinks": "No links and no email addresses.",
+      "tools": "You can mute this chat, or report or block the player, at the top.",
+      "kept": "We delete messages 30 days after the match ends.",
+      "ok": "OK"
+    },
+    "problem": {
+      "empty": "Write something first.",
+      "tooLong": "This message is too long.",
+      "link": "Messages cannot hold links or email addresses.",
+      "badWords": "This message breaks the chat rules. Change it and send again.",
+      "tooFast": "Too many messages. Wait a moment.",
+      "closed": "The chat is closed.",
+      "signedOut": "You are signed out. Sign in to chat.",
+      "network": "The message was not sent. Try again."
     }
   }
 }

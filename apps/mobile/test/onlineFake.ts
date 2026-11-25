@@ -60,6 +60,7 @@ import {
   createMemoryAuthStore,
   createMemoryPushNotifications,
   createMemoryPushTokens,
+  type Chat,
   type Friends,
   type Ratings,
   type GameTransport,
@@ -102,6 +103,7 @@ const transports = new Map<string, GameTransport>();
 const invitePorts = new Map<string, Invites>();
 const safetyPorts = new Map<string, Safety>();
 const friendPorts = new Map<string, Friends>();
+const chatPorts = new Map<string, Chat>();
 const notifications = createMemoryPushNotifications('ios');
 const appleSheet = createMemoryAppleSheet();
 const pushTokens = createMemoryPushTokens(() => auth.currentUser()?.id ?? null);
@@ -137,6 +139,27 @@ function devSafetyFor(playerId: string): Safety {
   }
   return port;
 }
+
+/** One `Chat` port per player on the current server, like `devChatFor` in the app. */
+function devChatFor(playerId: string): Chat {
+  let port = chatPorts.get(playerId);
+  if (port === undefined) {
+    port = server.chatFor(playerId);
+    chatPorts.set(playerId, port);
+  }
+  return port;
+}
+
+/** The chat on the server (#692), as the user signed in to `auth` at that moment. */
+const chat: Chat = {
+  watch: (gameId, onChat, onError) =>
+    server.chatFor(auth.currentUser()?.id ?? null).watch(gameId, onChat, onError),
+  send: (request) => server.chatFor(auth.currentUser()?.id ?? null).send(request),
+  setMuted: (gameId, muted) =>
+    server.chatFor(auth.currentUser()?.id ?? null).setMuted(gameId, muted),
+  settings: () => server.chatFor(auth.currentUser()?.id ?? null).settings(),
+  setEnabled: (enabled) => server.chatFor(auth.currentUser()?.id ?? null).setEnabled(enabled),
+};
 
 /** One `Friends` port per player on the current server, like `devFriendsFor` in the app. */
 function devFriendsFor(playerId: string): Friends {
@@ -338,6 +361,10 @@ export const onlineFake = {
   friends,
   ratings,
   matchmaking,
+  /** The `Chat` port (#692), as the user signed in to `auth`. */
+  chat,
+  /** The cached dev `Chat` port of `playerId` on the current server. */
+  devChatFor,
   /** This build, like `appBuild()` of `@/services`. */
   appBuild: (): AppBuild | null => build,
   /** Sets this build for the rest of the test (`null`: no store build). */
@@ -386,6 +413,7 @@ export function resetOnlineFake(): void {
   invitePorts.clear();
   safetyPorts.clear();
   friendPorts.clear();
+  chatPorts.clear();
   notifications.reset();
   pushTokens.reset();
   appUpdates.reset();

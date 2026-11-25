@@ -5,7 +5,7 @@
  * the transport, block and report (`Safety`, #435) and the player id
  * (`useOnlineConnection`, `connection.ts`).
  */
-import type { Friends, GameTransport, Safety } from '@tavli/contracts';
+import type { Chat, Friends, GameTransport, Safety } from '@tavli/contracts';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
@@ -21,6 +21,7 @@ export interface OnlineConnectProps {
     transport: GameTransport;
     safety: Safety;
     friends: Friends | null;
+    chat: Chat | null;
     me: string;
   }) => ReactNode;
 }
@@ -39,6 +40,7 @@ export function OnlineConnect({ gameId, onHome, children }: OnlineConnectProps) 
     transport: connection.transport,
     safety: connection.safety,
     friends: connection.friends,
+    chat: connection.chat,
     me: connection.me,
   });
 }

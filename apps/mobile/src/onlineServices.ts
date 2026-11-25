@@ -5,14 +5,15 @@
  * (`PushNotifications`), Delete my online data (`OnlineData`) and the
  * update policy (`AppUpdates`), usernames (`Usernames`), block and report
  * (`Safety`, #435), friends (`Friends`, #406), ratings (`Ratings`,
- * #407) and Play ranked matching (`Matchmaking`, #531), built on first use.
+ * #407), Play ranked matching (`Matchmaking`, #531) and the chat of a
+ * game (`Chat`, #692), built on first use.
  *
  * `services.ts` passes the adapters. This file imports none, so Jest can
  * test it with fakes. Nothing here runs at app start:
  * - the sign-in client is made on the first call to `auth`;
  * - the Convex client (one socket) opens on the first call to `games`,
  *   `invites`, `pushTokens`, `onlineData`, `appUpdates`, `usernames`,
- *   `safety`, `friends`, `ratings` or `matchmaking`; they share it;
+ *   `safety`, `friends`, `ratings`, `matchmaking` or `chat`; they share it;
  * - the notifications adapter is made on its first call. The root layout
  *   listens for taps on a push at start (`usePushTaps`): that only reads
  *   the phone, with no network call and no prompt. Turn notifications are
@@ -25,6 +26,7 @@
 import type {
   AppUpdates,
   AuthProvider,
+  Chat,
   Friends,
   GameTransport,
   Invites,
@@ -60,6 +62,8 @@ export interface OnlineServices {
   readonly ratings: Ratings;
   /** Play ranked matching of saved accounts (#531), on the same client. */
   readonly matchmaking: Matchmaking;
+  /** The chat of an online game (ADR-0011, #692), on the same client. */
+  readonly chat: Chat;
 }
 
 /** How to make the real parts. `services.ts` passes the adapters. */
@@ -90,6 +94,8 @@ export interface OnlineAdapters<Client> {
   createRatings(client: Client): Ratings;
   /** Play ranked matching on the shared client. */
   createMatchmaking(client: Client): Matchmaking;
+  /** The chat of an online game on the shared client. */
+  createChat(client: Client): Chat;
 }
 
 /** Calls `make` once, on the first call, and keeps the result. */
@@ -236,6 +242,17 @@ export function lazyMatchmaking(get: () => Matchmaking): Matchmaking {
   };
 }
 
+/** A `Chat` port that makes the real one on its first call. */
+export function lazyChat(get: () => Chat): Chat {
+  return {
+    watch: (gameId, onChat, onError) => get().watch(gameId, onChat, onError),
+    send: (request) => get().send(request),
+    setMuted: (gameId, muted) => get().setMuted(gameId, muted),
+    settings: () => get().settings(),
+    setEnabled: (enabled) => get().setEnabled(enabled),
+  };
+}
+
 /** A `PushNotifications` port that makes the real one on its first use. */
 export function lazyPushNotifications(get: () => PushNotifications): PushNotifications {
   return {
@@ -276,6 +293,7 @@ export function createOnlineServices<Client>(
   const friends = once(() => adapters.createFriends(client()));
   const ratings = once(() => adapters.createRatings(client()));
   const matchmaking = once(() => adapters.createMatchmaking(client()));
+  const chat = once(() => adapters.createChat(client()));
   return {
     auth: lazyAuthProvider(auth),
     games: lazyGameTransport(games),
@@ -289,5 +307,6 @@ export function createOnlineServices<Client>(
     friends: lazyFriends(friends),
     ratings: lazyRatings(ratings),
     matchmaking: lazyMatchmaking(matchmaking),
+    chat: lazyChat(chat),
   };
 }

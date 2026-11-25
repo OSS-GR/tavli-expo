@@ -465,6 +465,26 @@ Home's **Play ranked** tile (a row of its own above the other tiles, #517; "Find
 - **Analytics**: `ranked_search_started` and `ranked_search_ended` (the game, how it ended, the wait in seconds). Never an id, a name or a rating.
 - **Tests:** `RankedScreen.test.tsx` (the save step, the rules sheet once, the search, "Nobody yet", a match found, analytics), `RankedMatchEnd.test.tsx`, and the `#532` tests in `navigation.test.tsx` (a guest sees the save step; a saved player lands in the game) and `HomeScreen.test.tsx`.
 
+## Chat (#692)
+
+> ADR-0011. The server side is "Chat" in [the online game service](online-game-service.md#chat).
+
+The two players of an online game write short messages to each other (`features/chat/`).
+
+- **The chat button.** `OnlineMatchScreen` watches the game's chat (`useChat`, one `Chat.watch` per game screen) and gives `GameScreen` its `chat` prop when the game has a chat to offer this player (`chatOffered`: every status but `unavailable`). The button sits beside the other seat (portrait) or under the menu button (the left rail), with a dot for new messages.
+- **The sheet.** The chat opens in the game screen's one sheet (overlay `chat`, look `raised`): iOS shows no second `Modal`. `ChatSheet` is the scrolling content, and `ChatComposer` (the text field and Send) is the sheet's `footer`, so it stays in place. `Sheet` has `footer` and `stickToEnd` for this.
+- **What shows** follows `ChatView.status`: the messages (yours on the right), or a card that says what chat needs with a button (`onChatFix` opens `/account` or `/username`; "turned off" opens Settings), or the muted note with Unmute. The first time, the chat rules show before the text field.
+- **A refused message** keeps the typed text and shows the reason under the field (`FieldProblem`): a link, a slur, too long, too fast. Every `ChatErrorCode` has its own text.
+- **Mute, report, block.** The header has Mute and Report. Report opens `ReportOrBlock` with `chatGameId`: the reasons then offer "Something they wrote in the chat" first, and the report names the game. From the game menu the dialog has no chat reason.
+- **Unread.** `chatSeen` (`chatSeen.ts`) keeps, on the phone only, the time of the newest message read per game (key `chatSeen`, the last 40 games) and whether the rules were read (`chatRulesSeen`). An open chat is a read chat.
+- **Screen readers** hear a new message from the other player once (`useAnnouncement`, key `chat:<game>:<message>`), also while the chat is closed. Each bubble reads as "You: …" or "They: …".
+- **Settings → Online → Chat in online games** (`ChatSettingRow`): the switch the server keeps (`Chat.setEnabled`). It shows once the setting loaded.
+- The services: `chat` from `@/services` (Convex), `devChatFor` for a dev game (`useOnlineConnection` gives the right one), `onlineFake.chat` and `onlineFake.devChatFor` in Jest.
+- **Try it on a phone:** a dev online game (`/dev/online`, dev builds) has a chat. `startDevGame` with `chat` gives this phone and the bot a username on the in-memory server, and the bot answers each message after `DEV_CHAT_REPLY_MS`. No real account is needed.
+- No message text goes to analytics, crash reports or logs. There is no analytics event for chat.
+
+Tests: `features/chat/ChatScreen.test.tsx` (the button, the dot, the rules, a send, a refusal, mute, the "chat needs" cards, a report from the chat, the screen reader), `ChatSettingRow.test.tsx`, `chatSeen.test.ts`.
+
 ## What a saved account gives (#463)
 
 `AccountBenefits` (`features/online/AccountBenefits.tsx`) lists what a saved account gives, the same five rows in each place that shows the full list: **Your own username**, **Your record with each friend**, **Invites in one tap** (the friend gets a notification), **Your games on any phone**, **A rating and leaderboards** (#407). Only what is built: no "coming soon". Add a row only for a built feature, in `BENEFITS` and the `benefits.*` strings.

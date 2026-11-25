@@ -115,10 +115,16 @@ export interface ReportOrBlockProps {
   onClose: () => void;
   /** `true` while the sheet must stay open: a call is on its way. */
   onHold?: (hold: boolean) => void;
+  /**
+   * The dialog opened from the chat of this game (#692): the reasons then
+   * offer "Something they wrote in the chat", and a report names the
+   * game, so the server keeps the player's last messages with it.
+   */
+  chatGameId?: string;
 }
 
 /** The steps of the dialog. Show it in a `Sheet` (`ReportOrBlockSheet`). */
-export function ReportOrBlock({ player, safety, onClose, onHold }: ReportOrBlockProps) {
+export function ReportOrBlock({ player, safety, onClose, onHold, chatGameId }: ReportOrBlockProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>({ kind: 'checking' });
   const live = useRef(true);
@@ -189,7 +195,11 @@ export function ReportOrBlock({ player, safety, onClose, onHold }: ReportOrBlock
       resolve(
         action.kind === 'block'
           ? safety.block(player.id)
-          : safety.report({ playerId: player.id, reason: action.reason }),
+          : safety.report({
+              playerId: player.id,
+              reason: action.reason,
+              ...(chatGameId === undefined ? {} : { gameId: chatGameId }),
+            }),
       );
     }).then(
       () => end({ kind: 'done', action }),
@@ -206,6 +216,7 @@ export function ReportOrBlock({ player, safety, onClose, onHold }: ReportOrBlock
       onRun={run}
       onStep={setStep}
       onClose={onClose}
+      fromChat={chatGameId !== undefined}
     />
   );
 }
@@ -216,9 +227,11 @@ interface StepViewProps {
   onRun: (action: Action) => void;
   onStep: (step: Step) => void;
   onClose: () => void;
+  /** The dialog opened from a chat: the reasons offer the chat reason, first. */
+  fromChat: boolean;
 }
 
-function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
+function StepView({ step, name, onRun, onStep, onClose, fromChat }: StepViewProps) {
   const { t } = useTranslation();
   const titleRef = useFocusOnShow();
   const cancel = (
@@ -287,8 +300,11 @@ function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
             ...(step.blocked ? [t('safety.reasons.blockedAlready')] : []),
             t('safety.reasons.body'),
           ]}>
-          {/* The chat reason shows only where a chat is (the chat sheet, #692). */}
-          {REPORT_REASONS.filter((reason) => reason !== 'chat').map((reason) => (
+          {/* The chat reason shows only from a chat (#692), and first there. */}
+          {(fromChat
+            ? (['chat', ...REPORT_REASONS.filter((reason) => reason !== 'chat')] as const)
+            : REPORT_REASONS.filter((reason) => reason !== 'chat')
+          ).map((reason) => (
             <ActionButton
               key={reason}
               testID={`safety-reason-${reason}`}

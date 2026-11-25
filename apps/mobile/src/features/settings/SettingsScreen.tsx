@@ -1,4 +1,4 @@
-import type { AuthProvider, Usernames } from '@tavli/contracts';
+import type { AuthProvider, Chat, Usernames } from '@tavli/contracts';
 import { getTheme } from '@tavli/themes';
 import Constants from 'expo-constants';
 import { useState } from 'react';
@@ -7,6 +7,7 @@ import { Linking, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { SectionCard, SectionRow } from '@/components/SectionCard';
+import { ChatSettingRow } from '@/features/chat/ChatSettingRow';
 import { HistorySettings } from '@/features/history/HistorySettings';
 import { useTurnPushState } from '@/features/notifications/TurnPushSettings';
 import type { TurnPushes } from '@/features/notifications/turnPushes';
@@ -66,6 +67,11 @@ export interface SettingsScreenProps {
    * phone used online play (`hasOnlineAccount()`, read again each `visit`).
    */
   onBlocked?: () => void;
+  /**
+   * The chat switch (#692): "Chat in online games". It shows like Blocked
+   * players, once the setting loaded.
+   */
+  chat?: Chat;
   /** Opens Friends (#406). `undefined`: no Friends row. */
   onFriends?: () => void;
   /** Opens Leaderboards (#407). `undefined`: no Leaderboards row. Shows like Friends. */
@@ -87,6 +93,7 @@ export function SettingsScreen({
   onTour,
   onSupport,
   turnPushes,
+  chat,
   onAccount,
   account,
   onBlocked,
@@ -176,7 +183,7 @@ export function SettingsScreen({
 
       {/* The account card on top opens Account, so Online has no Account
           row (#561); with no row left, no section. */}
-      {turnPushes || (usedOnline && (onFriends || onRatings || onBlocked)) ? (
+      {turnPushes || (usedOnline && (onFriends || onRatings || onBlocked || chat)) ? (
         <SectionCard title={t('settings.sections.online')}>
           {onFriends && usedOnline ? (
             <SectionRow
@@ -201,6 +208,7 @@ export function SettingsScreen({
           {turnPushes ? (
             <TurnPushRow pushes={turnPushes} onPress={open('notifications')} onOff={onOff} />
           ) : null}
+          {chat && usedOnline ? <ChatSettingRow chat={chat} visit={visit} /> : null}
           {onBlocked && usedOnline ? (
             <SectionRow
               testID="settings-blocked"

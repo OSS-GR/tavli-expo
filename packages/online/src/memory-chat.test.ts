@@ -131,6 +131,16 @@ describe('chat on the in-memory server', () => {
     expect(saved.last()?.status).toBe('muted');
   });
 
+  it("moves a guest's chat ban into the account", async () => {
+    const { server } = setup();
+    await markNamed(server, 'saved');
+    server.banChat('guest', START + 5000);
+    server.moveGuest('guest', 'saved');
+    expect((await server.onlineDataFor('saved').exportMyData()).chat.ban).toEqual({
+      until: START + 5000,
+    });
+  });
+
   it("puts only the caller's own messages and switch in Download my data", async () => {
     const { server, gameId, passTime } = await ready();
     await server.chatFor('alice').send({ gameId, text: 'first' });

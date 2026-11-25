@@ -284,6 +284,31 @@ describe('chat on the Convex server', () => {
     expect(await as(t, ALICE).query(api.chat.myChatSettings, {})).toEqual({ enabled: true });
   });
 
+  it("the guest move gives the guest's chat ban to the account, and the longer ban stays", async () => {
+    const t = await setup();
+    const DAY = 24 * 60 * 60 * 1000;
+    const bans = async () =>
+      (await t.run(async (ctx) => await ctx.db.query('chatBans').collect())).map(
+        ({ playerId, until }) => ({ playerId, until }),
+      );
+    const [first = '', second = '', third = ''] = await authUsers(t, 3);
+    // The account has no ban: it gets the guest's.
+    await t.mutation(internal.chat.banChatForOwner, { playerId: first, days: 2 });
+    await t.mutation(internal.guestMove.startGuestMove, { source: first, target: ALICE });
+    await runScheduled(t);
+    expect(await bans()).toEqual([{ playerId: ALICE, until: START + 2 * DAY }]);
+    // The account's ban is shorter: the guest's longer one stays, in one row.
+    await t.mutation(internal.chat.banChatForOwner, { playerId: second, days: 5 });
+    await t.mutation(internal.guestMove.startGuestMove, { source: second, target: ALICE });
+    await runScheduled(t);
+    expect(await bans()).toEqual([{ playerId: ALICE, until: START + 5 * DAY }]);
+    // A ban with no end beats any end.
+    await t.mutation(internal.chat.banChatForOwner, { playerId: third });
+    await t.mutation(internal.guestMove.startGuestMove, { source: third, target: ALICE });
+    await runScheduled(t);
+    expect(await bans()).toEqual([{ playerId: ALICE, until: null }]);
+  });
+
   it("Download my data holds the caller's own messages and switch, never the other player's", async () => {
     const t = await setup();
     const gameId = await play(t, ALICE, BOB);

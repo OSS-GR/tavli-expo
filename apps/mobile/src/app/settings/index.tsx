@@ -16,7 +16,7 @@ import {
 } from '@/features/match/routes';
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
-import { auth, friends, onlineData, ratings, safety, usernames } from '@/services';
+import { auth, chat, friends, onlineData, ratings, safety, usernames } from '@/services';
 
 export default function SettingsRoute() {
   const { t } = useTranslation();
@@ -41,6 +41,7 @@ export default function SettingsRoute() {
         onAccount={auth && usernames && onlineData ? () => router.push('/account') : undefined}
         account={auth && usernames ? { auth, usernames } : undefined}
         onBlocked={auth && safety ? () => router.push('/blocked') : undefined}
+        chat={auth ? chat : undefined}
         onFriends={auth && friends ? () => router.push(FRIENDS_HREF) : undefined}
         onRatings={auth && ratings ? () => router.push(RATINGS_HREF) : undefined}
         visit={visit}

@@ -15,8 +15,14 @@
  * when this phone accepts it, the bot plays the new game (the bot is the
  * inviter, so it plays White). The invite stops when the dev screen
  * closes.
+ *
+ * Chat (#692): with `chat`, the dev game gives this phone and the bot a
+ * saved account with a username, so the game has a chat, and the bot
+ * answers each message you write (`DEV_CHAT_REPLIES`), a moment later.
+ * This is the way to try the chat on a phone without two real accounts.
  */
 import { thinkingDelayMs } from '@tavli/bot';
+import { TERMS_VERSION } from '@tavli/contracts';
 import type { BotRunner, Difficulty, OnlineGameChoice } from '@tavli/contracts';
 import type { Rng } from '@tavli/engine';
 import type { MemoryGameServer } from '@tavli/online';
@@ -37,6 +43,17 @@ export const DEV_TICK_MS = 1000;
  */
 export const DEV_BOT_MIN_THINK_MS = 1500;
 
+/** The bot waits this long before it answers a chat message. */
+export const DEV_CHAT_REPLY_MS = 1200;
+/** What the bot answers in a dev chat, one after the other. */
+export const DEV_CHAT_REPLIES = [
+  'Καλή επιτυχία!',
+  'Nice roll.',
+  'Έλα, παίξε!',
+  'Good game so far',
+  'One more after this?',
+] as const;
+
 /** What the bot needs to play a dev game. */
 export interface DevBotOptions {
   readonly server: MemoryGameServer;
@@ -45,6 +62,8 @@ export interface DevBotOptions {
   readonly rng: Rng;
   /** For tests: faster bot timing. */
   readonly timing?: Partial<BotTiming>;
+  /** The game has a chat, and the bot answers in it (#692). */
+  readonly chat?: boolean;
 }
 
 /** The game the bot offers: in a dev game, or in a dev invite. */
@@ -79,13 +98,69 @@ export function startDevGame(options: DevGameOptions): DevGame {
     options.targetPoints,
     options.turnTimeMinutes,
   );
-  return playDevGame(gameId, options);
+  return playDevGame(gameId, options, me);
+}
+
+/**
+ * Gives `playerId` a saved account with a username on the dev server, so
+ * the player may chat (#692). A player who has a name keeps it.
+ */
+async function nameForChat(server: MemoryGameServer, playerId: string, name: string) {
+  server.markSaved(playerId);
+  const usernames = server.usernamesFor(playerId, true);
+  if ((await usernames.mine()).name !== null) return;
+  await usernames.setMine({ name, acceptTerms: TERMS_VERSION, ageChecked: true });
+}
+
+/**
+ * The dev chat (#692): names both players, then the bot answers each new
+ * message of the other player. Returns the stop function.
+ */
+function startDevChat(server: MemoryGameServer, gameId: string, me: string): () => void {
+  let stopped = false;
+  let stopWatch: (() => void) | null = null;
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const answered = new Set<string>();
+  let replies = 0;
+  void Promise.all([
+    nameForChat(server, me, 'You_dev'),
+    nameForChat(server, DEV_BOT_ID, 'Dev_bot'),
+  ]).then(
+    () => {
+      if (stopped) return;
+      const chat = server.chatFor(DEV_BOT_ID);
+      const mine = server.getGame(gameId)?.players.white === DEV_BOT_ID ? 'white' : 'black';
+      stopWatch = chat.watch(gameId, (view) => {
+        for (const message of view.messages) {
+          if (message.from === mine || answered.has(message.id)) continue;
+          answered.add(message.id);
+          const text = DEV_CHAT_REPLIES[replies % DEV_CHAT_REPLIES.length] ?? 'OK';
+          replies += 1;
+          const timer = setTimeout(() => {
+            timers.delete(timer);
+            // A refused answer (the rate limit) is no problem in a dev chat.
+            if (!stopped) void chat.send({ gameId, text }).catch(() => undefined);
+          }, DEV_CHAT_REPLY_MS);
+          timers.add(timer);
+        }
+      });
+    },
+    (error: unknown) => console.warn('dev chat', error),
+  );
+  return () => {
+    stopped = true;
+    stopWatch?.();
+    for (const timer of timers) clearTimeout(timer);
+    timers.clear();
+  };
 }
 
 /** The bot plays its side of `gameId`, and the server's turn timers run. */
-function playDevGame(gameId: string, options: DevBotOptions): DevGame {
+function playDevGame(gameId: string, options: DevBotOptions, me?: string): DevGame {
   const { server } = options;
   rememberDevGame(gameId);
+  const stopChat =
+    options.chat === true && me !== undefined ? startDevChat(server, gameId, me) : null;
   const bot = startOnlineBot({
     transport: server.transportFor(DEV_BOT_ID),
     gameId,
@@ -109,6 +184,7 @@ function playDevGame(gameId: string, options: DevBotOptions): DevGame {
     stop: () => {
       clearInterval(timer);
       bot.stop();
+      stopChat?.();
       if (current === game) current = null;
     },
   };

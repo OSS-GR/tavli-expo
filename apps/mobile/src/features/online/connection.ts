@@ -15,13 +15,15 @@
  *
  * Never send the user id to analytics.
  */
-import type { Friends, GameTransport, Safety } from '@tavli/contracts';
+import type { Chat, Friends, GameTransport, Safety } from '@tavli/contracts';
 import { useEffect, useState } from 'react';
 
 import { turnPushes } from '@/features/notifications/appTurnPushes';
 import { checkAppUpdate } from '@/features/update/updateCheck';
 import {
   auth,
+  chat,
+  devChatFor,
   devFriendsFor,
   devSafetyFor,
   friends,
@@ -44,6 +46,8 @@ export type OnlineConnection =
       readonly safety: Safety;
       /** The opponent's card (#651). `null` when the build has none. */
       readonly friends: Friends | null;
+      /** The chat of the game (#692). `null` when the build has none. */
+      readonly chat: Chat | null;
       readonly me: string;
     }
   /** This build has no online server (no Convex URL). */
@@ -89,11 +93,19 @@ export function useOnlineConnection(gameId: string): OnlineConnection {
       transport: gameTransportFor(onlinePlayerId),
       safety: devSafetyFor(onlinePlayerId),
       friends: devFriendsFor(onlinePlayerId),
+      chat: devChatFor(onlinePlayerId),
       me: onlinePlayerId,
     };
   }
   if (auth === undefined || games === undefined || safety === undefined) return { status: 'off' };
   if (session === null) return { status: 'connecting' };
   if (session === 'signedOut' || session === 'failed') return { status: session };
-  return { status: 'ready', transport: games, safety, friends: friends ?? null, me: session.me };
+  return {
+    status: 'ready',
+    transport: games,
+    safety,
+    friends: friends ?? null,
+    chat: chat ?? null,
+    me: session.me,
+  };
 }

@@ -2375,6 +2375,16 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
     // The switch goes with the guest: the account keeps its own, like its name.
     chatOff.delete(source);
+    // A ban follows the person: the longer one stays (no end beats any end).
+    if (chatBans.has(source)) {
+      const moved = chatBans.get(source) ?? null;
+      const own = chatBans.get(target);
+      chatBans.set(
+        target,
+        own === undefined ? moved : own === null || moved === null ? null : Math.max(own, moved),
+      );
+      chatBans.delete(source);
+    }
     // Blocks both ways: never one of `target` by itself, never one twice.
     const mine = blocks.get(source) ?? new Map<string, number>();
     blocks.delete(source);

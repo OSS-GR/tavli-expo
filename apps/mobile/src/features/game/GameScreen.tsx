@@ -378,6 +378,16 @@ export interface GameScreenProps {
   covered?: boolean;
   /** Shows the menu button (wireframe 7). */
   onOpenMenu?: () => void;
+  /**
+   * Shows the chat button beside the other seat (an online game with a
+   * chat, #692). `unread`: the dot for new messages.
+   */
+  chat?: {
+    readonly unread: number;
+    readonly label: string;
+    readonly hint: string;
+    readonly onOpen: () => void;
+  };
   /** Shows "Home" on the game-end sheet. */
   onHome?: () => void;
   /** Shows "Review" on the game-end sheet: the biggest mistakes of the game (#215). */
@@ -426,6 +436,7 @@ export function GameScreen({
   paused = false,
   covered = false,
   onOpenMenu,
+  chat,
   onHome,
   onReview,
   onMatchOver,
@@ -2222,6 +2233,22 @@ export function GameScreen({
     </Pressable>
   ) : null;
 
+  const chatButton = chat ? (
+    <Pressable
+      testID="chat-button"
+      accessibilityRole="button"
+      accessibilityLabel={chat.label}
+      accessibilityHint={chat.hint}
+      hitSlop={MENU_SLOP}
+      onPress={chat.onOpen}
+      style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
+      <Icon name="messageCircle" size={20} color={ui.colors.text} />
+      {chat.unread > 0 ? (
+        <View testID="chat-unread" style={styles.chatDot} importantForAccessibility="no" />
+      ) : null}
+    </Pressable>
+  ) : null;
+
   const boardLayer = (
     <View
       testID="game-board-layer"
@@ -2439,6 +2466,7 @@ export function GameScreen({
         contentContainerStyle={styles.railContent}
         alwaysBounceVertical={false}>
         {menuButton}
+        {chatButton}
         <View style={styles.railSeats}>
           {strip(top, 'strip-top')}
           {scoreBlock}
@@ -2458,6 +2486,7 @@ export function GameScreen({
           {strip(viewer, 'strip-bottom')}
           {scoreBlock}
           {strip(top, 'strip-top')}
+          {chatButton}
         </View>
         {/* Classic (#184) has room for the game label; tall leaves it to the menu. */}
         {classic ? gameLabelText : null}
@@ -2755,6 +2784,18 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  // The dot for new chat messages (#692), on the button's top right.
+  chatDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.accent,
+    borderWidth: 1,
+    borderColor: theme.colors.background,
   },
   menuIcon: {
     fontSize: 20,

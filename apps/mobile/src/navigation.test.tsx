@@ -916,8 +916,8 @@ describe('online games (#255)', () => {
     expect(router.getPathname()).toBe(`${board}/match-end`);
     expect(
       await screen.findByRole('header', {
-        // The bot has a guest name (#400).
-        name: `Guest ${onlineFake.guestNumber('bot')} wins the match!`,
+        // The dev game names both players, so it has a chat (#692).
+        name: 'Dev_bot wins the match!',
       }),
     ).toBeOnTheScreen();
     expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
@@ -926,7 +926,7 @@ describe('online games (#255)', () => {
     expect(screen.queryByRole('button', { name: 'Change settings' })).toBeNull();
     expect(historyStore.getState().records).toEqual([]);
     // Report or block the other player from match end (#435).
-    const bot = `Guest ${onlineFake.guestNumber('bot')}`;
+    const bot = 'Dev_bot';
     await user.press(screen.getByRole('button', { name: `Report or block ${bot}` }));
     await user.press(screen.getByRole('button', { name: `Block ${bot}` }));
     await user.press(screen.getByTestId('safety-block-yes'));
