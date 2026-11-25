@@ -43,6 +43,8 @@ We choose **A** (owner, 2026-11-13):
    row" (edge cases 32 to 38).
 6. Closing the app does not stop the clock.
 7. No chat, and never a fake player: the opponent is always a real person.
+   (ADR-0011 replaces "No chat": saved accounts may chat. "Never
+   a fake player" holds.)
 8. Matching is #531, later. It starts a game through `insertGame` with
    `turnTimeMinutes: 2` and `ranked: true`.
 9. Friend games are not ranked and keep today's rule.

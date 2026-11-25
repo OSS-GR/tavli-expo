@@ -89,7 +89,7 @@ Epics for M0 and MVP1 are split into small sub-issues. Later epics hold a checkl
 ## Later
 
 - Matchmaking with strangers, Glicko ratings, leaderboards
-- Chat and emotes
+- Chat in online games: planned, see [ADR-0011](decisions/0011-chat.md) (epic #692). Emotes: not planned
 - Hints and post-game analysis using the bot (the game review after an offline game is built: #215)
 - Web version: planned in phases, see [the web plan](architecture/web-app.md) (ADR-0010, proposed, #637)
 - Kafeneio mode: players build their own house-rule variants (#58)
