@@ -926,7 +926,7 @@ describe('online games (#255)', () => {
     expect(screen.queryByRole('button', { name: 'Change settings' })).toBeNull();
     expect(historyStore.getState().records).toEqual([]);
     // Report or block the other player from match end (#435).
-    const bot = `Guest ${onlineFake.guestNumber('bot')}`;
+    const bot = 'Dev_bot';
     await user.press(screen.getByRole('button', { name: `Report or block ${bot}` }));
     await user.press(screen.getByRole('button', { name: `Block ${bot}` }));
     await user.press(screen.getByTestId('safety-block-yes'));
