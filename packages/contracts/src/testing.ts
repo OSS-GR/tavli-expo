@@ -73,6 +73,12 @@ export {
   type PushTokensContractSubject,
 } from './testing/push-notifications-contract';
 export {
+  chatContract,
+  type ChatContractCheck,
+  type ChatContractPlayer,
+  type ChatContractSubject,
+} from './testing/chat-contract';
+export {
   safetyContract,
   type SafetyContractCheck,
   type SafetyContractPlayer,

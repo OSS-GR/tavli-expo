@@ -115,7 +115,7 @@ const GREEK_LOOK_ALIKES: Readonly<Record<string, string>> = {
 };
 
 /** No case, no accents, look-alike single letters as one. */
-function foldLetters(name: string): string {
+export function foldLetters(name: string): string {
   const plain = name
     .normalize('NFD')
     .replace(/[\u0300-\u036F]/g, '')
