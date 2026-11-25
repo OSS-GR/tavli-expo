@@ -10,6 +10,7 @@ import { chatContract } from '@tavli/contracts/testing';
 import type { ChatContractSubject } from '@tavli/contracts/testing';
 import { createSeededRng } from '@tavli/engine';
 
+import { CHAT_KEEP_MS } from './chat';
 import { createMemoryGameServer } from './memory-server';
 import { markNamed } from './testing';
 
@@ -115,7 +116,7 @@ describe('chat on the in-memory server', () => {
     });
   });
 
-  it("moves a guest's mute and switch into the account", async () => {
+  it("moves a guest's mute into the account; the account keeps its own switch", async () => {
     const { server, play } = setup();
     await markNamed(server, 'bob');
     await markNamed(server, 'saved');
@@ -123,10 +124,49 @@ describe('chat on the in-memory server', () => {
     await server.chatFor('guest').setMuted(gameId, true);
     await server.chatFor('guest').setEnabled(false);
     server.moveGuest('guest', 'saved');
-    expect(await server.chatFor('saved').settings()).toEqual({ enabled: false });
-    await server.chatFor('saved').setEnabled(true);
+    expect(await server.chatFor('saved').settings()).toEqual({ enabled: true });
     const saved = watching(server, 'saved', gameId);
     await flush();
     expect(saved.last()?.status).toBe('muted');
+  });
+
+  it("puts only the caller's own messages and switch in Download my data", async () => {
+    const { server, gameId, passTime } = await ready();
+    await server.chatFor('alice').send({ gameId, text: 'first' });
+    passTime(1000);
+    await server.chatFor('bob').send({ gameId, text: 'from bob' });
+    passTime(1000);
+    await server.chatFor('alice').send({ gameId, text: 'second' });
+    await server.chatFor('alice').setEnabled(false);
+    const copy = await server.onlineDataFor('alice').exportMyData();
+    expect(copy.chat).toEqual({
+      enabled: false,
+      messages: [
+        { gameId, text: 'second', sentAt: START + 2000 },
+        { gameId, text: 'first', sentAt: START },
+      ],
+    });
+    expect(JSON.stringify(copy)).not.toContain('from bob');
+  });
+
+  it('closes and deletes the chat CHAT_KEEP_MS after the match ends', async () => {
+    const { server, gameId, passTime } = await ready();
+    await server.chatFor('alice').send({ gameId, text: 'good game' });
+    await server.chatFor('bob').setMuted(gameId, true);
+    await server.transportFor('alice').resign(gameId);
+    const alice = watching(server, 'alice', gameId);
+    passTime(CHAT_KEEP_MS - 1);
+    server.runDueTimeouts();
+    await flush();
+    expect(alice.last()?.messages).toHaveLength(1);
+    passTime(1);
+    server.runDueTimeouts();
+    await flush();
+    expect(alice.last()).toEqual({ gameId, status: 'unavailable', messages: [] });
+    await expect(server.chatFor('alice').send({ gameId, text: 'hello?' })).rejects.toMatchObject({
+      code: 'CHAT_CLOSED',
+    });
+    const copy = await server.onlineDataFor('alice').exportMyData();
+    expect(copy.chat.messages).toEqual([]);
   });
 });

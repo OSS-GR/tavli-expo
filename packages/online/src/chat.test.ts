@@ -8,7 +8,9 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHAT_KEEP_MS,
   NO_CHAT_PLAYER,
+  chatExpired,
   chatSeenBy,
   chatStatus,
   cleanChatText,
@@ -64,6 +66,15 @@ describe('chatStatus', () => {
   it("puts the caller's own reason before the other side's", () => {
     expect(status({ saved: false }, { saved: false })).toBe('needs-account');
     expect(status({ enabled: false }, {}, { blocksOther: true })).toBe('turned-off');
+  });
+
+  it('is unavailable once the match ended CHAT_KEEP_MS ago', () => {
+    const base = { me: READY, other: READY, muted: false, blocksOther: false };
+    expect(chatStatus({ ...base, expired: true })).toBe('unavailable');
+    expect(chatStatus({ ...base, me: NO_CHAT_PLAYER, expired: true })).toBe('needs-account');
+    expect(chatExpired(null, 10 * CHAT_KEEP_MS)).toBe(false);
+    expect(chatExpired(1000, 1000 + CHAT_KEEP_MS - 1)).toBe(false);
+    expect(chatExpired(1000, 1000 + CHAT_KEEP_MS)).toBe(true);
   });
 
   it('is muted only when the chat would be open', () => {

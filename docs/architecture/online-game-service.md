@@ -870,7 +870,7 @@ An action, so it can read the tables with no cap in pages: the capped parts (acc
 
 ## Chat
 
-> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694), and the Convex side (#695). The account delete and the 30-day clean-up, the report of a message and the screens come in later steps.
+> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694), the Convex side (#695), and how long the data lives (#697). The report of a message and the screens come in later steps.
 
 The two players of an online game write short text messages to each other, in friend games and in Play ranked.
 
@@ -924,6 +924,16 @@ Tables: `chatMessages` (indexes `by_game`, `by_game_sender` for the rate limit, 
 - `getChat` reads the game's rows newest first and stops at `CHAT_VIEW_MESSAGES`, so a long chat costs the same.
 - The rate limit reads only the caller's rows of the last `CHAT_RATE_WINDOW_MS`.
 - A saved account is a Better Auth user that is not anonymous (`authComponent.getAnyUserById`), as for ratings.
+
+### How long chat data lives (#697)
+
+| When | What happens | Job |
+|------|--------------|-----|
+| 30 days (`CHAT_KEEP_MS`) after a match ends | The messages and the mutes of the game are deleted. The chat is closed from that moment (`chatExpired`, status `unavailable`), so no row comes after | `deleteGameChat`, scheduled by the save that ends the match |
+| An account delete | The player's messages and mutes are deleted. The switch goes with the name row | `deleteChatRows`, scheduled by `deleteAccountOf` |
+| A guest move (#403) | The guest's mutes become the account's, never one twice. The account keeps its own switch | `moveGuestChat`, scheduled by `startGuestMove` |
+
+Each job handles `CHAT_DELETE_PAGE` rows and runs again while there may be more. Download my data (`MyData.chat`) holds the caller's switch and own messages, never the other player's. The in-memory server does the same; its `runDueTimeouts` runs the 30-day clean-up.
 
 The adapter is `createConvexChat` (`CHAT_FUNCTIONS` in `@tavli/backend-convex`). `convex/convexChat.test.ts` runs `chatContract()` through it on the real functions.
 

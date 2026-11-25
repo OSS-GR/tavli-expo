@@ -244,7 +244,8 @@ export default defineSchema({
   /**
    * Chat messages (ADR-0011, `chat.ts`): one row per message of an online
    * game. Not part of the stored game or its record. The text never goes
-   * to analytics, pushes or logs.
+   * to analytics, pushes or logs. Deleted `CHAT_KEEP_DAYS` after the match
+   * ends (`deleteGameChat`) and with the sender's account (`deleteChatRows`).
    */
   chatMessages: defineTable({
     gameId: v.id('games'),
@@ -270,7 +271,10 @@ export default defineSchema({
   chatMutes: defineTable({
     playerId: v.string(),
     gameId: v.id('games'),
-  }).index('by_player', ['playerId', 'gameId']),
+  })
+    .index('by_player', ['playerId', 'gameId'])
+    // The 30-day clean-up of a game's chat (`deleteGameChat`).
+    .index('by_game', ['gameId']),
 
   /**
    * Friends (#406, `friends.ts`): two rows per friendship, one from each

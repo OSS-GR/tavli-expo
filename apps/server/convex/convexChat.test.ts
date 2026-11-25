@@ -20,11 +20,13 @@ import {
 } from '@tavli/backend-convex';
 import type { ChatFunctions } from '@tavli/backend-convex';
 import { CHAT_VIEW_MESSAGES, createRecordingPushProvider } from '@tavli/contracts';
+import { CHAT_KEEP_MS } from '@tavli/online';
 import { chatContract } from '@tavli/contracts/testing';
 import type { ChatContractSubject } from '@tavli/contracts/testing';
 
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import { CHAT_DELETE_PAGE } from './chat';
 import { setPushProvider } from './push';
 import schema from './schema';
 import { convexTestNetwork } from './test.network';
@@ -50,6 +52,9 @@ const START = Date.UTC(2026, 10, 25, 12, 0, 0);
 const GAME = { choice: 'portes', targetPoints: 3, turnTimeMinutes: null } as const;
 
 beforeEach(() => {
+  // The account delete runs Better Auth's own `deleteUser` (`createAuth(ctx)`).
+  vi.stubEnv('BETTER_AUTH_SECRET', 'a-test-secret-that-is-long-enough-0123456789');
+  vi.stubEnv('CONVEX_SITE_URL', 'http://127.0.0.1:3211');
   // Invites schedule their expiry and games a turn timer: fake timers keep
   // them from firing.
   vi.useFakeTimers();
@@ -60,7 +65,14 @@ beforeEach(() => {
 afterEach(() => {
   setPushProvider(null);
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
+
+/** Runs the functions scheduled up to now (the pages of a delete or a move). */
+async function runScheduled(t: Tester) {
+  vi.advanceTimersByTime(0);
+  await t.finishInProgressScheduledFunctions();
+}
 
 function as(t: Tester, playerId: string) {
   return t.withIdentity({ subject: playerId });
@@ -195,6 +207,138 @@ describe('chat on the Convex server', () => {
     ]);
     await as(t, ALICE).mutation(api.chat.setChatMuted, { gameId, muted: false });
     expect(await mutes()).toEqual([]);
+  });
+
+  /** Every chat row, as the tests compare them. */
+  async function chatRows(t: Awaited<ReturnType<typeof setup>>) {
+    return await t.run(async (ctx) => ({
+      messages: (await ctx.db.query('chatMessages').collect()).map(({ senderId, text }) => ({
+        senderId,
+        text,
+      })),
+      mutes: (await ctx.db.query('chatMutes').collect()).map(({ playerId }) => playerId),
+    }));
+  }
+
+  it("the account delete removes the player's messages and mutes, in pages", async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    await as(t, BOB).mutation(api.chat.sendChat, { gameId, text: 'from bob' });
+    await as(t, ALICE).mutation(api.chat.setChatMuted, { gameId, muted: true });
+    await as(t, BOB).mutation(api.chat.setChatMuted, { gameId, muted: true });
+    // More of Alice's rows than one page holds, put in directly.
+    await t.run(async (ctx) => {
+      for (let i = 0; i < CHAT_DELETE_PAGE + 5; i += 1) {
+        await ctx.db.insert('chatMessages', {
+          gameId,
+          senderId: ALICE,
+          from: 'white',
+          text: `message ${i}`,
+          sentAt: START + i,
+          hidden: false,
+        });
+      }
+    });
+    await as(t, ALICE).mutation(api.account.deleteMyAccount, {});
+    await runScheduled(t);
+    await runScheduled(t);
+    expect(await chatRows(t)).toEqual({
+      messages: [{ senderId: BOB, text: 'from bob' }],
+      mutes: [BOB],
+    });
+    // The other account is gone, so the chat is closed for Bob.
+    expect(await as(t, BOB).query(api.chat.getChat, { gameId })).toEqual({
+      gameId,
+      status: 'unavailable',
+      messages: [],
+    });
+  });
+
+  it("the guest move gives the guest's mutes to the account, never twice", async () => {
+    const t = await setup();
+    const [guest = '', other = ''] = await authUsers(t, 2);
+    const first = await play(t, BOB, guest);
+    const second = await play(t, BOB, other);
+    await as(t, guest).mutation(api.chat.setChatMuted, { gameId: first, muted: true });
+    await as(t, guest).mutation(api.chat.setChatEnabled, { enabled: false });
+    // The account has a mute of its own, and one the guest has too after a row put in directly.
+    await as(t, ALICE).mutation(api.chat.setChatEnabled, { enabled: true });
+    await t.run(async (ctx) => {
+      await ctx.db.insert('chatMutes', { playerId: ALICE, gameId: first });
+      await ctx.db.insert('chatMutes', { playerId: guest, gameId: second });
+    });
+    await t.mutation(internal.guestMove.startGuestMove, { source: guest, target: ALICE });
+    await runScheduled(t);
+    const mutes = await t.run(async (ctx) => await ctx.db.query('chatMutes').collect());
+    expect(
+      mutes
+        .map(({ playerId, gameId }) => ({ playerId, gameId }))
+        .sort((a, b) => a.gameId.localeCompare(b.gameId)),
+    ).toEqual(
+      [
+        { playerId: ALICE, gameId: first },
+        { playerId: ALICE, gameId: second },
+      ].sort((a, b) => a.gameId.localeCompare(b.gameId)),
+    );
+    // The account keeps its own switch: the guest's went with the guest.
+    expect(await as(t, ALICE).query(api.chat.myChatSettings, {})).toEqual({ enabled: true });
+  });
+
+  it("Download my data holds the caller's own messages and switch, never the other player's", async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    await as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'first' });
+    vi.setSystemTime(START + 1000);
+    await as(t, BOB).mutation(api.chat.sendChat, { gameId, text: 'from bob' });
+    vi.setSystemTime(START + 2000);
+    await as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'second' });
+    await as(t, ALICE).mutation(api.chat.setChatEnabled, { enabled: false });
+    const copy = await as(t, ALICE).action(api.myData.exportMyData, {});
+    expect(copy.chat).toEqual({
+      enabled: false,
+      messages: [
+        { gameId, text: 'second', sentAt: START + 2000 },
+        { gameId, text: 'first', sentAt: START },
+      ],
+    });
+    expect(JSON.stringify(copy)).not.toContain('from bob');
+  });
+
+  it('a match that ends schedules the delete of its chat', async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    await as(t, ALICE).mutation(api.games.resign, { gameId });
+    const jobs = await t.run(
+      async (ctx) => await ctx.db.system.query('_scheduled_functions').collect(),
+    );
+    const job = jobs.find((row) => row.name.includes('deleteGameChat'));
+    expect(job?.args).toEqual([{ gameId }]);
+    expect(job?.scheduledTime).toBe(START + CHAT_KEEP_MS);
+  });
+
+  it('the chat of a match is deleted and closed CHAT_KEEP_MS after the match ends', async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    await as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'good game' });
+    await as(t, BOB).mutation(api.chat.setChatMuted, { gameId, muted: true });
+    await as(t, ALICE).mutation(api.games.resign, { gameId });
+    // One millisecond before: the chat is open, and a send still works.
+    // (Only the clock moves here: a fake timer cannot hold a 30-day delay,
+    // so the test runs the scheduled job itself.)
+    vi.setSystemTime(START + CHAT_KEEP_MS - 1);
+    await as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'still here' });
+    expect((await as(t, ALICE).query(api.chat.getChat, { gameId })).messages).toHaveLength(2);
+    vi.setSystemTime(START + CHAT_KEEP_MS);
+    await t.mutation(internal.chat.deleteGameChat, { gameId });
+    expect(await chatRows(t)).toEqual({ messages: [], mutes: [] });
+    expect(await as(t, ALICE).query(api.chat.getChat, { gameId })).toEqual({
+      gameId,
+      status: 'unavailable',
+      messages: [],
+    });
+    await expect(
+      as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'hello?' }),
+    ).rejects.toThrow(/CHAT_CLOSED/);
   });
 
   it('the adapter names the functions of the server api', () => {

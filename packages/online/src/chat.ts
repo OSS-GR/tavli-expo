@@ -8,6 +8,7 @@
  */
 
 import {
+  CHAT_KEEP_DAYS,
   CHAT_MAX_LENGTH,
   CHAT_MESSAGES_PER_MINUTE,
   CHAT_RATE_WINDOW_MS,
@@ -68,6 +69,20 @@ export interface ChatStatusInput {
   readonly muted: boolean;
   /** The caller blocks the other player. (The other way never shows: the blocked player is not told.) */
   readonly blocksOther: boolean;
+  /** The match ended `CHAT_KEEP_DAYS` ago (`chatExpired`): its chat is deleted and closed. */
+  readonly expired?: boolean;
+}
+
+/** How long a chat stays after its match ends, in milliseconds. */
+export const CHAT_KEEP_MS = CHAT_KEEP_DAYS * 24 * 60 * 60 * 1000;
+
+/**
+ * True when the chat of a match is over for good: the match is finished
+ * and ended `CHAT_KEEP_MS` ago or more. `endedAt`: the last save of the
+ * finished match, or `null` while it runs.
+ */
+export function chatExpired(endedAt: number | null, now: number): boolean {
+  return endedAt !== null && now - endedAt >= CHAT_KEEP_MS;
 }
 
 /**
@@ -75,10 +90,16 @@ export interface ChatStatusInput {
  * first, so the app can lead them to the fix. A reason on the other side
  * is always `unavailable`: the view never says which.
  */
-export function chatStatus({ me, other, muted, blocksOther }: ChatStatusInput): ChatStatus {
+export function chatStatus({
+  me,
+  other,
+  muted,
+  blocksOther,
+  expired = false,
+}: ChatStatusInput): ChatStatus {
   const mine = ownReason(me);
   if (mine !== null) return mine;
-  if (blocksOther || ownReason(other) !== null) return 'unavailable';
+  if (expired || blocksOther || ownReason(other) !== null) return 'unavailable';
   return muted ? 'muted' : 'open';
 }
 

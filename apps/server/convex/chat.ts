@@ -17,6 +17,15 @@
  * chat; the blocked player is never told, and their message is kept
  * `hidden`. The text of a message never goes to analytics, pushes or
  * logs: never log one here.
+ *
+ * How long the rows live:
+ * - `deleteGameChat` runs `CHAT_KEEP_MS` after a match ends (`games.ts`
+ *   schedules it): the messages and the mutes of the game, in pages. From
+ *   then on the chat is closed (`chatExpired`), so no new row comes.
+ * - `deleteChatRows` runs after an account delete: the player's messages
+ *   and mutes, in pages. The switch goes with the name row.
+ * - `moveGuestChat` runs in a guest move (#403): the guest's mutes become
+ *   the account's. A guest has no messages, but a row would move too.
  */
 
 import { ConvexError, v } from 'convex/values';
@@ -30,11 +39,12 @@ import type {
   ChatView,
 } from '@tavli/contracts';
 import type { PlayerId } from '@tavli/engine';
-import { chatSeenBy, chatStatus, planChatMessage, sideOf } from '@tavli/online';
+import { chatExpired, chatSeenBy, chatStatus, planChatMessage, sideOf } from '@tavli/online';
 import type { ChatPlayer, StoredChatMessage } from '@tavli/online';
 
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query } from './_generated/server';
+import { internal } from './_generated/api';
+import { internalMutation, mutation, query } from './_generated/server';
 import type { QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
 import { existingPlayer, signedInPlayer } from './caller';
@@ -92,7 +102,18 @@ async function statusOf(ctx: QueryCtx, callerId: string, seat: Seat): Promise<Ch
     muteRow(ctx, callerId, seat.game._id),
     blocks(ctx, callerId, seat.otherId),
   ]);
-  return chatStatus({ me, other, muted: mute !== null, blocksOther });
+  const { game } = seat;
+  return chatStatus({
+    me,
+    other,
+    muted: mute !== null,
+    blocksOther,
+    // Rows from before `updatedAt` existed have none: their creation time stands in.
+    expired: chatExpired(
+      game.status === 'finished' ? (game.updatedAt ?? game._creationTime) : null,
+      Date.now(),
+    ),
+  });
 }
 
 function stored(row: Doc<'chatMessages'>): StoredChatMessage {
@@ -189,6 +210,99 @@ export const setChatEnabled = mutation({
     if (row !== null && (row.chatOff === true) === enabled) {
       // `undefined` removes the field: an account with chat on has none.
       await ctx.db.patch(row._id, { chatOff: enabled ? undefined : true });
+    }
+    return null;
+  },
+});
+
+/**
+ * How many rows one run of the jobs below handles: one write each, far
+ * below Convex's limit of 16,000 writes per transaction.
+ */
+export const CHAT_DELETE_PAGE = 200;
+
+/**
+ * Deletes up to `CHAT_DELETE_PAGE` chat messages and mutes of a game, and
+ * runs again while there may be more. `games.ts` schedules it
+ * `CHAT_KEEP_MS` after the match ends. The chat is closed by then
+ * (`chatExpired`), so no new row can come.
+ */
+export const deleteGameChat = internalMutation({
+  args: { gameId: v.id('games') },
+  returns: v.null(),
+  handler: async (ctx, { gameId }) => {
+    const messages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_game', (q) => q.eq('gameId', gameId))
+      .take(CHAT_DELETE_PAGE);
+    for (const row of messages) await ctx.db.delete(row._id);
+    const mutes = await ctx.db
+      .query('chatMutes')
+      .withIndex('by_game', (q) => q.eq('gameId', gameId))
+      .take(CHAT_DELETE_PAGE - messages.length);
+    for (const row of mutes) await ctx.db.delete(row._id);
+    if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
+      await ctx.scheduler.runAfter(0, internal.chat.deleteGameChat, { gameId });
+    }
+    return null;
+  },
+});
+
+/**
+ * Deletes up to `CHAT_DELETE_PAGE` chat messages and mutes of `playerId`,
+ * a deleted account, and runs again while there may be more. Scheduled by
+ * `deleteAccountOf`. No new row can name the player once the account is
+ * gone: `sendChat` and `setChatMuted` need it to exist.
+ */
+export const deleteChatRows = internalMutation({
+  args: { playerId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { playerId }) => {
+    const messages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_sender', (q) => q.eq('senderId', playerId))
+      .take(CHAT_DELETE_PAGE);
+    for (const row of messages) await ctx.db.delete(row._id);
+    const mutes = await ctx.db
+      .query('chatMutes')
+      .withIndex('by_player', (q) => q.eq('playerId', playerId))
+      .take(CHAT_DELETE_PAGE - messages.length);
+    for (const row of mutes) await ctx.db.delete(row._id);
+    if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
+      await ctx.scheduler.runAfter(0, internal.chat.deleteChatRows, { playerId });
+    }
+    return null;
+  },
+});
+
+/**
+ * Moves up to `CHAT_DELETE_PAGE` chat rows of guest `source` to account
+ * `target` (#403), and runs again while there may be more. A mute the
+ * account has already is dropped. Scheduled by `startGuestMove`, after
+ * the guest is deleted, so no new row can name it.
+ */
+export const moveGuestChat = internalMutation({
+  args: { source: v.string(), target: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { source, target }) => {
+    const messages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_sender', (q) => q.eq('senderId', source))
+      .take(CHAT_DELETE_PAGE);
+    for (const row of messages) await ctx.db.patch(row._id, { senderId: target });
+    const mutes = await ctx.db
+      .query('chatMutes')
+      .withIndex('by_player', (q) => q.eq('playerId', source))
+      .take(CHAT_DELETE_PAGE - messages.length);
+    for (const row of mutes) {
+      if ((await muteRow(ctx, target, row.gameId)) === null) {
+        await ctx.db.patch(row._id, { playerId: target });
+      } else {
+        await ctx.db.delete(row._id);
+      }
+    }
+    if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
+      await ctx.scheduler.runAfter(0, internal.chat.moveGuestChat, { source, target });
     }
     return null;
   },
