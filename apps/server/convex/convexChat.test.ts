@@ -296,6 +296,7 @@ describe('chat on the Convex server', () => {
     const copy = await as(t, ALICE).action(api.myData.exportMyData, {});
     expect(copy.chat).toEqual({
       enabled: false,
+      ban: null,
       messages: [
         { gameId, text: 'second', sentAt: START + 2000 },
         { gameId, text: 'first', sentAt: START },
@@ -339,6 +340,105 @@ describe('chat on the Convex server', () => {
     await expect(
       as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'hello?' }),
     ).rejects.toThrow(/CHAT_CLOSED/);
+  });
+
+  it("a report from the chat keeps the reported player's last messages in its row", async () => {
+    const t = await setup();
+    const network = convexTestNetwork(t);
+    const gameId = await play(t, ALICE, BOB);
+    await as(t, BOB).mutation(api.chat.sendChat, { gameId, text: 'rude one' });
+    vi.setSystemTime(START + 1000);
+    await as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'please stop' });
+    vi.setSystemTime(START + 2000);
+    await as(t, BOB).mutation(api.chat.sendChat, { gameId, text: 'rude two' });
+    // Through the adapter, as the app sends it.
+    await createConvexSafety({ client: network.clientFor(ALICE) }).report({
+      playerId: BOB,
+      reason: 'chat',
+      gameId,
+    });
+    const reports = await t.run(async (ctx) => await ctx.db.query('reports').collect());
+    expect(reports.map(({ reason, chatMessages }) => ({ reason, chatMessages }))).toEqual([
+      {
+        reason: 'chat',
+        chatMessages: [
+          { text: 'rude one', sentAt: START },
+          { text: 'rude two', sentAt: START + 2000 },
+        ],
+      },
+    ]);
+    // A report blocks too.
+    expect((await as(t, ALICE).query(api.chat.getChat, { gameId })).status).toBe('unavailable');
+  });
+
+  it("a report with no game, or another pair's game, keeps no message", async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    const other = await play(t, BOB, CAROL);
+    await as(t, BOB).mutation(api.chat.sendChat, { gameId: other, text: 'to carol' });
+    await as(t, BOB).mutation(api.chat.sendChat, { gameId, text: 'to alice' });
+    await as(t, ALICE).mutation(api.safety.reportPlayer, {
+      playerId: BOB,
+      reason: 'chat',
+      gameId: other,
+    });
+    const first = await t.run(async (ctx) => await ctx.db.query('reports').collect());
+    expect(first[0]?.chatMessages).toBeUndefined();
+    // A second report, with the right game, gives the kept row its messages.
+    await as(t, ALICE).mutation(api.safety.reportPlayer, { playerId: BOB, reason: 'chat', gameId });
+    const second = await t.run(async (ctx) => await ctx.db.query('reports').collect());
+    expect(second).toHaveLength(1);
+    expect(second[0]?.chatMessages).toEqual([{ text: 'to alice', sentAt: START }]);
+  });
+
+  it("the owner's ban closes the chat until it ends, and the delete drops it", async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    const status = async (player: string) =>
+      (await as(t, player).query(api.chat.getChat, { gameId })).status;
+    await t.mutation(internal.chat.banChatForOwner, { playerId: BOB, days: 1 });
+    expect(await status(BOB)).toBe('banned');
+    expect(await status(ALICE)).toBe('unavailable');
+    await expect(as(t, BOB).mutation(api.chat.sendChat, { gameId, text: 'hi' })).rejects.toThrow(
+      /CHAT_CLOSED/,
+    );
+    expect((await as(t, BOB).action(api.myData.exportMyData, {})).chat.ban).toEqual({
+      until: START + 24 * 60 * 60 * 1000,
+    });
+    vi.setSystemTime(START + 24 * 60 * 60 * 1000);
+    expect(await status(BOB)).toBe('open');
+    // A ban with no end, then the owner ends it.
+    await t.mutation(internal.chat.banChatForOwner, { playerId: BOB });
+    expect(await status(BOB)).toBe('banned');
+    expect(await t.run(async (ctx) => await ctx.db.query('chatBans').collect())).toHaveLength(1);
+    await t.mutation(internal.chat.unbanChatForOwner, { playerId: BOB });
+    expect(await status(BOB)).toBe('open');
+    // The account delete drops a ban.
+    await t.mutation(internal.chat.banChatForOwner, { playerId: BOB });
+    await as(t, BOB).mutation(api.account.deleteMyAccount, {});
+    await runScheduled(t);
+    expect(await t.run(async (ctx) => await ctx.db.query('chatBans').collect())).toEqual([]);
+  });
+
+  it("the owner deletes a player's messages, in pages", async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    await as(t, ALICE).mutation(api.chat.sendChat, { gameId, text: 'fine' });
+    await t.run(async (ctx) => {
+      for (let i = 0; i < CHAT_DELETE_PAGE + 5; i += 1) {
+        await ctx.db.insert('chatMessages', {
+          gameId,
+          senderId: BOB,
+          from: 'black',
+          text: `rude ${i}`,
+          sentAt: START + i,
+          hidden: false,
+        });
+      }
+    });
+    await t.mutation(internal.chat.deleteChatMessagesForOwner, { playerId: BOB });
+    await runScheduled(t);
+    expect((await chatRows(t)).messages).toEqual([{ senderId: ALICE, text: 'fine' }]);
   });
 
   it('the adapter names the functions of the server api', () => {

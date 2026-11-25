@@ -255,7 +255,8 @@ describe('function references', () => {
     expectType<Extends<FunctionArgs<Fns['blockPlayer']>, FunctionArgs<Api['blockPlayer']>>>();
     expectType<Extends<FunctionArgs<Fns['unblockPlayer']>, FunctionArgs<Api['unblockPlayer']>>>();
     expectType<Extends<FunctionArgs<Fns['listMyBlocks']>, FunctionArgs<Api['listMyBlocks']>>>();
-    expectType<Extends<FunctionArgs<Fns['reportPlayer']>, FunctionArgs<Api['reportPlayer']>>>();
+    // The server's game id is a string with a brand, so this one is checked the other way.
+    expectType<Extends<FunctionArgs<Api['reportPlayer']>, FunctionArgs<Fns['reportPlayer']>>>();
     expectType<
       Extends<FunctionReturnType<Api['listMyBlocks']>, FunctionReturnType<Fns['listMyBlocks']>>
     >();

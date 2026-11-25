@@ -33,8 +33,13 @@
 
 import { ConvexError, v } from 'convex/values';
 
-import { MAX_BLOCKS, MAX_REPORTS_PER_DAY } from '@tavli/contracts';
-import type { BlockedPlayer, PlayerName, SafetyErrorCode } from '@tavli/contracts';
+import { MAX_BLOCKS, MAX_REPORTS_PER_DAY, REPORT_CHAT_MESSAGES } from '@tavli/contracts';
+import type {
+  BlockedPlayer,
+  PlayerName,
+  ReportedChatMessage,
+  SafetyErrorCode,
+} from '@tavli/contracts';
 import {
   SafetyError,
   checkBlockCap,
@@ -44,10 +49,13 @@ import {
   checkTarget,
   namesSeenBy,
   reportWindowStart,
+  reportedChat,
+  sideOf,
 } from '@tavli/online';
 import type { PerPlayer } from '@tavli/engine';
 
 import { internal } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { authComponent } from './auth';
@@ -226,12 +234,48 @@ export const listMyBlocks = query({
 });
 
 /**
- * The caller reports `playerId`, and blocks them. A second report of the
+ * What a report from the chat of `gameId` keeps (ADR-0011 item 13,
+ * `reportedChat`): the reported player's last messages there that the
+ * reporter could see. Nothing for no game, or a game that is not between
+ * the two. It reads the reported player's newest rows only.
+ */
+async function reportedMessages(
+  ctx: QueryCtx,
+  callerId: string,
+  reportedId: string,
+  gameId: Id<'games'> | undefined,
+): Promise<ReportedChatMessage[]> {
+  if (gameId === undefined) return [];
+  const game = await ctx.db.get(gameId);
+  if (game === null || sideOf(game.players, callerId) === null) return [];
+  const reported = sideOf(game.players, reportedId);
+  if (reported === null) return [];
+  const rows = await ctx.db
+    .query('chatMessages')
+    .withIndex('by_game_sender', (q) => q.eq('gameId', gameId).eq('senderId', reportedId))
+    .order('desc')
+    // Hidden rows are left out, so read some more than the report keeps.
+    .take(REPORT_CHAT_MESSAGES * 3);
+  return reportedChat(
+    rows.map((row) => ({
+      id: row._id,
+      from: row.from,
+      text: row.text,
+      sentAt: row.sentAt,
+      hidden: row.hidden,
+    })),
+    reported,
+  );
+}
+
+/**
+ * The caller reports `playerId`, and blocks them. With a `gameId` the
+ * report keeps the player's last chat messages of that game. A second report of the
  * same player adds no row while the first is kept. `reason` is checked by
  * `checkReason`, so a wrong one gets `BAD_REQUEST`, not a validator error.
  */
 export const reportPlayer = mutation({
-  args: { playerId: v.string(), reason: v.string() },
+  args: { playerId: v.string(), reason: v.string(), gameId: v.optional(v.id('games')) },
   returns: v.null(),
   handler: async (ctx, request) => {
     const callerId = await existingPlayer(ctx);
@@ -240,10 +284,15 @@ export const reportPlayer = mutation({
     guarded(() => checkTarget(callerId, playerId));
     const known = await met(ctx, callerId, playerId);
     guarded(() => checkMet(known));
+    const chatMessages = await reportedMessages(ctx, callerId, playerId, request.gameId);
     const kept = await ctx.db
       .query('reports')
       .withIndex('by_pair', (q) => q.eq('reporterId', callerId).eq('reportedId', playerId))
       .first();
+    if (kept !== null && kept.chatMessages === undefined && chatMessages.length > 0) {
+      // The kept report gets the messages: a second report adds no row.
+      await ctx.db.patch(kept._id, { chatMessages });
+    }
     if (kept === null) {
       const now = Date.now();
       const recent = await ctx.db
@@ -259,6 +308,7 @@ export const reportPlayer = mutation({
         reportedId: playerId,
         reason,
         ...(username === undefined ? {} : { username }),
+        ...(chatMessages.length > 0 ? { chatMessages } : {}),
         createdAt: now,
       });
     }

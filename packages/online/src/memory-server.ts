@@ -102,6 +102,7 @@ import type {
   PlayerName,
   Ratings,
   RatingsErrorData,
+  ReportedChatMessage,
   RankedGame,
   ReportReason,
   Safety,
@@ -209,7 +210,15 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
-import { ChatError, chatExpired, chatSeenBy, chatStatus, planChatMessage } from './chat';
+import {
+  ChatError,
+  chatBanned,
+  chatExpired,
+  chatSeenBy,
+  chatStatus,
+  planChatMessage,
+  reportedChat,
+} from './chat';
 import type { ChatPlayer, StoredChatMessage } from './chat';
 import { checkRecordCall, gameRecordLog } from './game-record';
 import { nameFrom, namesOf, pickGuestNumber } from './names';
@@ -268,6 +277,8 @@ export interface MemoryReport {
   /** The reported player's username at that moment, if they had one. */
   readonly username: string | null;
   readonly createdAt: number;
+  /** The reported player's last chat messages of the reported game (ADR-0011). Absent: none kept. */
+  readonly chat?: readonly ReportedChatMessage[];
 }
 
 export interface MemoryGameServer {
@@ -379,6 +390,15 @@ export interface MemoryGameServer {
   markSaved(playerId: string): void;
   /** Every report kept, oldest first (copies). The owner's view, for tests. */
   reportsOf(): MemoryReport[];
+  /**
+   * The owner stops `playerId`'s chat (ADR-0011 item 14) until `until`
+   * (epoch ms), or for good with `null`, like the Convex `banChatForOwner`.
+   */
+  banChat(playerId: string, until: number | null): void;
+  /** The owner ends the ban, like the Convex `unbanChatForOwner`. */
+  unbanChat(playerId: string): void;
+  /** The owner deletes every chat message `playerId` wrote, like the Convex `deleteChatMessagesForOwner`. */
+  deleteChatOf(playerId: string): void;
   /** The owner deletes a report after the review, like a row deleted in the dashboard. For tests. */
   deleteReport(reporterId: string, reportedId: string): void;
   /**
@@ -589,6 +609,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const chatMutes = new Set<string>();
   /** Players who turned chat off in all games. */
   const chatOff = new Set<string>();
+  /** Chat bans by the owner: player → the end (`null`: no end), like the Convex `chatBans` table. */
+  const chatBans = new Map<string, number | null>();
   const chatListeners = new Set<ChatListener>();
   let chatSeq = 0;
   const tokenRng = options.tokenRng ?? createSeededRng(406);
@@ -1302,6 +1324,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       if (key.startsWith(`${playerId}\n`)) chatMutes.delete(key);
     }
     chatOff.delete(playerId);
+    chatBans.delete(playerId);
     notifyChatsOf(playerId);
   }
 
@@ -1362,6 +1385,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             : { game: seek.game, status: seek.status, since: seek.createdAt },
         chat: {
           enabled: !chatOff.has(playerId),
+          ban: chatBans.has(playerId) ? { until: chatBans.get(playerId) ?? null } : null,
           messages: [...chatMessages].flatMap(([gameId, kept]) =>
             kept
               .filter((message) => message.senderId === playerId)
@@ -1486,10 +1510,22 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           const reason = checkReason(request.reason);
           checkTarget(id, other);
           checkMet(met(id, other));
-          const kept = reports.some(
+          // A report from the chat of a game keeps the reported player's
+          // last messages there (ADR-0011). Another pair's game is ignored.
+          const game = request.gameId === undefined ? undefined : games.get(request.gameId);
+          const reportedSide = game === undefined ? null : sideOf(game.players, other);
+          const chat =
+            game === undefined || reportedSide === null || sideOf(game.players, id) === null
+              ? []
+              : reportedChat(chatMessages.get(game.gameId) ?? [], reportedSide);
+          const kept = reports.find(
             (report) => report.reporterId === id && report.reportedId === other,
           );
-          if (!kept) {
+          if (kept !== undefined && kept.chat === undefined && chat.length > 0) {
+            // The kept report gets the messages: a second report adds no row.
+            reports = reports.map((report) => (report === kept ? { ...kept, chat } : report));
+          }
+          if (kept === undefined) {
             const at = now();
             const since = reportWindowStart(at);
             checkReportCap(
@@ -1502,6 +1538,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
               reason,
               username: nameRecords.get(other)?.username ?? null,
               createdAt: at,
+              ...(chat.length > 0 ? { chat } : {}),
             });
           }
           // A report also blocks; a full block list does not stop the report.
@@ -1520,6 +1557,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       hasUsername: record?.username !== undefined,
       termsVersion: record?.termsVersion ?? null,
       enabled: !chatOff.has(playerId),
+      banned: chatBanned(chatBans.get(playerId), now()),
     };
   }
 
@@ -2422,6 +2460,25 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     },
 
     reportsOf: () => copy(reports),
+
+    banChat(playerId, until) {
+      chatBans.set(playerId, until);
+      notifyChatsOf(playerId);
+    },
+
+    unbanChat(playerId) {
+      if (chatBans.delete(playerId)) notifyChatsOf(playerId);
+    },
+
+    deleteChatOf(playerId) {
+      for (const [gameId, kept] of chatMessages) {
+        chatMessages.set(
+          gameId,
+          kept.filter((message) => message.senderId !== playerId),
+        );
+      }
+      notifyChatsOf(playerId);
+    },
 
     deleteReport(reporterId, reportedId) {
       reports = reports.filter(

@@ -10,7 +10,9 @@
  *   invites look expired to them (`getInvite`, `watchInvite`), and
  *   accepting or declining one gets `INVITE_EXPIRED`. Games that already
  *   run go on: the blocker may resign.
- * - **Report.** A reason from `REPORT_REASONS`, no free text. The server
+ * - **Report.** A reason from `REPORT_REASONS`, no free text from the
+ *   reporter. A report from the chat of a game (`gameId`) also keeps the
+ *   reported player's last chat messages of that game. The server
  *   keeps the reported player's username at that moment, so the owner
  *   sees the name even after a change. Reporting also blocks. The owner
  *   reads the reports in the Convex dashboard and deletes each one there
@@ -35,6 +37,8 @@ export const REPORT_REASONS = [
   'cheating',
   /** Harassment. */
   'harassment',
+  /** Something the player wrote in the chat of a game (ADR-0011). */
+  'chat',
   /** Something else. */
   'other',
 ] as const;
@@ -43,6 +47,19 @@ export type ReportReason = (typeof REPORT_REASONS)[number];
 
 export function isReportReason(value: unknown): value is ReportReason {
   return typeof value === 'string' && (REPORT_REASONS as readonly string[]).includes(value);
+}
+
+/**
+ * A report with a `gameId` keeps a copy of the reported player's last
+ * messages in the chat of that game, at most this many (ADR-0011 item
+ * 13), so the owner can judge after the chat is deleted.
+ */
+export const REPORT_CHAT_MESSAGES = 20;
+
+/** One chat message kept with a report: the reported player's own words. */
+export interface ReportedChatMessage {
+  readonly text: string;
+  readonly sentAt: number;
 }
 
 /** The most players one player may block. */
@@ -72,6 +89,13 @@ export interface ReportRequest {
   /** The reported player's id, as in `OnlineGameView.players` or `InviteView.from`. */
   readonly playerId: string;
   readonly reason: ReportReason;
+  /**
+   * The game whose chat the report is about (ADR-0011). The server then
+   * keeps the reported player's last `REPORT_CHAT_MESSAGES` messages of
+   * that game with the report. A game that is not between the two is
+   * ignored.
+   */
+  readonly gameId?: string;
 }
 
 export const SAFETY_ERROR_CODES = [

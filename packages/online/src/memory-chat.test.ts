@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { CHAT_RATE_WINDOW_MS, REPORT_CHAT_MESSAGES } from '@tavli/contracts';
 import type { ChatView } from '@tavli/contracts';
 import { chatContract } from '@tavli/contracts/testing';
 import type { ChatContractSubject } from '@tavli/contracts/testing';
@@ -141,12 +142,89 @@ describe('chat on the in-memory server', () => {
     const copy = await server.onlineDataFor('alice').exportMyData();
     expect(copy.chat).toEqual({
       enabled: false,
+      ban: null,
       messages: [
         { gameId, text: 'second', sentAt: START + 2000 },
         { gameId, text: 'first', sentAt: START },
       ],
     });
     expect(JSON.stringify(copy)).not.toContain('from bob');
+  });
+
+  it('a report from the chat keeps the last messages of the reported player only', async () => {
+    const { server, gameId, passTime } = await ready();
+    for (let i = 0; i < REPORT_CHAT_MESSAGES + 2; i += 1) {
+      passTime(CHAT_RATE_WINDOW_MS);
+      await server.chatFor('bob').send({ gameId, text: `rude ${i}` });
+    }
+    await server.chatFor('alice').send({ gameId, text: 'please stop' });
+    await server.safetyFor('alice').report({ playerId: 'bob', reason: 'chat', gameId });
+    const [report] = server.reportsOf();
+    expect(report?.reason).toBe('chat');
+    expect(report?.chat).toHaveLength(REPORT_CHAT_MESSAGES);
+    expect(report?.chat?.[0]?.text).toBe('rude 2');
+    expect(report?.chat?.at(-1)?.text).toBe(`rude ${REPORT_CHAT_MESSAGES + 1}`);
+    expect(JSON.stringify(report)).not.toContain('please stop');
+    // A report blocks too: the chat is closed for the reporter.
+    const alice = watching(server, 'alice', gameId);
+    await flush();
+    expect(alice.last()?.status).toBe('unavailable');
+  });
+
+  it('a second report gives the kept report its messages, and adds no row', async () => {
+    const { server, gameId } = await ready();
+    await server.chatFor('bob').send({ gameId, text: 'rude' });
+    await server.safetyFor('alice').report({ playerId: 'bob', reason: 'name' });
+    expect(server.reportsOf()[0]?.chat).toBeUndefined();
+    await server.safetyFor('alice').report({ playerId: 'bob', reason: 'chat', gameId });
+    expect(server.reportsOf()).toHaveLength(1);
+    expect(server.reportsOf()[0]).toMatchObject({ reason: 'name', chat: [{ text: 'rude' }] });
+  });
+
+  it("ignores a report's game that is not between the two players", async () => {
+    const { server, gameId, play } = await ready();
+    await markNamed(server, 'carol');
+    const other = await play('bob', 'carol');
+    await server.chatFor('bob').send({ gameId: other, text: 'to carol' });
+    await server.safetyFor('alice').report({ playerId: 'bob', reason: 'chat', gameId: other });
+    expect(server.reportsOf()[0]?.chat).toBeUndefined();
+    expect(gameId).not.toBe(other);
+  });
+
+  it('a ban closes the chat for the banned player until it ends', async () => {
+    const { server, gameId, passTime } = await ready();
+    const alice = watching(server, 'alice', gameId);
+    const bob = watching(server, 'bob', gameId);
+    server.banChat('bob', START + 1000);
+    await flush();
+    expect(bob.last()?.status).toBe('banned');
+    expect(alice.last()?.status).toBe('unavailable');
+    await expect(server.chatFor('bob').send({ gameId, text: 'hi' })).rejects.toMatchObject({
+      code: 'CHAT_CLOSED',
+    });
+    expect((await server.onlineDataFor('bob').exportMyData()).chat.ban).toEqual({
+      until: START + 1000,
+    });
+    passTime(1000);
+    await expect(server.chatFor('bob').send({ gameId, text: 'hi' })).resolves.toMatchObject({
+      text: 'hi',
+    });
+    server.banChat('bob', null);
+    await flush();
+    expect(bob.last()?.status).toBe('banned');
+    server.unbanChat('bob');
+    await flush();
+    expect(bob.last()?.status).toBe('open');
+  });
+
+  it("the owner deletes a player's messages", async () => {
+    const { server, gameId } = await ready();
+    await server.chatFor('bob').send({ gameId, text: 'rude' });
+    await server.chatFor('alice').send({ gameId, text: 'fine' });
+    const alice = watching(server, 'alice', gameId);
+    server.deleteChatOf('bob');
+    await flush();
+    expect(alice.last()?.messages.map((message) => message.text)).toEqual(['fine']);
   });
 
   it('closes and deletes the chat CHAT_KEEP_MS after the match ends', async () => {

@@ -287,7 +287,8 @@ function StepView({ step, name, onRun, onStep, onClose }: StepViewProps) {
             ...(step.blocked ? [t('safety.reasons.blockedAlready')] : []),
             t('safety.reasons.body'),
           ]}>
-          {REPORT_REASONS.map((reason) => (
+          {/* The chat reason shows only where a chat is (the chat sheet, #692). */}
+          {REPORT_REASONS.filter((reason) => reason !== 'chat').map((reason) => (
             <ActionButton
               key={reason}
               testID={`safety-reason-${reason}`}

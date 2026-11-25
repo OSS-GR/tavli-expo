@@ -56,13 +56,15 @@ export const CHAT_STATUSES = [
   'needs-username',
   /** The caller did not accept the current terms (the chat rules are in them). */
   'needs-terms',
+  /** The owner stopped the caller's chat after a report (a ban). */
+  'banned',
   /** The caller turned chat off for all games (`setEnabled(false)`). */
   'turned-off',
   /** The caller muted this game (`setMuted`). */
   'muted',
   /**
    * No chat in this game for a reason on the other side (a guest, no
-   * username, chat turned off, or the caller blocks them), or the match
+   * username, chat turned off, a ban, or the caller blocks them), or the match
    * ended `CHAT_KEEP_DAYS` ago and its chat is deleted. The view never
    * says which.
    */

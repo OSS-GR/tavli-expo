@@ -234,6 +234,12 @@ export default defineSchema({
     reason: reportReason,
     /** The reported player's username at that moment. Absent: a guest. */
     username: v.optional(v.string()),
+    /**
+     * The reported player's last chat messages of the reported game
+     * (ADR-0011, `reportedChat`): their own words, for the owner's review.
+     * Absent: a report with no game, or with no message.
+     */
+    chatMessages: v.optional(v.array(v.object({ text: v.string(), sentAt: v.number() }))),
     /** When the report was made, epoch ms (server clock). */
     createdAt: v.number(),
   })
@@ -275,6 +281,18 @@ export default defineSchema({
     .index('by_player', ['playerId', 'gameId'])
     // The 30-day clean-up of a game's chat (`deleteGameChat`).
     .index('by_game', ['gameId']),
+
+  /**
+   * Chat bans (ADR-0011 item 14, `chat.ts`): the owner stopped `playerId`'s
+   * chat after a report. One row per player. Only the owner's internal
+   * functions write it. Deleted with the account.
+   */
+  chatBans: defineTable({
+    playerId: v.string(),
+    /** The end of the ban, epoch ms. `null`: no end. */
+    until: v.union(v.number(), v.null()),
+    createdAt: v.number(),
+  }).index('by_player', ['playerId']),
 
   /**
    * Friends (#406, `friends.ts`): two rows per friendship, one from each

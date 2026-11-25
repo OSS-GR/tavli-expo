@@ -120,6 +120,7 @@ export function makeMyData(parts: Omit<MyData, 'format' | 'version'>): MyData {
     rankedSearch: parts.rankedSearch,
     chat: {
       enabled: parts.chat.enabled,
+      ban: parts.chat.ban,
       messages: newestFirst(parts.chat.messages, (message) => message.sentAt),
     },
   };
