@@ -13,9 +13,10 @@ import {
   CHAT_MESSAGES_PER_MINUTE,
   CHAT_RATE_WINDOW_MS,
   CHAT_VIEW_MESSAGES,
+  REPORT_CHAT_MESSAGES,
   TERMS_VERSION,
 } from '@tavli/contracts';
-import type { ChatErrorCode, ChatMessage, ChatStatus } from '@tavli/contracts';
+import type { ChatErrorCode, ChatMessage, ChatStatus, ReportedChatMessage } from '@tavli/contracts';
 import type { PlayerId } from '@tavli/engine';
 
 import { foldLetters } from './usernames';
@@ -41,6 +42,32 @@ export interface ChatPlayer {
   readonly termsVersion: string | null;
   /** The player's chat switch (`setEnabled`). A player with no stored value has `true`. */
   readonly enabled: boolean;
+  /** The owner stopped the player's chat, and the ban has not ended (`chatBanned`). */
+  readonly banned?: boolean;
+}
+
+/**
+ * True while a ban holds. `until`: the end of the ban in epoch ms, `null`
+ * for a ban with no end, `undefined` for no ban.
+ */
+export function chatBanned(until: number | null | undefined, now: number): boolean {
+  return until !== undefined && (until === null || now < until);
+}
+
+/**
+ * What a report from the chat of a game keeps: the last
+ * `REPORT_CHAT_MESSAGES` messages `reported` wrote there that the
+ * reporter could see (not the hidden ones), oldest first.
+ */
+export function reportedChat(
+  messages: readonly StoredChatMessage[],
+  reported: PlayerId,
+): ReportedChatMessage[] {
+  return messages
+    .filter((message) => message.from === reported && !message.hidden)
+    .sort((a, b) => a.sentAt - b.sentAt)
+    .slice(-REPORT_CHAT_MESSAGES)
+    .map(({ text, sentAt }) => ({ text, sentAt }));
 }
 
 /** A player with nothing kept: a guest. */
@@ -58,6 +85,7 @@ function ownReason(
   if (!player.saved) return 'needs-account';
   if (!player.hasUsername) return 'needs-username';
   if (player.termsVersion !== TERMS_VERSION) return 'needs-terms';
+  if (player.banned === true) return 'banned';
   if (!player.enabled) return 'turned-off';
   return null;
 }

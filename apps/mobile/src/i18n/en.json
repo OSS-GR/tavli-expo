@@ -2254,6 +2254,7 @@
       "name": "Offensive name",
       "cheating": "Cheating or abuse of the game",
       "harassment": "Harassment",
+      "chat": "Something they wrote in the chat",
       "other": "Something else",
       "blockedAlready": "You block this player already. A report tells us more."
     },

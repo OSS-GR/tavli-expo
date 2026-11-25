@@ -870,7 +870,7 @@ An action, so it can read the tables with no cap in pages: the capped parts (acc
 
 ## Chat
 
-> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694), the Convex side (#695), and how long the data lives (#697). The report of a message and the screens come in later steps.
+> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694), the Convex side (#695), how long the data lives (#697), and the report with the owner's tools (#698). The screens come in later steps.
 
 The two players of an online game write short text messages to each other, in friend games and in Play ranked.
 
@@ -884,6 +884,7 @@ The two players of an online game write short text messages to each other, in fr
 | `needs-account` | The caller is a guest |
 | `needs-username` | The caller has a saved account with no username |
 | `needs-terms` | The caller did not accept the current terms (`TERMS_VERSION`) |
+| `banned` | The owner stopped the caller's chat (a row in `chatBans` that has not ended) |
 | `turned-off` | The caller turned chat off for all games (`setEnabled(false)`) |
 | `muted` | The caller muted this game (`setMuted`) |
 | `unavailable` | A reason on the other side, or the caller blocks them. The view never says which |
@@ -934,6 +935,20 @@ Tables: `chatMessages` (indexes `by_game`, `by_game_sender` for the rate limit, 
 | A guest move (#403) | The guest's mutes become the account's, never one twice. The account keeps its own switch | `moveGuestChat`, scheduled by `startGuestMove` |
 
 Each job handles `CHAT_DELETE_PAGE` rows and runs again while there may be more. Download my data (`MyData.chat`) holds the caller's switch and own messages, never the other player's. The in-memory server does the same; its `runDueTimeouts` runs the 30-day clean-up.
+
+### Report a chat, and the owner's tools (#698)
+
+- A report with a `gameId` (`Safety.report`, reason `chat` from the chat sheet) keeps the reported player's last `REPORT_CHAT_MESSAGES` (20) messages of that game in the `reports` row (`chatMessages`): only their own words that the reporter could see (`reportedChat`). A game that is not between the two is ignored. A second report gives a kept report its messages and adds no row. A report still blocks.
+- The owner acts from the Convex dashboard, with internal functions only:
+
+| Function | What it does |
+|----------|--------------|
+| `chat:banChatForOwner` `{ playerId, days? }` | Stops the player's chat for `days` days, or for good with no `days`. A second call replaces the ban |
+| `chat:unbanChatForOwner` `{ playerId }` | Ends the ban |
+| `chat:deleteChatMessagesForOwner` `{ playerId }` | Deletes every message the player wrote, in pages |
+
+- **How to handle a report:** open `reports` in the dashboard, read the row (`reason`, `username`, `chatMessages`), run a tool above if needed with the row's `reportedId`, then delete the row. Apple rule 1.2 asks for this within 24 hours.
+- A banned player sees `banned`; the other player sees `unavailable`. The account delete drops the ban, and Download my data shows it (`MyData.chat.ban`).
 
 The adapter is `createConvexChat` (`CHAT_FUNCTIONS` in `@tavli/backend-convex`). `convex/convexChat.test.ts` runs `chatContract()` through it on the real functions.
 

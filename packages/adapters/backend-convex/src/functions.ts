@@ -279,7 +279,7 @@ export interface SafetyFunctions {
   readonly reportPlayer: FunctionReference<
     'mutation',
     'public',
-    { playerId: string; reason: string },
+    { playerId: string; reason: string; gameId?: string },
     null
   >;
 }

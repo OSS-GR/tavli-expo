@@ -164,6 +164,7 @@ export type {
 export {
   MAX_BLOCKS,
   MAX_REPORTS_PER_DAY,
+  REPORT_CHAT_MESSAGES,
   REPORT_REASONS,
   REPORT_WINDOW_MS,
   SAFETY_ERROR_CODES,
@@ -173,6 +174,7 @@ export {
 export type {
   BlockedPlayer,
   ReportReason,
+  ReportedChatMessage,
   ReportRequest,
   Safety,
   SafetyErrorCode,

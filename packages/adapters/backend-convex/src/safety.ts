@@ -52,8 +52,15 @@ export function createConvexSafety(options: ConvexSafetyOptions): Safety {
       await run(() => client.mutation(SAFETY_FUNCTIONS.unblockPlayer, { playerId }));
     },
     listBlocked: () => run(() => client.query(SAFETY_FUNCTIONS.listMyBlocks, {})),
-    report: async ({ playerId, reason }) => {
-      await run(() => client.mutation(SAFETY_FUNCTIONS.reportPlayer, { playerId, reason }));
+    report: async ({ playerId, reason, gameId }) => {
+      await run(() =>
+        client.mutation(SAFETY_FUNCTIONS.reportPlayer, {
+          playerId,
+          reason,
+          // Only a report from the chat of a game names the game.
+          ...(gameId === undefined ? {} : { gameId }),
+        }),
+      );
     },
   };
 }

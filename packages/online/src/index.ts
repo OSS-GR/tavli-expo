@@ -192,6 +192,7 @@ export {
   CHAT_KEEP_MS,
   ChatError,
   NO_CHAT_PLAYER,
+  chatBanned,
   chatExpired,
   chatSeenBy,
   chatStatus,
@@ -199,6 +200,7 @@ export {
   hasBadWord,
   hasLink,
   planChatMessage,
+  reportedChat,
 } from './chat';
 export type {
   ChatPlan,

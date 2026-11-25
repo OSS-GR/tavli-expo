@@ -26,6 +26,11 @@
  *   and mutes, in pages. The switch goes with the name row.
  * - `moveGuestChat` runs in a guest move (#403): the guest's mutes become
  *   the account's. A guest has no messages, but a row would move too.
+ *
+ * The owner's tools (ADR-0011 item 14) are internal functions, run from
+ * the Convex dashboard, never public: `banChatForOwner`,
+ * `unbanChatForOwner` and `deleteChatMessagesForOwner`. A report from a
+ * chat keeps the reported messages in its `reports` row (`safety.ts`).
  */
 
 import { ConvexError, v } from 'convex/values';
@@ -39,7 +44,14 @@ import type {
   ChatView,
 } from '@tavli/contracts';
 import type { PlayerId } from '@tavli/engine';
-import { chatExpired, chatSeenBy, chatStatus, planChatMessage, sideOf } from '@tavli/online';
+import {
+  chatBanned,
+  chatExpired,
+  chatSeenBy,
+  chatStatus,
+  planChatMessage,
+  sideOf,
+} from '@tavli/online';
 import type { ChatPlayer, StoredChatMessage } from '@tavli/online';
 
 import type { Doc, Id } from './_generated/dataModel';
@@ -58,17 +70,27 @@ function fail(code: ChatErrorCode, message: string): never {
   throw new ConvexError(data);
 }
 
+/** The chat ban of `playerId`, or `null`. */
+export async function banRow(ctx: QueryCtx, playerId: string) {
+  return await ctx.db
+    .query('chatBans')
+    .withIndex('by_player', (q) => q.eq('playerId', playerId))
+    .first();
+}
+
 /** What the chat rules need to know about `playerId`. */
 async function chatPlayerOf(ctx: QueryCtx, playerId: string): Promise<ChatPlayer> {
-  const [user, row] = await Promise.all([
+  const [user, row, ban] = await Promise.all([
     authComponent.getAnyUserById(ctx, playerId),
     nameRowOf(ctx, playerId),
+    banRow(ctx, playerId),
   ]);
   return {
     saved: user !== null && user.isAnonymous !== true,
     hasUsername: row?.username !== undefined,
     termsVersion: row?.termsVersion ?? null,
     enabled: row?.chatOff !== true,
+    banned: chatBanned(ban?.until, Date.now()),
   };
 }
 
@@ -236,10 +258,15 @@ export const deleteGameChat = internalMutation({
       .withIndex('by_game', (q) => q.eq('gameId', gameId))
       .take(CHAT_DELETE_PAGE);
     for (const row of messages) await ctx.db.delete(row._id);
-    const mutes = await ctx.db
-      .query('chatMutes')
-      .withIndex('by_game', (q) => q.eq('gameId', gameId))
-      .take(CHAT_DELETE_PAGE - messages.length);
+    // A page full of messages reads no mute: the next run does.
+    const room = CHAT_DELETE_PAGE - messages.length;
+    const mutes =
+      room === 0
+        ? []
+        : await ctx.db
+            .query('chatMutes')
+            .withIndex('by_game', (q) => q.eq('gameId', gameId))
+            .take(room);
     for (const row of mutes) await ctx.db.delete(row._id);
     if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
       await ctx.scheduler.runAfter(0, internal.chat.deleteGameChat, { gameId });
@@ -263,11 +290,18 @@ export const deleteChatRows = internalMutation({
       .withIndex('by_sender', (q) => q.eq('senderId', playerId))
       .take(CHAT_DELETE_PAGE);
     for (const row of messages) await ctx.db.delete(row._id);
-    const mutes = await ctx.db
-      .query('chatMutes')
-      .withIndex('by_player', (q) => q.eq('playerId', playerId))
-      .take(CHAT_DELETE_PAGE - messages.length);
+    // A page full of messages reads no mute: the next run does.
+    const room = CHAT_DELETE_PAGE - messages.length;
+    const mutes =
+      room === 0
+        ? []
+        : await ctx.db
+            .query('chatMutes')
+            .withIndex('by_player', (q) => q.eq('playerId', playerId))
+            .take(room);
     for (const row of mutes) await ctx.db.delete(row._id);
+    const ban = await banRow(ctx, playerId);
+    if (ban !== null) await ctx.db.delete(ban._id);
     if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
       await ctx.scheduler.runAfter(0, internal.chat.deleteChatRows, { playerId });
     }
@@ -290,10 +324,15 @@ export const moveGuestChat = internalMutation({
       .withIndex('by_sender', (q) => q.eq('senderId', source))
       .take(CHAT_DELETE_PAGE);
     for (const row of messages) await ctx.db.patch(row._id, { senderId: target });
-    const mutes = await ctx.db
-      .query('chatMutes')
-      .withIndex('by_player', (q) => q.eq('playerId', source))
-      .take(CHAT_DELETE_PAGE - messages.length);
+    // A page full of messages reads no mute: the next run does.
+    const room = CHAT_DELETE_PAGE - messages.length;
+    const mutes =
+      room === 0
+        ? []
+        : await ctx.db
+            .query('chatMutes')
+            .withIndex('by_player', (q) => q.eq('playerId', source))
+            .take(room);
     for (const row of mutes) {
       if ((await muteRow(ctx, target, row.gameId)) === null) {
         await ctx.db.patch(row._id, { playerId: target });
@@ -303,6 +342,56 @@ export const moveGuestChat = internalMutation({
     }
     if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
       await ctx.scheduler.runAfter(0, internal.chat.moveGuestChat, { source, target });
+    }
+    return null;
+  },
+});
+
+/**
+ * The owner stops `playerId`'s chat (ADR-0011 item 14): for `days` days,
+ * or for good with no `days`. A second call replaces the ban. The player
+ * sees the status `banned`; the other player sees `unavailable`. Run it
+ * from the Convex dashboard. Never make it public.
+ */
+export const banChatForOwner = internalMutation({
+  args: { playerId: v.string(), days: v.optional(v.number()) },
+  returns: v.null(),
+  handler: async (ctx, { playerId, days }) => {
+    const now = Date.now();
+    const until = days === undefined ? null : now + days * 24 * 60 * 60 * 1000;
+    const row = await banRow(ctx, playerId);
+    if (row === null) await ctx.db.insert('chatBans', { playerId, until, createdAt: now });
+    else await ctx.db.patch(row._id, { until });
+    return null;
+  },
+});
+
+/** The owner ends the chat ban of `playerId`. No ban: no change. Never make it public. */
+export const unbanChatForOwner = internalMutation({
+  args: { playerId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { playerId }) => {
+    const row = await banRow(ctx, playerId);
+    if (row !== null) await ctx.db.delete(row._id);
+    return null;
+  },
+});
+
+/**
+ * The owner deletes every chat message `playerId` wrote, in pages (the
+ * mutes and a ban stay). Never make it public.
+ */
+export const deleteChatMessagesForOwner = internalMutation({
+  args: { playerId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { playerId }) => {
+    const messages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_sender', (q) => q.eq('senderId', playerId))
+      .take(CHAT_DELETE_PAGE);
+    for (const row of messages) await ctx.db.delete(row._id);
+    if (messages.length === CHAT_DELETE_PAGE) {
+      await ctx.scheduler.runAfter(0, internal.chat.deleteChatMessagesForOwner, { playerId });
     }
     return null;
   },

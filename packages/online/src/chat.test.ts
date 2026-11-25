@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHAT_KEEP_MS,
   NO_CHAT_PLAYER,
+  chatBanned,
   chatExpired,
   chatSeenBy,
   chatStatus,
@@ -75,6 +76,17 @@ describe('chatStatus', () => {
     expect(chatExpired(null, 10 * CHAT_KEEP_MS)).toBe(false);
     expect(chatExpired(1000, 1000 + CHAT_KEEP_MS - 1)).toBe(false);
     expect(chatExpired(1000, 1000 + CHAT_KEEP_MS)).toBe(true);
+  });
+
+  it('is banned for the banned player and unavailable for the other', () => {
+    expect(status({ banned: true })).toBe('banned');
+    expect(status({ banned: true, enabled: false })).toBe('banned');
+    expect(status({ banned: true, termsVersion: null })).toBe('needs-terms');
+    expect(status({}, { banned: true })).toBe('unavailable');
+    expect(chatBanned(undefined, 5)).toBe(false);
+    expect(chatBanned(null, 5)).toBe(true);
+    expect(chatBanned(6, 5)).toBe(true);
+    expect(chatBanned(5, 5)).toBe(false);
   });
 
   it('is muted only when the chat would be open', () => {

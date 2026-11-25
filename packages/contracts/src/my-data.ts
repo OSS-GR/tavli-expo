@@ -60,6 +60,8 @@ export interface MyData {
 export interface MyDataChat {
   /** False when the caller turned chat off in all games. */
   readonly enabled: boolean;
+  /** A chat ban by the owner: `until` is its end, `null` for no end. `null`: no ban. */
+  readonly ban: { readonly until: number | null } | null;
   /** The caller's own messages that are still kept, newest first. Never the other player's. */
   readonly messages: readonly MyDataChatMessage[];
 }
