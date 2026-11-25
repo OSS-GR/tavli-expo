@@ -73,7 +73,7 @@ export function DiceRow({
   // The web's dice warm-up (#679). Only a row that starts empty warms up:
   // its canvas is invisible meanwhile, and real dice must never hide.
   const [startedEmpty] = useState(dice.length === 0);
-  const warming = useWarming() && startedEmpty;
+  const warming = useWarming() && startedEmpty && dice.length === 0;
   const double = dice.length === 4;
   // Dice at rest (no roll) always show all four of a double. A thrown roll
   // (`rest`) keeps the reveal of a double: only its tumble is off.
