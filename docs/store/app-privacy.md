@@ -33,7 +33,7 @@ What never leaves the phone: the saved settings (only the events above say that 
 
 ## Step 2: Data types
 
-Tick these nine. Leave every other box empty.
+Tick these ten. Leave every other box empty.
 
 | Apple category | Data type | Why |
 |----------------|-----------|-----|
@@ -42,6 +42,7 @@ Tick these nine. Leave every other box empty.
 | Identifiers | **Device ID** | The install id (PostHog `identify`, Sentry user id after Allow), PostHog's random ids, and the push token on Convex (turn notifications, #285) |
 | Contacts | **Contacts** | The friends list on Convex (#406): Apple's "Contacts" includes a social graph. The app never reads the phone's address book. |
 | User Content | **Gameplay Content** | The online games and invites on Convex: the moves, rolls and score of a game with a friend (#281), and a saved account's rating and its rated match count (#407, shown to friends and, with "Show me on the global board" on, on the global board with the username) |
+| User Content | **Emails or Text Messages** | The chat messages of an online game on Convex (ADR-0011, #692): the text, the sender and the time, kept until 30 days after the match ends. Only saved accounts with a username chat. **Owner:** Apple's form names this type "Emails or Text Messages" (the contents of a message); if the form reads better as **Other User Content**, tick that one and change the manifest key in `app.json` to match. |
 | Usage Data | **Product Interaction** | The PostHog events (app opened, games, settings, screens) |
 | Diagnostics | **Crash Data** | Sentry crash and error reports |
 | Diagnostics | **Performance Data** | App hangs (iOS) and ANRs (Android), after Allow only. These are Sentry native SDK defaults (checked in the SDK source in #139; not yet seen in a build). Declare them, as the manifest does. |
@@ -60,6 +61,7 @@ Apple asks three questions per type. The answers match the privacy manifest in `
 | Device ID | **Analytics**, **App Functionality** | **Yes** | **No** |
 | Contacts | **App Functionality** | **Yes** | **No** |
 | Gameplay Content | **App Functionality** | **Yes** | **No** |
+| Emails or Text Messages | **App Functionality** | **Yes** | **No** |
 | Product Interaction | **Analytics** | **Yes** | **No** |
 | Crash Data | **App Functionality** | **Yes** | **No** |
 | Performance Data | **App Functionality** | **Yes** | **No** |
@@ -79,7 +81,7 @@ The online play data (Email Address, User ID, Contacts, Gameplay Content) is lin
 
 **Owner:** for the install id and the diagnostics you may still argue "not linked": no name or phone, and the id is random and lives only in this install. (The online data, and the Apple email, stay linked.) If you choose that, keep the label and the manifest the same: set `NSPrivacyCollectedDataTypeLinked` back to `false` in `apps/mobile/app.json` (a code PR).
 
-The iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: true` for all nine types, and `NSPrivacyCollectedDataTypeTracking: false` (#139, #281, #401, #406).
+The iOS privacy manifest in `apps/mobile/app.json` says `NSPrivacyCollectedDataTypeLinked: true` for all ten types, and `NSPrivacyCollectedDataTypeTracking: false` (#139, #281, #401, #406, #705).
 
 ## The label people will see
 
@@ -106,7 +108,7 @@ Apple asks apps that make an account to let people delete it in the app (App Rev
 - [ ] PostHog project is in the **EU** cloud, and **Discard client IP data** is on (`docs/architecture/analytics-events.md`, Setup). If IPs were stored, Apple could see it as coarse location.
 - [ ] The app has no other SDK that sends data. Today the network SDKs are Sentry, PostHog, Convex (with Better Auth) and Expo Notifications (the push token, #285). If you add one (for example EAS Update), update this page first.
 - [ ] In a release build, **before** answering the consent screen, trigger a JS error and look at the event in Sentry: no `user`, no `contexts.device.id`, no device name, and no session in Release Health. Then trigger a native crash: nothing should arrive, not even on the next launch. See "Pre-consent crash reports" below.
-- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all nine).
+- [ ] `NSPrivacyCollectedDataTypeLinked` in `apps/mobile/app.json` matches the "linked" answers above (today: `true` for all ten).
 - [ ] Both Convex deployments are in the EU (`eu-west-1`), and you accepted Convex's data processing terms (DPA). The deployments have `BETTER_AUTH_SECRET` set (`npx convex env set`; never in the repo).
 - [ ] Check where Expo's push service processes the data, and whether its terms need a data processing agreement (DPA).
 - [ ] Email Address is ticked since Sign in with Apple (#401). Usernames (#405) are screen names, so they fall under User ID (Apple: "screen name, handle"), not Name or Other User Content. The server also keeps when the player accepted the terms and ticked the age box: no age or birthday. Blocks and reports (#320) are tied to the user id: a report keeps a reason from a fixed list and the reported username, with no free text, so no new data type (User ID covers them). The email code (#399) needs no new type: Email Address covers it (App Functionality, linked, no tracking). Ratings (#407) are computed from the online games: Gameplay Content covers them, so the privacy manifest (`apps/mobile/app.json`) needs no new type. A Play ranked seek (#531) holds the user id, the game, the rating and the time: User ID and Gameplay Content cover it, so again no new type in the label or the manifest. When Google ships, check the label again.
