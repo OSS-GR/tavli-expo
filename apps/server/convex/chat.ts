@@ -258,10 +258,15 @@ export const deleteGameChat = internalMutation({
       .withIndex('by_game', (q) => q.eq('gameId', gameId))
       .take(CHAT_DELETE_PAGE);
     for (const row of messages) await ctx.db.delete(row._id);
-    const mutes = await ctx.db
-      .query('chatMutes')
-      .withIndex('by_game', (q) => q.eq('gameId', gameId))
-      .take(CHAT_DELETE_PAGE - messages.length);
+    // A page full of messages reads no mute: the next run does.
+    const room = CHAT_DELETE_PAGE - messages.length;
+    const mutes =
+      room === 0
+        ? []
+        : await ctx.db
+            .query('chatMutes')
+            .withIndex('by_game', (q) => q.eq('gameId', gameId))
+            .take(room);
     for (const row of mutes) await ctx.db.delete(row._id);
     if (messages.length + mutes.length === CHAT_DELETE_PAGE) {
       await ctx.scheduler.runAfter(0, internal.chat.deleteGameChat, { gameId });
@@ -285,10 +290,15 @@ export const deleteChatRows = internalMutation({
       .withIndex('by_sender', (q) => q.eq('senderId', playerId))
       .take(CHAT_DELETE_PAGE);
     for (const row of messages) await ctx.db.delete(row._id);
-    const mutes = await ctx.db
-      .query('chatMutes')
-      .withIndex('by_player', (q) => q.eq('playerId', playerId))
-      .take(CHAT_DELETE_PAGE - messages.length);
+    // A page full of messages reads no mute: the next run does.
+    const room = CHAT_DELETE_PAGE - messages.length;
+    const mutes =
+      room === 0
+        ? []
+        : await ctx.db
+            .query('chatMutes')
+            .withIndex('by_player', (q) => q.eq('playerId', playerId))
+            .take(room);
     for (const row of mutes) await ctx.db.delete(row._id);
     const ban = await banRow(ctx, playerId);
     if (ban !== null) await ctx.db.delete(ban._id);
@@ -314,10 +324,15 @@ export const moveGuestChat = internalMutation({
       .withIndex('by_sender', (q) => q.eq('senderId', source))
       .take(CHAT_DELETE_PAGE);
     for (const row of messages) await ctx.db.patch(row._id, { senderId: target });
-    const mutes = await ctx.db
-      .query('chatMutes')
-      .withIndex('by_player', (q) => q.eq('playerId', source))
-      .take(CHAT_DELETE_PAGE - messages.length);
+    // A page full of messages reads no mute: the next run does.
+    const room = CHAT_DELETE_PAGE - messages.length;
+    const mutes =
+      room === 0
+        ? []
+        : await ctx.db
+            .query('chatMutes')
+            .withIndex('by_player', (q) => q.eq('playerId', source))
+            .take(room);
     for (const row of mutes) {
       if ((await muteRow(ctx, target, row.gameId)) === null) {
         await ctx.db.patch(row._id, { playerId: target });
