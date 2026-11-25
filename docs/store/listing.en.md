@@ -38,7 +38,7 @@ Do **not** claim:
 - **Android.** This listing is for the iPhone launch. The Google Play blocks stay for later.
 - **iPad.** The app is iPhone only (`ios.supportsTablet` is not set).
 - **How often Hard wins.** Say "Hard in every game", not a win rate.
-- **Contacts, chat or voice.** None of these exist.
+- **Contacts or voice.** Neither exists. Chat exists (ADR-0011, #692): text only, between the two players of an online game, for saved accounts with a username. Do not call it "moderated" or "safe for children".
 - **"The best" or "#1".** Apple rejects unproven claims (Guideline 2.3).
 
 ## App name

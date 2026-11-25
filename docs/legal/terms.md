@@ -8,7 +8,7 @@ OWNER: have a lawyer check it before it goes live.
 
 # Tavlaki terms of use
 
-**Version:** 16 November 2026
+**Version:** 25 November 2026
 
 Ελληνικά: [tavlaki.com/el/terms](https://tavlaki.com/el/terms)
 
@@ -16,9 +16,10 @@ These terms are the agreement between you and us about Tavlaki, a free app for G
 
 ## The short version
 
-- Tavlaki is free. It has no purchases, no ads and no chat. Nobody plays for money or prizes here.
+- Tavlaki is free. It has no purchases and no ads. Nobody plays for money or prizes here.
 - You can play on your phone without an account.
 - Online, be kind and play fair: no programs or other people that play for you in ranked games, no fake accounts, no tricks with ratings.
+- You can chat with the other player of an online game. Friendly swearing is fine; attacks on a person are not. You can mute a chat, turn chat off, and block or report a player.
 - Pick a username that is fine for everyone to see. We may change a name that breaks the rules.
 - If we act against your account, we tell you why where we can, and you can ask us to look again.
 - You can delete your account in the app at any time.
@@ -35,7 +36,7 @@ This email is our contact point for players and for the authorities. You can wri
 ## What Tavlaki is
 
 - **On your phone:** you play against the computer, or with a friend on the same phone, and you can learn with the lessons. This needs no account and no internet.
-- **Online:** you play with friends through invites, add friends, play ranked matches with other players, and see ratings and leaderboards. Online play needs an online account (see below).
+- **Online:** you play with friends through invites, add friends, play ranked matches with other players, chat with the player you play, and see ratings and leaderboards. Online play needs an online account (see below).
 - Tavlaki is **free**. There are no purchases in the app and no ads.
 - Tavlaki is a game of skill and luck for fun. **It is not gambling.** Points, ratings and wins have no money value, and you cannot win prizes. Do not use Tavlaki to bet or to play for money or anything else of value.
 
@@ -105,9 +106,19 @@ When you play online, do not:
 - A ranked game gives **2 minutes** a turn. If your time runs out on **two of your turns in a row**, also across games of the same match, you lose the match. A turn you play sets the count back to 0.
 - A slow network, a flat battery or a late notification does not undo a result. If our server caused a wrong result, we may correct it.
 
+## Chat
+
+- In an online game you can write short messages to the other player. Chat needs an online account saved with Sign in with Apple or an email code, a username, and these terms. A game has a chat only when both players can chat.
+- Friendly swearing between players is fine. These are not allowed in a chat: threats; harassment or bullying; hate against a person or a group (for race, origin, religion, sex, sexual orientation, disability or the like), also as a "joke"; sexual messages; anything about harm to children; another person's private data (such as a real name, an address or a phone number); spam, ads and links; asking a player to move to another app or site; help with cheating; and anything against the law.
+- A filter refuses links, email addresses and a short list of slurs. It does not catch everything: a message that passes the filter can still break these terms.
+- You can mute the chat of a game, turn chat off for all games in **Settings**, and block or report the other player. The other player is not told.
+- You may meet words you do not like. We do not read chats while they happen. We read the messages that come with a report.
+- We delete the messages 30 days after the match ends (see the privacy policy).
+- If you break these rules, we may delete your messages and stop your chat, for a time or for good (see "What we may do").
+
 ## Reports and blocks
 
-- To report a player, tap **Report or block** where their name shows: in the menu of an online game, at the end of an online match, in History or in Friends. Pick one reason: an offensive name, cheating or abuse of the game, harassment, or something else. There is no text box. A report also blocks the player.
+- To report a player, tap **Report or block** where their name shows: in the menu or the chat of an online game, at the end of an online match, in History or in Friends. Pick one reason: an offensive name, cheating or abuse of the game, harassment, something they wrote in the chat, or something else. There is no text box. A report from the chat of a game sends us that player's last 20 messages of that game. A report also blocks the player.
 - A player you block cannot send you new invites or play ranked with you, and their name no longer shows to you. A friendship between you ends. A game you play with them now goes on. To unblock them, go to **Settings → Blocked players**.
 - The other player is not told about a block or a report.
 - We read every report. A report alone does not punish anyone: we look at what happened first.
@@ -121,6 +132,7 @@ If an account or a username breaks these terms or the law, we may, depending on 
 - correct or reset a rating, or take the account off the leaderboards;
 - end a game, or set a result right;
 - stop the account from playing online, or from playing ranked, for a time;
+- delete chat messages, or stop the account's chat, for a time or for good;
 - delete the account, for serious or repeated breaks.
 
 We pick the smallest step that fixes the problem. We also look at what the player may say for themselves.
@@ -142,7 +154,7 @@ Turn notifications are your choice. You can turn them off in the app or in your 
 
 ## Your content
 
-Your username and your online games stay yours. You let us store them and show them to the players who see them in the app (the players you play, your friends, and, on the global board, other saved players). This permission is free, and only to run the game. It ends when you delete your account, except for what the privacy policy says we keep (such as finished games for the other player, with no name). We do not sell your content.
+Your username, your chat messages and your online games stay yours. You let us store them and show them to the players who see them in the app (the players you play, your friends, and, on the global board, other saved players). A chat message goes only to the player you play, and to us with a report. This permission is free, and only to run the game. It ends when you delete your account, except for what the privacy policy says we keep (such as finished games for the other player, with no name). We do not sell your content.
 
 ## The app as it is
 
