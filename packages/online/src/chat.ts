@@ -107,7 +107,9 @@ function wordsOf(text: string): string[] {
  * common words.
  */
 const SLUR_PARTS = [
-  'nigg',
+  // Not the shorter "nigg": it would refuse "niggle".
+  'nigger',
+  'nigga',
   'faggot',
   'tranny',
   'paedo',
@@ -144,12 +146,13 @@ export function hasBadWord(text: string): boolean {
 /**
  * The text to keep: composed form (NFC), control and invisible format
  * characters out, each run of white space (line breaks too) as one space,
- * no space at the ends.
+ * no space at the ends. The two joiners stay (U+200D and U+200C): joined
+ * emoji and some scripts need them.
  */
 export function cleanChatText(text: string): string {
   return text
     .normalize('NFC')
-    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+    .replace(/[\p{Cc}\p{Cf}]/gu, (char) => (char === '\u200D' || char === '\u200C' ? char : ' '))
     .replace(/\s+/gu, ' ')
     .trim();
 }
