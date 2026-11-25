@@ -293,6 +293,26 @@ export {
 } from './ratings';
 export type { BoardRow, MyRating, Ratings, RatingsErrorCode, RatingsErrorData } from './ratings';
 export {
+  CHAT_ERROR_CODES,
+  CHAT_KEEP_DAYS,
+  CHAT_MAX_LENGTH,
+  CHAT_MESSAGES_PER_MINUTE,
+  CHAT_RATE_WINDOW_MS,
+  CHAT_STATUSES,
+  CHAT_VIEW_MESSAGES,
+  isChatErrorData,
+} from './chat';
+export type {
+  Chat,
+  ChatErrorCode,
+  ChatErrorData,
+  ChatMessage,
+  ChatSettings,
+  ChatStatus,
+  ChatView,
+  SendChatRequest,
+} from './chat';
+export {
   MATCHED_SEEK_KEEP_MS,
   MATCHMAKING_ERROR_CODES,
   NOBODY_YET_MS,

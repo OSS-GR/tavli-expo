@@ -60,6 +60,7 @@ export { NO_NAMES, nameFrom, namesOf, pickGuestNumber, type NameRecord } from '.
 export {
   checkUsername,
   isAllowedUsername,
+  foldLetters,
   myUsernameOf,
   nextUsernameChange,
   planUsername,
@@ -187,6 +188,23 @@ export {
   namesSeenBy,
   reportWindowStart,
 } from './safety';
+export {
+  ChatError,
+  NO_CHAT_PLAYER,
+  chatSeenBy,
+  chatStatus,
+  cleanChatText,
+  hasBadWord,
+  hasLink,
+  planChatMessage,
+} from './chat';
+export type {
+  ChatPlan,
+  ChatPlayer,
+  ChatStatusInput,
+  PlanChatInput,
+  StoredChatMessage,
+} from './chat';
 export {
   guestGameMove,
   renamePlayerInEvent,

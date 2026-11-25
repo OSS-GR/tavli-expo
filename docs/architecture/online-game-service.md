@@ -868,6 +868,44 @@ An action, so it can read the tables with no cap in pages: the capped parts (acc
 
 `OnlineData.exportMyData()` (contracts). On Convex: `createConvexOnlineData` calls the action named in `MY_DATA_FUNCTIONS` (`backend-convex/src/functions.ts`); `convex/convexOnlineData.test.ts` checks the name and types against `api` and runs `onlineDataContract` through the adapter. Server tests: `convex/myData.test.ts` (the contents with no other ids, an expired invite, paging past one page, `NOT_SIGNED_IN`).
 
+## Chat
+
+> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694). The Convex functions, the report of a message and the screens come in later steps.
+
+The two players of an online game write short text messages to each other, in friend games and in Play ranked.
+
+### Who sees a chat
+
+`chatStatus` (`packages/online/src/chat.ts`) gives each player one status:
+
+| Status | Meaning |
+|--------|---------|
+| `open` | Both players may chat. Only this status has messages and takes a send |
+| `needs-account` | The caller is a guest |
+| `needs-username` | The caller has a saved account with no username |
+| `needs-terms` | The caller did not accept the current terms (`TERMS_VERSION`) |
+| `turned-off` | The caller turned chat off for all games (`setEnabled(false)`) |
+| `muted` | The caller muted this game (`setMuted`) |
+| `unavailable` | A reason on the other side, or the caller blocks them. The view never says which |
+
+The caller's own reason comes first, so the app can lead them to the fix.
+
+### A message
+
+`planChatMessage` checks one send, in this order: the status, the clean text (`cleanChatText`: one line, no hidden characters), the length (`CHAT_MAX_LENGTH`, in characters), no web or email address (`hasLink`), the slur filter (`hasBadWord`: a short list of slurs, one word at a time; ordinary swearing is allowed), the cap of the minute (`CHAT_MESSAGES_PER_MINUTE`). There is no cap per game (owner, 2026-11-25). It returns a plan, so a server can count a refused message.
+
+### Mute, the switch and a block
+
+- A view holds the newest `CHAT_VIEW_MESSAGES` (200) messages: a game has no cap, so a long chat must not make every view larger.
+- A muted or turned-off chat holds no messages for that player: the text never reaches their phone.
+- A player who blocks the other sees `unavailable`. The blocked player is not told: their chat stays `open`, and a message they send is kept `hidden`, so only they see it (`chatSeenBy`). After an unblock it stays hidden.
+
+### The port
+
+`Chat` (`packages/contracts/src/chat.ts`): `watch`, `send`, `setMuted`, `settings`, `setEnabled`. The in-memory server has `chatFor(playerId)`; `markNamed` (`@tavli/online/testing`) makes a player who may chat. The contract checks are `chatContract()` (`@tavli/contracts/testing`).
+
+The text of a message never goes to analytics, crash reports, pushes or logs.
+
 ## Update needed
 
 Issue #390. A server deploy can break older app builds (#380). The owner then sets the lowest build that still works, and an older build shows the "Update needed" screen with one button, **Update** (TestFlight on iOS, Google Play on Android). The app side is in [App shell → Update needed](app-shell.md#update-needed-390).

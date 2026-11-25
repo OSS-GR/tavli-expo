@@ -74,6 +74,10 @@ import {
   normalizeInviteCode,
 } from '@tavli/contracts';
 import type {
+  Chat,
+  ChatErrorData,
+  ChatMessage,
+  ChatView,
   BoardRow,
   FoundPlayer,
   Friends,
@@ -205,6 +209,8 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
+import { ChatError, chatSeenBy, chatStatus, planChatMessage } from './chat';
+import type { ChatPlayer, StoredChatMessage } from './chat';
 import { checkRecordCall, gameRecordLog } from './game-record';
 import { nameFrom, namesOf, pickGuestNumber } from './names';
 import type { NameRecord } from './names';
@@ -334,6 +340,13 @@ export interface MemoryGameServer {
    */
   safetyFor(playerId: string | null): Safety;
   /**
+   * Chat (ADR-0011, #692) as `playerId` (`null`: nobody signed in), as if
+   * they were signed in. A game's chat is open only when both players are
+   * marked with `markSaved`, have a username and accepted the terms
+   * (`markNamed` in `@tavli/online/testing` does all three).
+   */
+  chatFor(playerId: string | null): Chat;
+  /**
    * Friends (#406) as `playerId` (`null`: nobody signed in), as if they
    * were signed in. Only players marked with `markSaved` may have friends.
    */
@@ -417,6 +430,22 @@ interface MemoryGame extends SavedGame {
   readonly events: readonly string[];
   /** The last saved change, epoch ms (server clock). */
   readonly updatedAt: number;
+}
+
+/** A kept chat message (#692) with its sender's id, for the account delete. */
+interface MemoryChatMessage extends StoredChatMessage {
+  readonly senderId: string;
+}
+
+interface ChatListener {
+  readonly gameId: string;
+  readonly playerId: string;
+  readonly onChat: (view: ChatView) => void;
+  active: boolean;
+}
+
+function chatMuteKey(playerId: string, gameId: string): string {
+  return `${playerId}\n${gameId}`;
 }
 
 interface Listener {
@@ -513,6 +542,10 @@ function toErrorData(error: unknown): unknown {
     const data: SafetyErrorData = { code: error.code, message: error.message };
     return data;
   }
+  if (error instanceof ChatError) {
+    const data: ChatErrorData = { code: error.code, message: error.message };
+    return data;
+  }
   if (error instanceof FriendsError) {
     const data: FriendsErrorData = { code: error.code, message: error.message };
     return data;
@@ -550,6 +583,14 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
   const blocks = new Map<string, Map<string, number>>();
   /** Reports (#320), oldest first, like the Convex `reports` table. */
   let reports: MemoryReport[] = [];
+  /** Chat (#692): the messages of each game, oldest first, like the Convex `chatMessages` table. */
+  const chatMessages = new Map<string, MemoryChatMessage[]>();
+  /** Chat mutes: `chatMuteKey(player, game)`, like the Convex `chatMutes` table. */
+  const chatMutes = new Set<string>();
+  /** Players who turned chat off in all games. */
+  const chatOff = new Set<string>();
+  const chatListeners = new Set<ChatListener>();
+  let chatSeq = 0;
   const tokenRng = options.tokenRng ?? createSeededRng(406);
   /** Players with a saved account (#406), like a Better Auth user that is not anonymous. */
   const savedPlayers = new Set<string>();
@@ -652,6 +693,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             ...next,
             guestNumber: next.guestNumber ?? pickGuestNumber(nameRng),
           });
+          // A username and the terms open the chat (#692).
+          notifyChatsOf(id);
           return myUsernameOf(nameRecords.get(id) ?? null, saved, at);
         }),
     };
@@ -1248,6 +1291,18 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     }
     // The seek (#531), so no match can start with the player.
     if (seeks.delete(playerId)) notifySeeks();
+    // Chat (#692): the player's messages, mutes and switch.
+    for (const [gameId, kept] of chatMessages) {
+      chatMessages.set(
+        gameId,
+        kept.filter((message) => message.senderId !== playerId),
+      );
+    }
+    for (const key of [...chatMutes]) {
+      if (key.startsWith(`${playerId}\n`)) chatMutes.delete(key);
+    }
+    chatOff.delete(playerId);
+    notifyChatsOf(playerId);
   }
 
   /**
@@ -1358,6 +1413,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     for (const listener of inviteListeners) {
       if (listener.playerId === blockedId) sendInvite(listener);
     }
+    // Only the blocker's chat changes: the blocked player is never told (#692).
+    notifyChats((listener) => listener.playerId === blockerId);
   }
 
   /** `callerId` blocks `playerId`, after the checks, like the Convex `blockPlayer`. */
@@ -1443,6 +1500,149 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           if (!blocksPlayer(id, other) && (blocks.get(id)?.size ?? 0) < MAX_BLOCKS) {
             block(id, other);
           }
+        }),
+    };
+  }
+
+  /** What the chat rules need to know about `playerId`. */
+  function chatPlayerOf(playerId: string): ChatPlayer {
+    const record = nameRecords.get(playerId);
+    return {
+      saved: isSaved(playerId),
+      hasUsername: record?.username !== undefined,
+      termsVersion: record?.termsVersion ?? null,
+      enabled: !chatOff.has(playerId),
+    };
+  }
+
+  /** The chat of `game` as `playerId` (a player of it) sees it. */
+  function chatViewOf(game: MemoryGame, playerId: string, side: PlayerId): ChatView {
+    const otherId = game.players[side === 'white' ? 'black' : 'white'];
+    const status = chatStatus({
+      me: chatPlayerOf(playerId),
+      other: chatPlayerOf(otherId),
+      muted: chatMutes.has(chatMuteKey(playerId, game.gameId)),
+      blocksOther: blocksPlayer(playerId, otherId),
+    });
+    return {
+      gameId: game.gameId,
+      status,
+      messages: chatSeenBy(chatMessages.get(game.gameId) ?? [], side, status),
+    };
+  }
+
+  /** Sends the chat as it is now to each chat listener that `wanted` accepts. */
+  function notifyChats(wanted: (listener: ChatListener) => boolean): void {
+    for (const listener of chatListeners) {
+      if (!wanted(listener)) continue;
+      const game = games.get(listener.gameId);
+      const side = game === undefined ? null : sideOf(game.players, listener.playerId);
+      if (game === undefined || side === null) continue;
+      const text = JSON.stringify(chatViewOf(game, listener.playerId, side));
+      later(() => {
+        if (listener.active) listener.onChat(JSON.parse(text) as ChatView);
+      });
+    }
+  }
+
+  /** Both players of each game of `playerId` see their chat again: what the player may do changed. */
+  function notifyChatsOf(playerId: string): void {
+    notifyChats((listener) => {
+      const game = games.get(listener.gameId);
+      return game !== undefined && sideOf(game.players, playerId) !== null;
+    });
+  }
+
+  /** Chat (ADR-0011, #692), like the Convex `chat.ts`. */
+  function chatFor(playerId: string | null): Chat {
+    const caller = (): string => {
+      if (playerId === null || deletedPlayers.has(playerId)) {
+        throw new ChatError('NOT_SIGNED_IN', 'sign in first');
+      }
+      return playerId;
+    };
+    /** The game and the caller's side in it. */
+    const seat = (gameId: string): { id: string; game: MemoryGame; side: PlayerId } => {
+      const id = caller();
+      const game = games.get(gameId);
+      if (game === undefined) throw new ChatError('GAME_NOT_FOUND', 'no such game');
+      const side = sideOf(game.players, id);
+      if (side === null) throw new ChatError('NOT_A_PLAYER', 'you are not a player of this game');
+      return { id, game, side };
+    };
+    const call = async <T>(step: () => T): Promise<T> => {
+      await nextTick();
+      try {
+        const result = step();
+        return result === undefined ? result : copy(result);
+      } catch (error) {
+        throw toErrorData(error);
+      }
+    };
+    return {
+      watch: (gameId, onChat, onError) => {
+        const listener: ChatListener = { gameId, playerId: playerId ?? '', onChat, active: true };
+        later(() => {
+          if (!listener.active) return;
+          try {
+            const { id, game, side } = seat(gameId);
+            chatListeners.add(listener);
+            onChat(copy(chatViewOf(game, id, side)));
+          } catch (error) {
+            listener.active = false;
+            onError?.(toErrorData(error) as ChatErrorData);
+          }
+        });
+        return () => {
+          listener.active = false;
+          chatListeners.delete(listener);
+        };
+      },
+      send: (request) =>
+        call(() => {
+          const { id, game, side } = seat(request.gameId);
+          const otherId = game.players[side === 'white' ? 'black' : 'white'];
+          const kept = chatMessages.get(game.gameId) ?? [];
+          const at = now();
+          const plan = planChatMessage({
+            text: request.text,
+            status: chatViewOf(game, id, side).status,
+            sentTimes: kept.filter((message) => message.senderId === id).map((m) => m.sentAt),
+            now: at,
+          });
+          if (!plan.ok) throw new ChatError(plan.code, plan.message);
+          chatSeq += 1;
+          const message: MemoryChatMessage = {
+            id: `m${chatSeq}`,
+            from: side,
+            text: plan.text,
+            sentAt: at,
+            // The other player blocks the sender: only the sender sees it.
+            hidden: blocksPlayer(otherId, id),
+            senderId: id,
+          };
+          chatMessages.set(game.gameId, [...kept, message]);
+          notifyChats((listener) => listener.gameId === game.gameId);
+          const sent: ChatMessage = { id: message.id, from: side, text: plan.text, sentAt: at };
+          return sent;
+        }),
+      setMuted: (gameId, muted) =>
+        call(() => {
+          const { id, game } = seat(gameId);
+          const key = chatMuteKey(id, game.gameId);
+          if (muted === chatMutes.has(key)) return;
+          if (muted) chatMutes.add(key);
+          else chatMutes.delete(key);
+          notifyChats((listener) => listener.gameId === game.gameId && listener.playerId === id);
+        }),
+      settings: () => call(() => ({ enabled: !chatOff.has(caller()) })),
+      setEnabled: (enabled) =>
+        call(() => {
+          const id = caller();
+          if (enabled === !chatOff.has(id)) return;
+          if (enabled) chatOff.delete(id);
+          else chatOff.add(id);
+          notifyChatsOf(id);
         }),
     };
   }
@@ -2111,6 +2311,22 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       if (answeredBy.get(invite.code) === source) answeredBy.set(invite.code, target);
       if (invite.from === source) saveInvite({ ...invite, from: target });
     }
+    // Chat (#692): the guest's mutes and switch become the account's. A
+    // guest has no messages (chat needs a saved account), but a row moves too.
+    for (const [gameId, kept] of chatMessages) {
+      chatMessages.set(
+        gameId,
+        kept.map((message) =>
+          message.senderId === source ? { ...message, senderId: target } : message,
+        ),
+      );
+    }
+    for (const key of [...chatMutes]) {
+      if (!key.startsWith(`${source}\n`)) continue;
+      chatMutes.delete(key);
+      chatMutes.add(chatMuteKey(target, key.slice(source.length + 1)));
+    }
+    if (chatOff.delete(source)) chatOff.add(target);
     // Blocks both ways: never one of `target` by itself, never one twice.
     const mine = blocks.get(source) ?? new Map<string, number>();
     blocks.delete(source);
@@ -2147,6 +2363,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
     deletedPlayers.add(source);
     nameRecords.delete(source);
     notifyViewer(target);
+    notifyChatsOf(target);
   }
 
   return {
@@ -2175,6 +2392,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
     safetyFor,
 
+    chatFor,
+
     friendsFor,
 
     ratingsFor,
@@ -2189,6 +2408,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
 
     markSaved(playerId) {
       savedPlayers.add(playerId);
+      notifyChatsOf(playerId);
     },
 
     reportsOf: () => copy(reports),
