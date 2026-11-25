@@ -84,5 +84,6 @@
 | [0008](decisions/0008-accounts.md) | Sign-in methods and account rules: guests stay, Apple, Google and email code to save | Accepted |
 | [0009](decisions/0009-play-ranked.md) | Play ranked: 2-minute turns, two time outs in a row lose the match | Accepted |
 | [0010](decisions/0010-web-version.md) | Web version: the same Expo app, built for the browser too | Proposed |
+| [0011](decisions/0011-chat.md) | Chat in online games: free text for saved accounts, with a filter, mute, block and report | Accepted |
 
 New ADRs: copy [0000-template.md](decisions/0000-template.md).

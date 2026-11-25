@@ -41,7 +41,7 @@
 | Q31 | (2026-10-28) **Online invites last 24 hours.** Kept as built (`INVITE_TIME_MS`). | `docs/architecture/online-game-service.md`, #252 |
 | Test builds | (2026-10-28) **`preview` builds use the dev Convex deployment.** Only `production` uses prod, so test games never touch real players' data. | `apps/mobile/app.config.ts`, `docs/process/running-the-app.md` |
 | Q19 | (2026-10-28) Greek label for the pip count: **none needed.** The owner removed the pip count: "please remove the pip counter, it doesn't add anything, who uses it". The strips and Settings no longer show it. | #238 |
-| Q16 | (2026-11-02) **Chat: free text, later.** Not in the first online release. | #320 |
+| Q16 | (2026-11-02) **Chat: free text, later.** Not in the first online release. (2026-11-25) The owner asked for it: free text in friend games and Play ranked, for saved accounts. | #320, ADR-0011, epic #692 |
 | Q18 | (2026-11-02) **Sentry project:** done by the owner (DSN, org, project and token in EAS). | #43, `packages/adapters/crash-sentry/README.md` |
 | Q20 | (2026-11-02) **PostHog project:** done by the owner (EU region, client IP discarded, key in `.env.local` and EAS). The privacy link is still open (Q32). | #61, `docs/architecture/analytics-events.md` |
 | Q21 | (2026-11-02) **Fevga P3:** the opponent's test move obeys P1 and P2 too, with the active `p2Window`. `primeRulesOff` turns it all off. This never changes a real game (proof in the code). | `docs/rules/fevga.md` (edge case 20), #377 |
