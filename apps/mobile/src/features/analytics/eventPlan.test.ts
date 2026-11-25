@@ -19,7 +19,7 @@ import { DEFAULT_SETTINGS } from '@/features/settings/settings';
 const REPO = path.resolve(__dirname, '../../../../..');
 const SCANNED = ['apps', 'packages'];
 const SKIPPED_DIRS = new Set(['node_modules', '.expo', 'ios', 'android', 'dist', '_generated']);
-const POSTHOG_ADAPTER = 'packages/adapters/analytics-posthog/src/index.ts';
+const POSTHOG_ADAPTER = 'packages/adapters/analytics-posthog/src/posthog.ts';
 const EVENT_PLAN_DOC = 'docs/architecture/analytics-events.md';
 
 /** Every `.ts` and `.tsx` source file (no tests, no type files), as repo paths. */
