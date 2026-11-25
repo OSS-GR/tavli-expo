@@ -86,7 +86,7 @@ The app runs in a browser with offline play. Not public.
 - **Board:** CanvasKit loads before the first screen, with a loading screen in the app's colors (the web entry and the `main` field: findings 1 and 2).
 - **Canvases:** at most a few Skia canvases per screen (finding 4). `Icon` gets a web twin that draws SVG from the same path data. Count the canvases on every screen; the small board previews share one canvas or become images. A test fails when a screen has too many.
 - **Missing web calls:** guard what `react-native-web` lacks (`sendAccessibilityEvent`, finding 3) behind `features/accessibility`.
-- **Size:** try a smaller CanvasKit build, and load the online code only when online play opens. Goal: under 4 MB with Brotli for the first screen.
+- **Size:** goal under 4 MB with Brotli for the first screen. **Done (#690): 3.68 MB** (4.05 MB before). The browser build leaves out the Sentry and PostHog SDKs: `@tavli/crash-sentry` and `@tavli/analytics-posthog` have a browser twin that does nothing until phase 4 gives the web its crash reports and analytics. The browser check (`web:smoke`) fails over 4 MB. Left for later: a smaller CanvasKit needs our own build of it (the package's small file fails with React Native Skia), and the online code (Convex, Better Auth: about 0.2 MB) loads late only if the online ports become async, which is a phase 3 choice.
 - **Online play:** off in this phase (`games === undefined`), so the screens show "online play is off" as they do today with no server address.
 - **CI:** a new job builds the web app (`expo export --platform web`) on every PR and joins `checks`. A broken web build then blocks a merge.
 - **Docs:** `docs/process/running-the-app.md` gets "Run in a browser"; CLAUDE.md gets the web rules.
