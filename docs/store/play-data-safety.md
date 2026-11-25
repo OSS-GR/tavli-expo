@@ -25,20 +25,19 @@ The facts (what leaves the phone, when, and the code that does it) are in [app-p
 
 ## Section 2: Data types
 
-Tick these eight. Leave every other type empty.
+Tick these seven. Leave every other type empty.
 
 | Category | Data type | What it is in Tavlaki |
 |----------|-----------|-----------------------|
 | Personal info | **User IDs** | The guest account's random user id on Convex (online play with a friend, #281), its guest name ("Guest" and 4 random digits, picked by the server, #400) and the username a saved account picks (#405; Google's User IDs cover a screen name) |
 | Contacts | **Contacts** | The friends list on Convex (#406, saved accounts only): Google's "Contacts" includes social graph information. The app never reads the phone's contacts and asks for no contacts permission. |
 | App activity | **Other actions** | The online games on Convex: the moves, rolls and score of a game with a friend (Google's "Other actions" names gameplay), and a saved account's rating from them (#407), and a Play ranked seek (#531: the game, the rating and the time, until matched or 5 minutes) |
-| Messages | **Other in-app messages** | The chat messages of an online game on Convex (ADR-0011, #692): the text, the sender and the time, kept until 30 days after the match ends. Only saved accounts with a username chat. |
 | App activity | **App interactions** | The PostHog events: app opened, game started / finished / abandoned, undo, resign, setting changed, theme changed, screen viewed, tutorial started / step / finished / skipped, hint shown, review opened, invite created, push permission answered, online sign-in (`apple` or `guest` only) |
 | App info and performance | **Crash logs** | Sentry crash and error reports |
 | App info and performance | **Diagnostics** | Device facts and breadcrumbs in crash reports; after Allow also app hangs / ANRs and Sentry sessions; device facts on PostHog events |
 | Device or other IDs | **Device or other IDs** | The random install id and PostHog's random ids; the Expo push token on Convex, after the player turns on notifications (#285, #631) |
 
-Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Personal info except User IDs (name, email, address, phone, and the rest: the guest account has no real name or email), Financial info, Health and fitness, Messages except Other in-app messages (no email, no SMS), Photos and videos, Audio files, Files and docs, Calendar, App activity → In-app search (the server keeps only the times of username searches, for the limit, never the text), Installed apps, Other user-generated content (pass-and-play names stay on the phone), Web browsing, App info and performance → Other app performance data.
+Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is set not to store IPs, and the Better Auth session keeps the IP for sign-in only, never to find a place), Personal info except User IDs (name, email, address, phone, and the rest: the guest account has no real name or email), Financial info, Health and fitness, Messages, Photos and videos, Audio files, Files and docs, Calendar, App activity → In-app search (the server keeps only the times of username searches, for the limit, never the text), Installed apps, Other user-generated content (pass-and-play names stay on the phone), Web browsing, App info and performance → Other app performance data.
 
 ## Section 3: Questions for each data type
 
@@ -47,7 +46,6 @@ Leave empty: Location (approximate and precise: PostHog GeoIP is off, Sentry is 
 | User IDs | Yes | No | No | **Required** (see note) | **App functionality** |
 | Other actions | Yes | No | No | **Required** (see note) | **App functionality** |
 | Contacts | Yes | No | No | **Optional** (only a saved player who adds friends) | **App functionality** |
-| Other in-app messages | Yes | No | No | **Optional** (only a saved player who writes in a chat) | **App functionality** |
 | App interactions | Yes | No | No | **Optional** | **Analytics** |
 | Crash logs | Yes | No | No | **Required** (see note) | **Analytics** |
 | Diagnostics | Yes | No | No | **Required** (see note) | **Analytics** |
