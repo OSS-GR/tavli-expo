@@ -260,6 +260,9 @@ function OnlineBoard({
   const chatView = useChat(chat, gameId);
   const [seenAt, setSeenAt] = useState(() => chatSeen.seenAt(gameId));
   const [rulesSeen, setRulesSeen] = useState(() => chatSeen.rulesSeen());
+  // What the player typed and did not send yet. It lives here, so it stays
+  // when the text field goes away for a moment (Report or block, a close).
+  const [draft, setDraft] = useState('');
   const chatOpen = overlay.kind === 'chat';
   const newest = chatView === null ? 0 : newestSentAt(chatView);
   // An open chat is a read chat. The phone keeps what was read.
@@ -318,10 +321,16 @@ function OnlineBoard({
   const named = playerNameText(opponentName, t);
   const name = (player: PlayerId) => seats[player].name;
   // A new message from the other player is read to screen readers once
-  // (#692), also while the chat is closed. Old messages are not read again.
-  const heard = chatView?.messages.findLast(
-    (message) => message.from !== side && message.sentAt > seenAt,
-  );
+  // (#692), also while the chat is closed. Only messages that come while
+  // the screen is open are read: what the first view held is old.
+  const [loadedNewest, setLoadedNewest] = useState<number | null>(null);
+  if (chatView !== null && loadedNewest === null) setLoadedNewest(newest);
+  const heard =
+    loadedNewest === null
+      ? undefined
+      : chatView?.messages.findLast(
+          (message) => message.from !== side && message.sentAt > loadedNewest,
+        );
   useAnnouncement(
     heard === undefined
       ? null
@@ -627,7 +636,10 @@ function OnlineBoard({
             : 'dialog'
         }
         {...(composing
-          ? { footer: <ChatComposer chat={chat} gameId={gameId} />, stickToEnd: true }
+          ? {
+              footer: <ChatComposer chat={chat} gameId={gameId} text={draft} onText={setDraft} />,
+              stickToEnd: true,
+            }
           : {})}
         // The game screen turns with the phone (#185); its menu and dialog too.
         turns>

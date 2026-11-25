@@ -134,6 +134,45 @@ describe('the chat of an online game', () => {
     expect(JSON.parse(storage.getString(CHAT_SEEN_STORAGE_KEY) ?? '{}')).toHaveProperty(gameId);
   });
 
+  it('keeps the typed text while Report or block is open', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    await user.press(await button());
+    await user.type(await screen.findByTestId('chat-input'), 'half a thought');
+    await user.press(screen.getByTestId('chat-report'));
+    await user.press(await screen.findByTestId('safety-cancel'));
+    await user.press(await button());
+    expect((await screen.findByTestId('chat-input')).props.value).toBe('half a thought');
+  });
+
+  it('does not read old messages to screen readers when the screen opens', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    const server = createMemoryGameServer({ rng: createSeededRng(21), now: () => Date.now() });
+    await markNamed(server, 'me');
+    await markNamed(server, 'bob');
+    const gameId = server.createGame('me', { white: 'me', black: 'bob' }, 'portes', 3, null);
+    await server.chatFor('bob').send({ gameId, text: 'from yesterday' });
+    await renderWithRoot(
+      <OnlineMatchScreen
+        gameId={gameId}
+        transport={server.transportFor('me')}
+        chat={server.chatFor('me')}
+        me="me"
+        onExit={jest.fn()}
+        onSettings={jest.fn()}
+        onRules={jest.fn()}
+        onMatchOver={jest.fn()}
+      />,
+    );
+    await button();
+    await settle();
+    // The dot still shows it as unread; it is only not read aloud.
+    expect(dot()).not.toBeNull();
+    expect(announce.mock.calls.map(([text]) => text).join('|')).not.toContain('from yesterday');
+    announce.mockRestore();
+  });
+
   it('reads a new message to screen readers once, with the name', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     const { server, gameId } = await openGame();

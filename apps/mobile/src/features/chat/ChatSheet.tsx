@@ -317,13 +317,15 @@ type SendProblemKey = (typeof SEND_PROBLEM)[ChatErrorCode] | 'chat.problem.netwo
 export interface ChatComposerProps {
   chat: Chat;
   gameId: string;
+  /** The typed text. The screen keeps it, so it stays while the field is away. */
+  text: string;
+  onText: (text: string) => void;
 }
 
 /** The text field and Send: the footer of the sheet while the chat is open. */
-export function ChatComposer({ chat, gameId }: ChatComposerProps) {
+export function ChatComposer({ chat, gameId, text, onText: setText }: ChatComposerProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
-  const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   // The text key of the last refusal, and a count so the same problem is read again.
   const [problem, setProblem] = useState<{ key: SendProblemKey; n: number } | null>(null);
