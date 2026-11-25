@@ -480,6 +480,7 @@ The two players of an online game write short messages to each other (`features/
 - **Screen readers** hear a new message from the other player once (`useAnnouncement`, key `chat:<game>:<message>`), also while the chat is closed. Each bubble reads as "You: …" or "They: …".
 - **Settings → Online → Chat in online games** (`ChatSettingRow`): the switch the server keeps (`Chat.setEnabled`). It shows once the setting loaded.
 - The services: `chat` from `@/services` (Convex), `devChatFor` for a dev game (`useOnlineConnection` gives the right one), `onlineFake.chat` and `onlineFake.devChatFor` in Jest.
+- **Try it on a phone:** a dev online game (`/dev/online`, dev builds) has a chat. `startDevGame` with `chat` gives this phone and the bot a username on the in-memory server, and the bot answers each message after `DEV_CHAT_REPLY_MS`. No real account is needed.
 - No message text goes to analytics, crash reports or logs. There is no analytics event for chat.
 
 Tests: `features/chat/ChatScreen.test.tsx` (the button, the dot, the rules, a send, a refusal, mute, the "chat needs" cards, a report from the chat, the screen reader), `ChatSettingRow.test.tsx`, `chatSeen.test.ts`.

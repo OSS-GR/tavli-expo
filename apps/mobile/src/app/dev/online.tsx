@@ -3,7 +3,8 @@
  * Pick a game, a time limit and a length, then start: the board opens on the
  * online screen, and the bot plays the remote player through its own
  * transport (`features/online/devGame.ts`). Not linked from the app.
- * Release builds go home.
+ * Release builds go home. The game has a chat (#692): you and the bot get
+ * a username on the in-memory server, and the bot answers your messages.
  *
  * "Make an invite" (#256): the bot makes an invite with the same game,
  * time limit and length, and the screen shows its code and links. Open it with
@@ -65,6 +66,8 @@ export default function DevOnlineRoute() {
     difficulty: games.find((g) => g.choice === choice)?.level ?? 'easy',
     runner: botRunner,
     rng,
+    // The dev game has a chat, and the bot answers in it (#692).
+    chat: true,
   });
 
   const start = () => {

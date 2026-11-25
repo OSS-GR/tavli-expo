@@ -916,8 +916,8 @@ describe('online games (#255)', () => {
     expect(router.getPathname()).toBe(`${board}/match-end`);
     expect(
       await screen.findByRole('header', {
-        // The bot has a guest name (#400).
-        name: `Guest ${onlineFake.guestNumber('bot')} wins the match!`,
+        // The dev game names both players, so it has a chat (#692).
+        name: 'Dev_bot wins the match!',
       }),
     ).toBeOnTheScreen();
     expect(screen.getByText('You resigned the match.')).toBeOnTheScreen();
