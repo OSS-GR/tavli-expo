@@ -25,6 +25,8 @@ export {
   ACCOUNT_FUNCTIONS,
   APP_UPDATE_FUNCTION_NAMES,
   APP_UPDATE_FUNCTIONS,
+  CHAT_FUNCTION_NAMES,
+  CHAT_FUNCTIONS,
   FRIEND_FUNCTION_NAMES,
   FRIEND_FUNCTIONS,
   GAME_FUNCTION_NAMES,
@@ -45,6 +47,7 @@ export {
   USERNAME_FUNCTIONS,
   type AccountFunctions,
   type AppUpdateFunctions,
+  type ChatFunctions,
   type FriendFunctions,
   type FriendRequestResult,
   type GameFunctions,
@@ -94,6 +97,12 @@ export {
   type ConvexPushTokensClient,
   type ConvexPushTokensOptions,
 } from './pushTokens';
+export {
+  createConvexChat,
+  toChatError,
+  type ConvexChatClient,
+  type ConvexChatOptions,
+} from './chat';
 export {
   createConvexSafety,
   toSafetyError,

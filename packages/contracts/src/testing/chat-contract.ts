@@ -50,9 +50,20 @@ function check(ok: boolean, what: string): void {
   if (!ok) throw new Error(what);
 }
 
+/** JSON with the keys of each object sorted: servers may order keys their own way. */
+function sortedJson(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) =>
+    inner !== null && typeof inner === 'object' && !Array.isArray(inner)
+      ? Object.fromEntries(
+          Object.entries(inner as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : inner,
+  );
+}
+
 function same(actual: unknown, expected: unknown, what: string): void {
-  const a = JSON.stringify(actual);
-  const e = JSON.stringify(expected);
+  const a = sortedJson(actual);
+  const e = sortedJson(expected);
   if (a !== e) throw new Error(`${what}: expected ${e}, got ${a}`);
 }
 

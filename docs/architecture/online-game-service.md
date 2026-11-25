@@ -870,7 +870,7 @@ An action, so it can read the tables with no cap in pages: the capped parts (acc
 
 ## Chat
 
-> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694). The Convex functions, the report of a message and the screens come in later steps.
+> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694), and the Convex side (#695). The account delete and the 30-day clean-up, the report of a message and the screens come in later steps.
 
 The two players of an online game write short text messages to each other, in friend games and in Play ranked.
 
@@ -905,6 +905,27 @@ The caller's own reason comes first, so the app can lead them to the fix.
 `Chat` (`packages/contracts/src/chat.ts`): `watch`, `send`, `setMuted`, `settings`, `setEnabled`. The in-memory server has `chatFor(playerId)`; `markNamed` (`@tavli/online/testing`) makes a player who may chat. The contract checks are `chatContract()` (`@tavli/contracts/testing`).
 
 The text of a message never goes to analytics, crash reports, pushes or logs.
+
+### On Convex (#695)
+
+`apps/server/convex/chat.ts`:
+
+| Function | Kind | What it does |
+|----------|------|--------------|
+| `getChat` | query | The `ChatView` of a game for the caller. The adapter's `watch` follows it |
+| `sendChat` | mutation | One message, after `planChatMessage` |
+| `setChatMuted` | mutation | Adds or deletes the caller's `chatMutes` row of the game |
+| `myChatSettings` | query | The caller's switch |
+| `setChatEnabled` | mutation | Sets or removes `playerNames.chatOff` (it makes the name row for a player with none) |
+
+Tables: `chatMessages` (indexes `by_game`, `by_game_sender` for the rate limit, `by_sender` for the account delete) and `chatMutes` (`by_player`).
+
+- A closed chat reads no `chatMessages` row.
+- `getChat` reads the game's rows newest first and stops at `CHAT_VIEW_MESSAGES`, so a long chat costs the same.
+- The rate limit reads only the caller's rows of the last `CHAT_RATE_WINDOW_MS`.
+- A saved account is a Better Auth user that is not anonymous (`authComponent.getAnyUserById`), as for ratings.
+
+The adapter is `createConvexChat` (`CHAT_FUNCTIONS` in `@tavli/backend-convex`). `convex/convexChat.test.ts` runs `chatContract()` through it on the real functions.
 
 ## Update needed
 
