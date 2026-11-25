@@ -43,7 +43,7 @@ export const CHAT_RATE_WINDOW_MS = 60 * 1000;
  */
 export const CHAT_VIEW_MESSAGES = 200;
 
-/** Messages are deleted this many days after the match ends. */
+/** Messages are deleted this many days after the match ends. The chat is closed from then on. */
 export const CHAT_KEEP_DAYS = 30;
 
 /** Why the caller sees a chat or not. Only `open` has messages and takes a send. */
@@ -62,7 +62,8 @@ export const CHAT_STATUSES = [
   'muted',
   /**
    * No chat in this game for a reason on the other side (a guest, no
-   * username, chat turned off, or the caller blocks them). The view never
+   * username, chat turned off, or the caller blocks them), or the match
+   * ended `CHAT_KEEP_DAYS` ago and its chat is deleted. The view never
    * says which.
    */
   'unavailable',

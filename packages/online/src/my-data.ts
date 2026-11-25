@@ -118,5 +118,9 @@ export function makeMyData(parts: Omit<MyData, 'format' | 'version'>): MyData {
     reports: newestFirst(parts.reports, (report) => report.reportedAt),
     pushTokens: newestFirst(parts.pushTokens, (token) => token.updatedAt),
     rankedSearch: parts.rankedSearch,
+    chat: {
+      enabled: parts.chat.enabled,
+      messages: newestFirst(parts.chat.messages, (message) => message.sentAt),
+    },
   };
 }

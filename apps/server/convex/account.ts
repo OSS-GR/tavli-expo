@@ -264,6 +264,10 @@ export async function deleteAccountOf(ctx: MutationCtx, callerId: string): Promi
   // The pair counts of the ratings (#407): one per player met, no cap.
   await ctx.scheduler.runAfter(0, internal.ratings.deleteRatedPairs, { playerId: callerId });
 
+  // The chat messages and mutes of the caller (ADR-0011), in pages: a
+  // game has no cap. The switch went with the name row, above.
+  await ctx.scheduler.runAfter(0, internal.chat.deleteChatRows, { playerId: callerId });
+
   // The other active games, after this transaction. No new game can
   // start with the caller from now on: a game starts only from
   // `acceptInvite` or a Play ranked match, the caller's open invites and

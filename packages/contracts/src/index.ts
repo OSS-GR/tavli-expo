@@ -191,6 +191,8 @@ export type {
   MyData,
   MyDataAccount,
   MyDataBlock,
+  MyDataChat,
+  MyDataChatMessage,
   MyDataFriend,
   MyDataGame,
   MyDataInvite,

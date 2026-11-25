@@ -53,6 +53,21 @@ export interface MyData {
   readonly pushTokens: readonly MyDataPushToken[];
   /** A Play ranked search that is running now, or `null`. */
   readonly rankedSearch: MyDataRankedSearch | null;
+  /** Chat (ADR-0011): the caller's switch and the messages the caller wrote. */
+  readonly chat: MyDataChat;
+}
+
+export interface MyDataChat {
+  /** False when the caller turned chat off in all games. */
+  readonly enabled: boolean;
+  /** The caller's own messages that are still kept, newest first. Never the other player's. */
+  readonly messages: readonly MyDataChatMessage[];
+}
+
+export interface MyDataChatMessage {
+  readonly gameId: string;
+  readonly text: string;
+  readonly sentAt: number;
 }
 
 export interface MyDataAccount {

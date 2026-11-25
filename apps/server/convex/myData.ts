@@ -40,6 +40,7 @@ import type {
   MyDataPushToken,
   MyDataRankedSearch,
   MyDataRating,
+  MyDataChatMessage,
   MyDataReport,
 } from '@tavli/contracts';
 import {
@@ -100,6 +101,8 @@ interface Head {
   readonly blocks: MyDataBlock[];
   readonly pushTokens: MyDataPushToken[];
   readonly rankedSearch: MyDataRankedSearch | null;
+  /** The chat switch (ADR-0011). The messages come in pages (`exportChatPage`). */
+  readonly chatEnabled: boolean;
 }
 
 /** A Better Auth `account` row, as far as the keys need it. */
@@ -181,6 +184,7 @@ export const exportHead = internalQuery({
       pushTokens: tokens.map((row) => ({ platform: row.platform, updatedAt: row.updatedAt })),
       rankedSearch:
         seek === null ? null : { game: seek.game, status: seek.status, since: seek.createdAt },
+      chatEnabled: names?.chatOff !== true,
     };
   },
 });
@@ -233,6 +237,21 @@ export const exportInvitesPage = internalQuery({
   },
 });
 
+/** A page of the chat messages `playerId` wrote that are still kept (ADR-0011). Never the other player's. */
+export const exportChatPage = internalQuery({
+  args: pageArgs,
+  handler: async (ctx, { playerId, cursor }): Promise<Page<MyDataChatMessage>> => {
+    const result = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_sender', (q) => q.eq('senderId', playerId))
+      .paginate({ cursor, numItems: MY_DATA_ROWS_PAGE });
+    return pageOf(
+      result,
+      result.page.map((row) => ({ gameId: row.gameId, text: row.text, sentAt: row.sentAt })),
+    );
+  },
+});
+
 /** A page of the reports `playerId` made that are still kept. */
 export const exportReportsPage = internalQuery({
   args: pageArgs,
@@ -281,7 +300,8 @@ export const exportMyData = action({
     const head: Head | null = await ctx.runQuery(internal.myData.exportHead, { playerId });
     if (head === null) fail('NOT_SIGNED_IN', 'this account does not exist');
     const now = Date.now();
-    const [asWhite, asBlack, invites, reports] = await Promise.all([
+    const { chatEnabled, ...rest } = head;
+    const [asWhite, asBlack, invites, reports, chatMessages] = await Promise.all([
       allPages((cursor) =>
         ctx.runQuery(internal.myData.exportGamesPage, { playerId, cursor, side: 'white' }),
       ),
@@ -292,13 +312,15 @@ export const exportMyData = action({
         ctx.runQuery(internal.myData.exportInvitesPage, { playerId, cursor, now }),
       ),
       allPages((cursor) => ctx.runQuery(internal.myData.exportReportsPage, { playerId, cursor })),
+      allPages((cursor) => ctx.runQuery(internal.myData.exportChatPage, { playerId, cursor })),
     ]);
     return makeMyData({
       madeAt: now,
-      ...head,
+      ...rest,
       games: [...asWhite, ...asBlack],
       invites,
       reports,
+      chat: { enabled: chatEnabled, messages: chatMessages },
     });
   },
 });

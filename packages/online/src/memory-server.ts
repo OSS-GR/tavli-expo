@@ -209,7 +209,7 @@ import {
   toView,
 } from './online-game';
 import type { LoadedFlow, SavedDraft, SteppedFlow } from './online-game';
-import { ChatError, chatSeenBy, chatStatus, planChatMessage } from './chat';
+import { ChatError, chatExpired, chatSeenBy, chatStatus, planChatMessage } from './chat';
 import type { ChatPlayer, StoredChatMessage } from './chat';
 import { checkRecordCall, gameRecordLog } from './game-record';
 import { nameFrom, namesOf, pickGuestNumber } from './names';
@@ -1360,6 +1360,14 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
           seek === undefined
             ? null
             : { game: seek.game, status: seek.status, since: seek.createdAt },
+        chat: {
+          enabled: !chatOff.has(playerId),
+          messages: [...chatMessages].flatMap(([gameId, kept]) =>
+            kept
+              .filter((message) => message.senderId === playerId)
+              .map(({ text, sentAt }) => ({ gameId, text, sentAt })),
+          ),
+        },
       }),
     );
   }
@@ -1523,6 +1531,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       other: chatPlayerOf(otherId),
       muted: chatMutes.has(chatMuteKey(playerId, game.gameId)),
       blocksOther: blocksPlayer(playerId, otherId),
+      expired: chatExpired(game.status === 'finished' ? game.updatedAt : null, now()),
     });
     return {
       gameId: game.gameId,
@@ -2326,7 +2335,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       chatMutes.delete(key);
       chatMutes.add(chatMuteKey(target, key.slice(source.length + 1)));
     }
-    if (chatOff.delete(source)) chatOff.add(target);
+    // The switch goes with the guest: the account keeps its own, like its name.
+    chatOff.delete(source);
     // Blocks both ways: never one of `target` by itself, never one twice.
     const mine = blocks.get(source) ?? new Map<string, number>();
     blocks.delete(source);
@@ -2445,6 +2455,22 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
       }
       for (const invite of invites.values()) {
         if (isInviteExpired(invite, at)) saveInvite({ ...invite, status: 'expired' });
+      }
+      // Chat (#692): like the scheduled Convex `deleteGameChat`, the chat
+      // of a match that ended `CHAT_KEEP_DAYS` ago goes, with its mutes.
+      for (const game of games.values()) {
+        if (!chatExpired(game.status === 'finished' ? game.updatedAt : null, at)) continue;
+        if (
+          !chatMessages.has(game.gameId) &&
+          ![...chatMutes].some((key) => key.endsWith(`\n${game.gameId}`))
+        ) {
+          continue;
+        }
+        chatMessages.delete(game.gameId);
+        for (const key of [...chatMutes]) {
+          if (key.endsWith(`\n${game.gameId}`)) chatMutes.delete(key);
+        }
+        notifyChats((listener) => listener.gameId === game.gameId);
       }
       return applied;
     },

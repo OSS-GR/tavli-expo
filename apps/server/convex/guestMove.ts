@@ -168,6 +168,8 @@ export const startGuestMove = internalMutation({
     }
     await ctx.scheduler.runAfter(0, internal.guestMove.moveGuestInvites, { source, target });
     await ctx.scheduler.runAfter(0, internal.guestMove.moveGuestSafety, { source, target });
+    // Chat (ADR-0011): the guest's mutes. Its switch went with its name row.
+    await ctx.scheduler.runAfter(0, internal.chat.moveGuestChat, { source, target });
     return null;
   },
 });

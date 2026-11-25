@@ -189,8 +189,10 @@ export {
   reportWindowStart,
 } from './safety';
 export {
+  CHAT_KEEP_MS,
   ChatError,
   NO_CHAT_PLAYER,
+  chatExpired,
   chatSeenBy,
   chatStatus,
   cleanChatText,

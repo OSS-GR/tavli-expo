@@ -67,6 +67,7 @@ import {
   checkRankedGame,
   checkRecordCall,
   checkTurnTimeMinutes,
+  CHAT_KEEP_MS,
   checkViewer,
   createOnlineMatch,
   eventActor,
@@ -270,6 +271,10 @@ async function save(
   if (game.status === 'active' && winner !== null) {
     await recordFriendMatch(ctx, game.players, winner);
     if (rated) await rateMatch(ctx, game.players, winner, game.targetPoints, now);
+    // The chat of the match is deleted `CHAT_KEEP_DAYS` later (ADR-0011).
+    await ctx.scheduler.runAfter(CHAT_KEEP_MS, internal.chat.deleteGameChat, {
+      gameId: game._id,
+    });
   }
   await scheduleTurnPush(ctx, game, version, turnWait(before.flow), turnWait(flow), callerId);
   return version;
