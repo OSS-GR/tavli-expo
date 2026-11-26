@@ -53,7 +53,7 @@ import { mayRollOpening } from '@tavli/online';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View, useWindowDimensions } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -61,7 +61,7 @@ import { CHAT_PEEK_MS } from '@/features/chat/ChatPeek';
 import { ChatComposer, ChatHead, ChatSheet, type ChatFix } from '@/features/chat/ChatSheet';
 import { chatSeen, newestSentAt, unreadCount } from '@/features/chat/chatSeen';
 import { chatOffered, useChat, useChatPanel } from '@/features/chat/useChat';
-import { Sheet } from '@/components/Sheet';
+import { SIDE_PANEL_WIDTH, Sheet } from '@/components/Sheet';
 import { useGameStore } from '@/features/game/gameStore';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
 import {
@@ -265,6 +265,10 @@ function OnlineBoard({
   // when the text field goes away for a moment (Report or block, a close).
   const [draft, setDraft] = useState('');
   const chatOpen = overlay.kind === 'chat';
+  // On its side the chat is a panel at the right (`Sheet` `side`): the
+  // game screen leaves that room free, so the board stays whole (#716).
+  const window = useWindowDimensions();
+  const chatBeside = chatOpen && window.width > window.height;
   const chatPanel = useChatPanel(chatOpen, chatView?.status);
   const newest = chatView === null ? 0 : newestSentAt(chatView);
   // An open chat is a read chat. The phone keeps what was read.
@@ -637,6 +641,7 @@ function OnlineBoard({
         paused={paused || covered || overlay.kind !== 'none'}
         covered={covered || content !== null}
         onOpenMenu={() => setOverlay({ kind: 'menu' })}
+        sideSpace={chatBeside ? Math.min(SIDE_PANEL_WIDTH, window.width * 0.6) : 0}
         {...(chat && chatOffered(chatView)
           ? {
               chat: {
@@ -677,7 +682,9 @@ function OnlineBoard({
             }
           : {})}
         // The game screen turns with the phone (#185); its menu and dialog too.
-        turns>
+        turns
+        // On its side the chat is a panel at the right: the board stays whole (#716).
+        side={overlay.kind === 'chat'}>
         {content}
       </Sheet>
     </>

@@ -392,6 +392,12 @@ export interface GameScreenProps {
     readonly hint: string;
     readonly onOpen: () => void;
   };
+  /**
+   * Room to leave free at the right edge, in points (#716): the chat is a
+   * panel there while the phone is on its side, and the board stays whole
+   * beside it. The board keeps its place in the tree; only its size changes.
+   */
+  sideSpace?: number;
   /** Shows "Home" on the game-end sheet. */
   onHome?: () => void;
   /** Shows "Review" on the game-end sheet: the biggest mistakes of the game (#215). */
@@ -441,6 +447,7 @@ export function GameScreen({
   covered = false,
   onOpenMenu,
   chat,
+  sideSpace = 0,
   onHome,
   onReview,
   onMatchOver,
@@ -466,7 +473,9 @@ export function GameScreen({
   const setSetting = useSettings((s) => s.setSetting);
   const showMoveList = useMoveListShown();
   const moveListAsked = useMoveListAsked();
-  const { layout, rails, spaceKey } = useScreenLayout();
+  const { layout, rails, spaceKey: windowSpaceKey } = useScreenLayout();
+  // Room left free at the side changes the board's space too: it measures again.
+  const spaceKey = sideSpace > 0 ? `${windowSpaceKey}:side${sideSpace}` : windowSpaceKey;
   // The app's colors (the board theme is `theme`).
   const { theme: ui, rt } = useUnistyles();
   const landscape = layout === 'landscape';
@@ -2570,7 +2579,7 @@ export function GameScreen({
   // the board never flatten (`collapsable={false}`), so the canvases keep
   // their native parent too (#173).
   return (
-    <View style={styles.screen(landscape, island, cameraColumn)}>
+    <View testID="game-screen" style={styles.screen(landscape, island, cameraColumn, sideSpace)}>
       <GestureDetector gesture={swipeArea}>
         <View
           testID="game-content"
@@ -2673,15 +2682,21 @@ const styles = StyleSheet.create((theme, rt) => ({
   // iOS gives the same inset on both sides; the side away from the island
   // needs less (`sideMargins`), and the wide board gets the rest (#611).
   // Upright keeps a side inset too: the iPhone Duo's camera column.
-  screen: (landscape: boolean, island: IslandSide | null, column: number) => ({
+  screen: (landscape: boolean, island: IslandSide | null, column: number, sideSpace: number) => ({
     flex: 1,
     paddingTop: theme.space.xs,
     backgroundColor: theme.colors.background,
     paddingBottom: Math.max(rt.insets.bottom, landscape ? theme.space.xs : theme.space.sm),
     paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : rt.insets.left,
-    paddingRight: landscape
-      ? sideMargins(rt.insets, island, theme.space.xs).right
-      : rt.insets.right - column,
+    // `sideSpace`: the chat panel at the right edge (#716). The panel also
+    // covers the whole right inset, so the screen pads at least that much
+    // then, also on the side away from the island.
+    paddingRight:
+      sideSpace +
+      Math.max(
+        sideSpace > 0 ? rt.insets.right : 0,
+        landscape ? sideMargins(rt.insets, island, theme.space.xs).right : rt.insets.right - column,
+      ),
   }),
   content: (landscape: boolean) => ({
     flex: 1,

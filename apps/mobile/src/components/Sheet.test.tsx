@@ -7,7 +7,8 @@ import { StyleSheet, Text } from 'react-native';
 
 import { touch } from '../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../test/render';
-import { DRAG_CLOSE_DISTANCE, Sheet } from './Sheet';
+import { LANDSCAPE_SE, resetWindow, setWindow } from '../../test/window';
+import { DRAG_CLOSE_DISTANCE, SIDE_PANEL_WIDTH, Sheet } from './Sheet';
 
 function shown(look: 'raised' | 'sheet', onClose: () => void) {
   return renderWithRoot(
@@ -109,5 +110,40 @@ describe('<Sheet /> header and footer (#711)', () => {
     expect(inScroll('Inside')).toBe(true);
     expect(inScroll('Head')).toBe(false);
     expect(inScroll('Foot')).toBe(false);
+  });
+});
+
+describe('<Sheet side /> (#716)', () => {
+  afterEach(resetWindow);
+
+  const panel = () =>
+    renderWithRoot(
+      <Sheet
+        visible
+        onClose={() => undefined}
+        closeLabel="Close"
+        look="raised"
+        side
+        testID="the-sheet">
+        <Text>Inside</Text>
+      </Sheet>,
+    );
+  const sheetStyle = () =>
+    StyleSheet.flatten(screen.getByTestId('the-sheet').props.style as never) as {
+      width?: number | string;
+      height?: number | string;
+    };
+
+  it('is a panel at the right, with no grab handle, when the window is wider than tall', async () => {
+    await panel();
+    await setWindow(LANDSCAPE_SE);
+    expect(sheetStyle()).toMatchObject({ width: SIDE_PANEL_WIDTH, height: '100%' });
+    expect(screen.queryByTestId('sheet-handle', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('stays a bottom sheet with its handle in a tall window', async () => {
+    await panel();
+    expect(sheetStyle().width).toBe('100%');
+    expect(screen.getByTestId('sheet-handle', { includeHiddenElements: true })).toBeTruthy();
   });
 });
