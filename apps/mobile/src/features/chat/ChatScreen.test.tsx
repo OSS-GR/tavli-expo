@@ -6,12 +6,13 @@ import { TERMS_VERSION } from '@tavli/contracts';
 import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { markNamed } from '@tavli/online/testing';
-import { act, screen } from '@testing-library/react-native';
+import { act, screen, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
 import { storage } from '@/services';
 
+import { CHAT_PEEK_MS } from './ChatPeek';
 import { CHAT_RULES_STORAGE_KEY, CHAT_SEEN_STORAGE_KEY } from './chatSeen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
@@ -132,6 +133,60 @@ describe('the chat of an online game', () => {
     expect(dot()).toBeNull();
     // The phone keeps what was read.
     expect(JSON.parse(storage.getString(CHAT_SEEN_STORAGE_KEY) ?? '{}')).toHaveProperty(gameId);
+  });
+
+  it('shows a new message over the screen for a moment, with the count on the button', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const { server, gameId } = await openGame();
+    await button();
+    const peek = () => screen.queryByTestId('chat-peek', { includeHiddenElements: true });
+    expect(peek()).toBeNull();
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'one more?' });
+    });
+    await settle();
+    expect(peek()).not.toBeNull();
+    expect(
+      screen.getByTestId('chat-peek-text', { includeHiddenElements: true }).props.children,
+    ).toBe('one more?');
+    expect(within(dot()!).getByText('1', { includeHiddenElements: true })).toBeTruthy();
+    // Just before its time is over it still shows; then it goes. The count stays.
+    await act(async () => {
+      jest.advanceTimersByTime(CHAT_PEEK_MS - 500);
+    });
+    expect(peek()).not.toBeNull();
+    await act(async () => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(peek()).toBeNull();
+    expect(dot()).not.toBeNull();
+  });
+
+  it('opens the chat from the new message', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    await button();
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'hello' });
+    });
+    await settle();
+    await user.press(screen.getByTestId('chat-peek', { includeHiddenElements: true }));
+    expect(await screen.findByTestId('chat-messages')).toBeTruthy();
+    expect(screen.queryByTestId('chat-peek', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('shows no new message over the screen for a muted chat', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const { server, gameId } = await openGame();
+    await button();
+    await act(async () => {
+      await server.chatFor('me').setMuted(gameId, true);
+      await server.chatFor('bob').send({ gameId, text: 'hello' });
+    });
+    await settle();
+    expect(screen.queryByTestId('chat-peek', { includeHiddenElements: true })).toBeNull();
+    expect(dot()).toBeNull();
   });
 
   it('keeps the typed text while Report or block is open', async () => {

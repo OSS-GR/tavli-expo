@@ -4,6 +4,7 @@ import { hasBadWord, hasLink } from '@tavli/online';
 import el from '@/i18n/el.json';
 import en from '@/i18n/en.json';
 
+import { CHAT_PEEK_LENGTH, peekText } from './ChatPeek';
 import { CHAT_GROUP_GAP_MS, CHAT_PHRASES, CHAT_TIME_QUIET_MS, chatRows } from './chatLayout';
 
 const message = (id: string, from: 'white' | 'black', sentAt: number): ChatMessage => ({
@@ -71,5 +72,16 @@ describe('the ready phrases', () => {
       expect(hasLink(text)).toBe(false);
       expect(hasBadWord(text)).toBe(false);
     }
+  });
+});
+
+describe('peekText', () => {
+  it('keeps a short message whole', () => {
+    expect(peekText('one more?')).toBe('one more?');
+  });
+
+  it('cuts a long message by characters, not by code units', () => {
+    const long = '🎲'.repeat(CHAT_PEEK_LENGTH + 5);
+    expect(peekText(long)).toBe(`${'🎲'.repeat(CHAT_PEEK_LENGTH)}…`);
   });
 });

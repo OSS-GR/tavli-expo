@@ -57,6 +57,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { CHAT_PEEK_MS } from '@/features/chat/ChatPeek';
 import { ChatComposer, ChatHead, ChatSheet, type ChatFix } from '@/features/chat/ChatSheet';
 import { chatSeen, newestSentAt, unreadCount } from '@/features/chat/chatSeen';
 import { chatOffered, useChat, useChatPanel } from '@/features/chat/useChat';
@@ -338,6 +339,19 @@ function OnlineBoard({
       : t('chat.newMessage', { name: name(opponentSide), text: heard.text }),
     heard === undefined ? undefined : `chat:${gameId}:${heard.id}`,
   );
+  // The same message shows over the screen for a moment while the chat is
+  // closed (#709). A read message, or one whose time is over, does not.
+  const [peekOver, setPeekOver] = useState<string | null>(null);
+  const heardId = heard?.id;
+  useEffect(() => {
+    if (heardId === undefined) return;
+    const timer = setTimeout(() => setPeekOver(heardId), CHAT_PEEK_MS);
+    return () => clearTimeout(timer);
+  }, [heardId]);
+  const peek =
+    heard !== undefined && !chatOpen && heard.sentAt > seenAt && peekOver !== heard.id
+      ? { name: name(opponentSide), text: heard.text }
+      : null;
   if (view === null) return null;
 
   const finished = view.status === 'finished';
@@ -627,6 +641,7 @@ function OnlineBoard({
           ? {
               chat: {
                 unread,
+                peek,
                 label:
                   unread > 0
                     ? t('chat.openUnread', { name: name(opponentSide), count: unread })
