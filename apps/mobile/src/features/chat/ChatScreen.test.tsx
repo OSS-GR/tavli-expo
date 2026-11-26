@@ -281,6 +281,18 @@ describe('the chat of an online game', () => {
     expect(screen.getAllByText(/^\d{1,2}:\d{2}/)).toHaveLength(1);
   });
 
+  it('shows no game line in the first game of a match', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'hello' });
+    });
+    await user.press(await button());
+    await screen.findByText('hello');
+    expect(screen.queryByTestId('chat-game-1')).toBeNull();
+  });
+
   it('shows the chat rules again from the menu', async () => {
     storage.setString(CHAT_RULES_STORAGE_KEY, '1');
     const user = setupUser();

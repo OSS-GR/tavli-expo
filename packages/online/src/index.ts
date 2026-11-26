@@ -194,6 +194,7 @@ export {
   NO_CHAT_PLAYER,
   chatBanned,
   chatExpired,
+  chatGameNumber,
   chatSeenBy,
   chatStatus,
   cleanChatText,

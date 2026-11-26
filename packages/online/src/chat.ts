@@ -17,7 +17,7 @@ import {
   TERMS_VERSION,
 } from '@tavli/contracts';
 import type { ChatErrorCode, ChatMessage, ChatStatus, ReportedChatMessage } from '@tavli/contracts';
-import type { PlayerId } from '@tavli/engine';
+import type { MatchFlow, PlayerId } from '@tavli/engine';
 
 import { foldLetters } from './usernames';
 
@@ -60,7 +60,7 @@ export function chatBanned(until: number | null | undefined, now: number): boole
  * reporter could see (not the hidden ones), oldest first.
  */
 export function reportedChat(
-  messages: readonly StoredChatMessage[],
+  messages: readonly Pick<StoredChatMessage, 'from' | 'text' | 'sentAt' | 'hidden'>[],
   reported: PlayerId,
 ): ReportedChatMessage[] {
   return messages
@@ -249,6 +249,15 @@ export function planChatMessage({ text, status, sentTimes, now }: PlanChatInput)
   return { ok: true, text: clean };
 }
 
+/**
+ * The number of the game on the board, from 1: what a new message keeps
+ * as `ChatMessage.game`. A finished game is in `match.games` already.
+ */
+export function chatGameNumber(flow: MatchFlow): number {
+  const { games } = flow.match;
+  return flow.game.phase === 'game-over' ? games.length : games.length + 1;
+}
+
 /** A kept message. `hidden`: sent by a player the other blocks, so only its sender sees it. */
 export interface StoredChatMessage extends ChatMessage {
   readonly hidden: boolean;
@@ -267,7 +276,7 @@ export function chatSeenBy(
   if (status !== 'open') return [];
   return messages
     .filter((message) => !message.hidden || message.from === viewer)
-    .map(({ id, from, text, sentAt }) => ({ id, from, text, sentAt }))
+    .map(({ id, from, text, sentAt, game }) => ({ id, from, text, sentAt, game }))
     .sort((a, b) => a.sentAt - b.sentAt)
     .slice(-CHAT_VIEW_MESSAGES);
 }

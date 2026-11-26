@@ -152,6 +152,7 @@ export function chatContract(): ChatContractCheck[] {
           text: '  good\n luck ',
         });
         same(first.text, 'good luck', 'the kept text');
+        same(first.game, 1, 'a message of the first game of the match has game 1');
         await subject.advance(1000);
         const second = await subject
           .chatFor('bob')

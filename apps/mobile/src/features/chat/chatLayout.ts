@@ -20,6 +20,12 @@ export interface ChatRow {
    * time at its end, not one per message.
    */
   readonly time: boolean;
+  /**
+   * A new game of the match started before this message: a line with
+   * this game number shows over it. `null` for no line. The first
+   * message has one only when it is not from game 1.
+   */
+  readonly gameLine: number | null;
 }
 
 /** An answer this soon after a group hides the group's time. */
@@ -28,12 +34,18 @@ export const CHAT_TIME_QUIET_MS = 60 * 1000;
 export function chatRows(messages: readonly ChatMessage[], me: PlayerId): ChatRow[] {
   return messages.map((message, i) => {
     const next = messages[i + 1];
+    const gameBefore = messages[i - 1]?.game ?? 1;
+    // A new game also ends the group before it.
+    const newGame = next !== undefined && next.game !== message.game;
     const last =
       next === undefined ||
+      newGame ||
       next.from !== message.from ||
       next.sentAt - message.sentAt > CHAT_GROUP_GAP_MS;
-    const time = last && (next === undefined || next.sentAt - message.sentAt > CHAT_TIME_QUIET_MS);
-    return { message, mine: message.from === me, last, time };
+    const time =
+      last && (next === undefined || newGame || next.sentAt - message.sentAt > CHAT_TIME_QUIET_MS);
+    const gameLine = message.game !== gameBefore ? message.game : null;
+    return { message, mine: message.from === me, last, time, gameLine };
   });
 }
 

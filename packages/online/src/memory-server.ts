@@ -214,6 +214,7 @@ import {
   ChatError,
   chatBanned,
   chatExpired,
+  chatGameNumber,
   chatSeenBy,
   chatStatus,
   planChatMessage,
@@ -1664,13 +1665,20 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             from: side,
             text: plan.text,
             sentAt: at,
+            game: chatGameNumber(loadFlow(game.flow)),
             // The other player blocks the sender: only the sender sees it.
             hidden: blocksPlayer(otherId, id),
             senderId: id,
           };
           chatMessages.set(game.gameId, [...kept, message]);
           notifyChats((listener) => listener.gameId === game.gameId);
-          const sent: ChatMessage = { id: message.id, from: side, text: plan.text, sentAt: at };
+          const sent: ChatMessage = {
+            id: message.id,
+            from: side,
+            text: plan.text,
+            sentAt: at,
+            game: message.game,
+          };
           return sent;
         }),
       setMuted: (gameId, muted) =>

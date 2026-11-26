@@ -47,8 +47,10 @@ import type { PlayerId } from '@tavli/engine';
 import {
   chatBanned,
   chatExpired,
+  chatGameNumber,
   chatSeenBy,
   chatStatus,
+  loadStored,
   planChatMessage,
   sideOf,
 } from '@tavli/online';
@@ -139,7 +141,15 @@ async function statusOf(ctx: QueryCtx, callerId: string, seat: Seat): Promise<Ch
 }
 
 function stored(row: Doc<'chatMessages'>): StoredChatMessage {
-  return { id: row._id, from: row.from, text: row.text, sentAt: row.sentAt, hidden: row.hidden };
+  return {
+    id: row._id,
+    from: row.from,
+    text: row.text,
+    sentAt: row.sentAt,
+    // A row from before the server kept the game number counts as game 1.
+    game: row.game ?? 1,
+    hidden: row.hidden,
+  };
 }
 
 export const getChat = query({
@@ -189,16 +199,18 @@ export const sendChat = mutation({
       now,
     });
     if (!plan.ok) fail(plan.code, plan.message);
+    const game = chatGameNumber(loadStored(seat.game.flow).flow);
     const id = await ctx.db.insert('chatMessages', {
       gameId,
       senderId: callerId,
       from: seat.side,
       text: plan.text,
       sentAt: now,
+      game,
       // The other player blocks the sender: only the sender sees it.
       hidden: await blocks(ctx, seat.otherId, callerId),
     });
-    return { id, from: seat.side, text: plan.text, sentAt: now };
+    return { id, from: seat.side, text: plan.text, sentAt: now, game };
   },
 });
 

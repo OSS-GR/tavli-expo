@@ -2444,6 +2444,7 @@
     "rulesAgain": "Κανόνες συνομιλίας",
     "emptyTitle": "Πες ένα γεια!",
     "emptyLine": "Με το μαλακό. Στο «…» θα βρεις τη σίγαση και την αναφορά.",
+    "gameLine": "Παιχνίδι {{number}}",
     "phraseLabel": "Στείλε: {{text}}",
     "phrases": {
       "goodLuck": "Καλή τύχη!",

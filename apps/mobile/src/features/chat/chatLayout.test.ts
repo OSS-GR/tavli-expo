@@ -7,11 +7,12 @@ import en from '@/i18n/en.json';
 import { CHAT_PEEK_LENGTH, peekText } from './ChatPeek';
 import { CHAT_GROUP_GAP_MS, CHAT_PHRASES, CHAT_TIME_QUIET_MS, chatRows } from './chatLayout';
 
-const message = (id: string, from: 'white' | 'black', sentAt: number): ChatMessage => ({
+const message = (id: string, from: 'white' | 'black', sentAt: number, game = 1): ChatMessage => ({
   id,
   from,
   text: id,
   sentAt,
+  game,
 });
 
 describe('chatRows', () => {
@@ -53,6 +54,26 @@ describe('chatRows', () => {
       'white',
     );
     expect(rows.map((row) => row.time)).toEqual([false, true, true]);
+  });
+
+  it('draws a line where a new game starts, and ends the group before it', () => {
+    const rows = chatRows(
+      [
+        message('a', 'white', 0),
+        message('b', 'white', 1000),
+        message('c', 'white', 2000, 2),
+        message('d', 'black', 3000, 2),
+      ],
+      'white',
+    );
+    expect(rows.map((row) => row.gameLine)).toEqual([null, null, 2, null]);
+    expect(rows.map((row) => row.last)).toEqual([false, true, true, true]);
+    expect(rows[1]?.time).toBe(true);
+  });
+
+  it('draws a line over the first message when it is not from game 1', () => {
+    expect(chatRows([message('a', 'white', 0, 3)], 'white')[0]?.gameLine).toBe(3);
+    expect(chatRows([message('a', 'white', 0)], 'white')[0]?.gameLine).toBeNull();
   });
 
   it('gives no rows for no messages', () => {
