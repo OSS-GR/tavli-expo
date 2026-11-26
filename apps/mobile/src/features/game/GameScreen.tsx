@@ -2688,10 +2688,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.background,
     paddingBottom: Math.max(rt.insets.bottom, landscape ? theme.space.xs : theme.space.sm),
     paddingLeft: landscape ? sideMargins(rt.insets, island, theme.space.xs).left : rt.insets.left,
-    // `sideSpace`: the chat panel at the right edge (#716).
+    // `sideSpace`: the chat panel at the right edge (#716). The panel also
+    // covers the whole right inset, so the screen pads at least that much
+    // then, also on the side away from the island.
     paddingRight:
       sideSpace +
-      (landscape ? sideMargins(rt.insets, island, theme.space.xs).right : rt.insets.right - column),
+      Math.max(
+        sideSpace > 0 ? rt.insets.right : 0,
+        landscape ? sideMargins(rt.insets, island, theme.space.xs).right : rt.insets.right - column,
+      ),
   }),
   content: (landscape: boolean) => ({
     flex: 1,
