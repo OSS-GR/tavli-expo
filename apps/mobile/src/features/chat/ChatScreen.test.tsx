@@ -7,8 +7,9 @@ import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { markNamed } from '@tavli/online/testing';
 import { act, screen, within } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 
+import { SIDE_PANEL_WIDTH } from '@/components/Sheet';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
 import { storage } from '@/services';
 
@@ -17,6 +18,7 @@ import { CHAT_RULES_STORAGE_KEY, CHAT_SEEN_STORAGE_KEY } from './chatSeen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
 import { renderWithRoot } from '../../../test/render';
+import { LANDSCAPE_PRO_MAX, resetWindow, setWindow } from '../../../test/window';
 
 runOnFakeTimers();
 
@@ -291,6 +293,32 @@ describe('the chat of an online game', () => {
     await user.press(await button());
     await screen.findByText('hello');
     expect(screen.queryByTestId('chat-game-1')).toBeNull();
+  });
+
+  it('is a panel beside the board when the phone is on its side', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    const padding = () =>
+      (
+        StyleSheet.flatten(
+          screen.getByTestId('game-screen', { includeHiddenElements: true }).props.style as never,
+        ) as { paddingRight?: number }
+      ).paddingRight ?? 0;
+    try {
+      await setWindow(LANDSCAPE_PRO_MAX);
+      const before = padding();
+      await user.press(await button());
+      expect(await screen.findByTestId('chat-empty')).toBeTruthy();
+      // No grab handle on a side panel, and the game screen leaves its room free.
+      expect(screen.queryByTestId('sheet-handle', { includeHiddenElements: true })).toBeNull();
+      expect(padding()).toBe(before + SIDE_PANEL_WIDTH);
+      await user.press(screen.getByTestId('chat-close'));
+      await settle();
+      expect(padding()).toBe(before);
+    } finally {
+      await resetWindow();
+    }
   });
 
   it('shows the chat rules again from the menu', async () => {

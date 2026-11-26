@@ -19,6 +19,13 @@
  * it too; screen readers use those (the handle is hidden from them).
  * Android needs its own `GestureHandlerRootView` in a `Modal`.
  *
+ * `side` (the chat, #716): in a window that is wider than tall, the sheet
+ * is a panel at the right edge, as tall as the window, with no dimming:
+ * the screen under it leaves that room free (`SIDE_PANEL_WIDTH`), so the
+ * board beside it stays whole. It has no grab
+ * handle there (a drag down does not fit a side panel); the dimmed part,
+ * the back button and the content's own button close it.
+ *
  * A text field in it (the email code, the username) stays above the
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
  * Android resizes the window.
@@ -31,6 +38,7 @@ import {
   Pressable,
   ScrollView,
   View,
+  useWindowDimensions,
   type ModalProps,
 } from 'react-native';
 import {
@@ -53,6 +61,9 @@ export const DRAG_CLOSE_DISTANCE = 90;
 const DRAG_AWAY = 400;
 /** The handle's touch area: taller than the bar, so a thumb finds it. */
 const HANDLE_HEIGHT = 28;
+
+/** The width of a `side` sheet as a panel (points), before the right inset. */
+export const SIDE_PANEL_WIDTH = 340;
 
 export type SheetLook = 'sheet' | 'raised' | 'dialog' | 'bare';
 
@@ -84,6 +95,12 @@ export interface SheetProps {
   /** The screen under it turns with the phone (the game screen): the sheet turns too. */
   turns?: boolean;
   /**
+   * In a window that is wider than tall, show the sheet as a panel at
+   * the right edge (the chat, #716). Only for the looks at the bottom
+   * edge (`sheet`, `raised`).
+   */
+  side?: boolean;
+  /**
    * A part over the scrolling content that stays in place (the chat's
    * header and its menu, #711): the content scrolls under it.
    */
@@ -109,6 +126,7 @@ export function Sheet({
   ownCloseButton = false,
   look = 'sheet',
   turns = false,
+  side = false,
   header,
   footer,
   stickToEnd = false,
@@ -122,6 +140,9 @@ export function Sheet({
   const [kept, setKept] = useState(look);
   if (visible && kept !== look) setKept(look);
   const shown = visible ? look : kept;
+  // A side panel while the window is wider than tall.
+  const window = useWindowDimensions();
+  const docked = side && atBottom(shown) && window.width > window.height;
 
   // The drag of the handle (#652). A sheet that opens again starts in place.
   const dragY = useSharedValue(0);
@@ -142,7 +163,7 @@ export function Sheet({
   const pan = usePanGesture({
     // No spread here: the Worklets Babel plugin does not allow one in a gesture config.
     minDistance: 4,
-    enabled: visible && shown === 'raised',
+    enabled: visible && shown === 'raised' && !docked,
     testID: 'sheet-handle-pan',
     onUpdate: (e) => {
       'worklet';
@@ -171,10 +192,10 @@ export function Sheet({
       supportedOrientations={turns ? TURNS : UPRIGHT}>
       <GestureHandlerRootView style={FILL}>
         <KeyboardAvoidingView
-          style={styles.root(shown)}
+          style={styles.root(shown, docked)}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable
-            style={styles.scrim}
+            style={styles.scrim(docked)}
             onPress={onClose}
             accessible={!ownCloseButton}
             accessibilityRole="button"
@@ -184,9 +205,9 @@ export function Sheet({
           />
           <Animated.View
             testID={testID}
-            style={[styles.sheet(shown), dragged]}
+            style={[styles.sheet(shown, docked), dragged]}
             accessibilityViewIsModal>
-            {shown === 'raised' ? (
+            {shown === 'raised' && !docked ? (
               <GestureDetector gesture={pan}>
                 <View
                   testID="sheet-handle"
@@ -201,8 +222,8 @@ export function Sheet({
             <ScrollView
               testID="sheet-scroll"
               ref={scroll}
-              style={styles.scroll}
-              contentContainerStyle={styles.content(shown, footer != null)}
+              style={styles.scroll(docked)}
+              contentContainerStyle={styles.content(shown, footer != null, docked && stickToEnd)}
               keyboardShouldPersistTaps="handled"
               {...(stickToEnd
                 ? {
@@ -237,20 +258,22 @@ const TURNS: ModalProps['supportedOrientations'] = ['portrait', 'landscape'];
 export const MAX_SHEET_WIDTH = 560;
 
 const styles = StyleSheet.create((theme, rt) => ({
-  root: (look: SheetLook) => ({
+  root: (look: SheetLook, docked: boolean) => ({
     flex: 1,
     justifyContent: 'flex-end',
-    alignItems: 'center',
+    // A side panel sits at the right edge and pads the right inset itself.
+    alignItems: docked ? 'flex-end' : 'center',
     // Clear of a camera at the side (an iPhone Duo's camera column).
     paddingLeft: rt.insets.left + (atBottom(look) ? 0 : theme.space.lg),
-    paddingRight: rt.insets.right + (atBottom(look) ? 0 : theme.space.lg),
+    paddingRight: docked ? 0 : rt.insets.right + (atBottom(look) ? 0 : theme.space.lg),
   }),
-  scrim: {
+  // A side panel has the board beside it, not under it: no dimming.
+  scrim: (docked: boolean) => ({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.backgroundDeep,
-    opacity: 0.7,
-  },
-  sheet: (look: SheetLook) => ({
+    opacity: docked ? 0 : 0.7,
+  }),
+  sheet: (look: SheetLook, docked: boolean) => ({
     // Never taller than the screen: the content scrolls instead.
     flexShrink: 1,
     maxHeight: '100%',
@@ -282,6 +305,25 @@ const styles = StyleSheet.create((theme, rt) => ({
             borderWidth: 1,
             borderColor: theme.colors.border,
           }),
+    // A side panel: as tall as the window, at the right edge. These come
+    // last, so they stand over the look's own edges and corners.
+    ...(docked
+      ? {
+          height: '100%',
+          width: SIDE_PANEL_WIDTH + rt.insets.right,
+          maxWidth: '60%',
+          marginTop: 0,
+          paddingTop: rt.insets.top + theme.space.md,
+          paddingRight: rt.insets.right,
+          borderTopRightRadius: 0,
+          borderBottomLeftRadius: 0,
+          borderTopLeftRadius: 0,
+          borderTopWidth: 0,
+          borderRightWidth: 0,
+          borderBottomWidth: 0,
+          borderLeftWidth: 1,
+        }
+      : {}),
   }),
   handleArea: {
     height: HANDLE_HEIGHT,
@@ -295,11 +337,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderRadius: 3,
     backgroundColor: theme.colors.border,
   },
-  scroll: {
-    flexGrow: 0,
-  },
+  // A side panel's content fills the height between the header and the footer.
+  scroll: (docked: boolean) => ({
+    flexGrow: docked ? 1 : 0,
+  }),
   // One object for every look, so a theme change repaints it (#539).
-  content: (look: SheetLook, hasFooter: boolean) => ({
+  content: (look: SheetLook, hasFooter: boolean, atEnd: boolean) => ({
+    // A side panel with a list that grows at its end: the list sits at the bottom.
+    ...(atEnd ? { flexGrow: 1, justifyContent: 'flex-end' } : {}),
     gap: look === 'bare' ? 0 : theme.space.sm,
     paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
     // `raised`: the handle area above already gives the space.
