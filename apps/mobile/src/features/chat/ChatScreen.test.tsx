@@ -140,6 +140,7 @@ describe('the chat of an online game', () => {
     await openGame();
     await user.press(await button());
     await user.type(await screen.findByTestId('chat-input'), 'half a thought');
+    await user.press(screen.getByTestId('chat-more'));
     await user.press(screen.getByTestId('chat-report'));
     await user.press(await screen.findByTestId('safety-cancel'));
     await user.press(await button());
@@ -193,6 +194,76 @@ describe('the chat of an online game', () => {
     announce.mockRestore();
   });
 
+  it('sends a ready phrase with one tap and keeps the typed text out of it', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    await user.press(await button());
+    await user.press(await screen.findByTestId('chat-phrase-goodLuck'));
+    await settle();
+    const seen: string[] = [];
+    server.chatFor('bob').watch(gameId, (view) => {
+      seen.splice(0, seen.length, ...view.messages.map((message) => message.text));
+    });
+    await settle();
+    expect(seen).toEqual(['Good luck!']);
+    // The phrases go away while the player types.
+    await user.type(screen.getByTestId('chat-input'), 'hm');
+    expect(screen.queryByTestId('chat-phrases')).toBeNull();
+  });
+
+  it('groups messages and shows the time under the last one', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'one' });
+      await server.chatFor('bob').send({ gameId, text: 'two' });
+    });
+    await user.press(await button());
+    await screen.findByText('two');
+    // Two messages of one player in a row: one group, one time.
+    expect(screen.getAllByText(/^\d{1,2}:\d{2}/)).toHaveLength(1);
+  });
+
+  it('shows the chat rules again from the menu', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    await user.press(await button());
+    await user.press(await screen.findByTestId('chat-more'));
+    expect(screen.getByTestId('chat-menu')).toBeTruthy();
+    await user.press(screen.getByTestId('chat-rules-again'));
+    expect(screen.queryByTestId('chat-menu')).toBeNull();
+    expect(screen.getByTestId('chat-rules')).toBeTruthy();
+    // The text field waits while the rules show.
+    expect(screen.queryByTestId('chat-input')).toBeNull();
+    await user.press(screen.getByTestId('chat-rules-ok'));
+    expect(screen.queryByTestId('chat-rules')).toBeNull();
+    expect(screen.getByTestId('chat-empty')).toBeTruthy();
+    expect(screen.getByTestId('chat-input')).toBeTruthy();
+  });
+
+  it('says whether the menu is open, and forgets the asked rules after a mute', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    await user.press(await button());
+    const more = () => screen.getByTestId('chat-more');
+    expect(more().props.accessibilityState).toMatchObject({ expanded: false });
+    await user.press(more());
+    expect(more().props.accessibilityState).toMatchObject({ expanded: true });
+    await user.press(screen.getByTestId('chat-rules-again'));
+    await user.press(more());
+    await user.press(screen.getByTestId('chat-mute'));
+    await settle();
+    await user.press(await screen.findByTestId('chat-unmute'));
+    await settle();
+    // The messages again, not the rules.
+    expect(await screen.findByTestId('chat-empty')).toBeTruthy();
+    expect(screen.queryByTestId('chat-rules')).toBeNull();
+  });
+
   it('mutes and shows the chat again', async () => {
     storage.setString(CHAT_RULES_STORAGE_KEY, '1');
     const user = setupUser();
@@ -201,7 +272,8 @@ describe('the chat of an online game', () => {
       await server.chatFor('bob').send({ gameId, text: 'hello' });
     });
     await user.press(await button());
-    await user.press(await screen.findByTestId('chat-mute'));
+    await user.press(await screen.findByTestId('chat-more'));
+    await user.press(screen.getByTestId('chat-mute'));
     await settle();
     expect(await screen.findByTestId('chat-status-muted')).toBeTruthy();
     expect(screen.queryByText('hello')).toBeNull();
@@ -304,7 +376,8 @@ describe('the chat of an online game', () => {
       await server.chatFor('bob').send({ gameId, text: 'rude words' });
     });
     await user.press(await button());
-    await user.press(await screen.findByTestId('chat-report'));
+    await user.press(await screen.findByTestId('chat-more'));
+    await user.press(screen.getByTestId('chat-report'));
     await user.press(await screen.findByTestId('safety-report'));
     const reasons = await screen.findByTestId('safety-reasons');
     expect(reasons).toBeTruthy();

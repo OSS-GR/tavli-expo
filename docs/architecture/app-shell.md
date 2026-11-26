@@ -473,9 +473,12 @@ The two players of an online game write short messages to each other (`features/
 
 - **The chat button.** `OnlineMatchScreen` watches the game's chat (`useChat`, one `Chat.watch` per game screen) and gives `GameScreen` its `chat` prop when the game has a chat to offer this player (`chatOffered`: every status but `unavailable`). The button sits beside the other seat (portrait) or under the menu button (the left rail), with a dot for new messages.
 - **The sheet.** The chat opens in the game screen's one sheet (overlay `chat`, look `raised`): iOS shows no second `Modal`. `ChatSheet` is the scrolling content, and `ChatComposer` (the text field and Send) is the sheet's `footer`, so it stays in place. `Sheet` has `footer` and `stickToEnd` for this.
+- **The header** (chat v2, #711) names the other player with their checker. Its "…" button (`chat-more`) opens a small menu in place (`chat-menu`, no second `Modal`): Mute, Report or block, and Chat rules, which shows the rules again. The header is `ChatHead`, the sheet's `header`: it stays in place over the scrolling messages, as the field does under them. `useChatPanel` holds what the header and the content share (the open menu, the asked rules); a chat that closes forgets both.
+- **Messages** from one player that follow each other within `CHAT_GROUP_GAP_MS` form a group (`chatRows` in `chatLayout.ts`). The last bubble of a group has the tail. The time shows under it unless an answer came within `CHAT_TIME_QUIET_MS`, so a fast talk shows one time at its end.
+- **Ready phrases** (`CHAT_PHRASES`, the strings `chat.phrases.*`) are chips over the field while it is empty. A tap sends the phrase as a normal message in this phone's language, so the server checks and counts it like typed text. A new phrase must pass the chat filter in both languages.
 - **What shows** follows `ChatView.status`: the messages (yours on the right), or a card that says what chat needs with a button (`onChatFix` opens `/account` or `/username`; "turned off" opens Settings), or the muted note with Unmute. The first time, the chat rules show before the text field.
-- **A refused message** keeps the typed text and shows the reason under the field (`FieldProblem`): a link, a slur, too long, too fast. Every `ChatErrorCode` has its own text.
-- **Mute, report, block.** The header has Mute and Report. Report opens `ReportOrBlock` with `chatGameId`: the reasons then offer "Something they wrote in the chat" first, and the report names the game. From the game menu the dialog has no chat reason.
+- **A refused message** keeps the typed text, turns the field's border coral and shows the reason under the field (`FieldProblem`): a link, a slur, too long, too fast. The count of characters left shows inside the field for the last 40; screen readers hear the whole sentence. Every `ChatErrorCode` has its own text.
+- **Mute, report, block.** The "…" menu has Mute and Report or block. Report opens `ReportOrBlock` with `chatGameId`: the reasons then offer "Something they wrote in the chat" first, and the report names the game. From the game menu the dialog has no chat reason.
 - **Unread.** `chatSeen` (`chatSeen.ts`) keeps, on the phone only, the time of the newest message read per game (key `chatSeen`, the last 40 games) and whether the rules were read (`chatRulesSeen`). An open chat is a read chat.
 - **Screen readers** hear a new message from the other player once (`useAnnouncement`, key `chat:<game>:<message>`), also while the chat is closed. Each bubble reads as "You: …" or "They: …".
 - **Settings → Online → Chat in online games** (`ChatSettingRow`): the switch the server keeps (`Chat.setEnabled`). It shows once the setting loaded.
@@ -483,7 +486,7 @@ The two players of an online game write short messages to each other (`features/
 - **Try it on a phone:** a dev online game (`/dev/online`, dev builds) has a chat. `startDevGame` with `chat` gives this phone and the bot a username on the in-memory server, and the bot answers each message after `DEV_CHAT_REPLY_MS`. No real account is needed.
 - No message text goes to analytics, crash reports or logs. There is no analytics event for chat.
 
-Tests: `features/chat/ChatScreen.test.tsx` (the button, the dot, the rules, a send, a refusal, mute, the "chat needs" cards, a report from the chat, the screen reader), `ChatSettingRow.test.tsx`, `chatSeen.test.ts`.
+Tests: `chatLayout.test.ts` (the groups and the times), `features/chat/ChatScreen.test.tsx` (the button, the dot, the rules, the menu, a ready phrase, a send, a refusal, mute, the "chat needs" cards, a report from the chat, the screen reader), `ChatSettingRow.test.tsx`, `chatSeen.test.ts`.
 
 ## What a saved account gives (#463)
 

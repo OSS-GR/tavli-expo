@@ -85,3 +85,29 @@ describe('<Sheet /> grab handle (#652)', () => {
     expect(screen.getByText('Inside')).toBeOnTheScreen();
   });
 });
+
+describe('<Sheet /> header and footer (#711)', () => {
+  it('keeps the header and the footer out of the scrolling content', async () => {
+    await renderWithRoot(
+      <Sheet
+        visible
+        onClose={() => undefined}
+        closeLabel="Close"
+        look="raised"
+        header={<Text>Head</Text>}
+        footer={<Text>Foot</Text>}>
+        <Text>Inside</Text>
+      </Sheet>,
+    );
+    const scroll = screen.getByTestId('sheet-scroll');
+    const inScroll = (text: string) => {
+      for (let node = screen.getByText(text).parent; node !== null; node = node.parent) {
+        if (node === scroll) return true;
+      }
+      return false;
+    };
+    expect(inScroll('Inside')).toBe(true);
+    expect(inScroll('Head')).toBe(false);
+    expect(inScroll('Foot')).toBe(false);
+  });
+});

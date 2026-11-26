@@ -84,6 +84,11 @@ export interface SheetProps {
   /** The screen under it turns with the phone (the game screen): the sheet turns too. */
   turns?: boolean;
   /**
+   * A part over the scrolling content that stays in place (the chat's
+   * header and its menu, #711): the content scrolls under it.
+   */
+  header?: ReactNode;
+  /**
    * A part under the scrolling content that stays in place (the chat's
    * text field, #692): the content scrolls above it.
    */
@@ -104,6 +109,7 @@ export function Sheet({
   ownCloseButton = false,
   look = 'sheet',
   turns = false,
+  header,
   footer,
   stickToEnd = false,
   children,
@@ -191,7 +197,9 @@ export function Sheet({
                 </View>
               </GestureDetector>
             ) : null}
+            {header != null ? <View style={styles.header(shown)}>{header}</View> : null}
             <ScrollView
+              testID="sheet-scroll"
               ref={scroll}
               style={styles.scroll}
               contentContainerStyle={styles.content(shown, footer != null)}
@@ -304,6 +312,11 @@ const styles = StyleSheet.create((theme, rt) => ({
         : look === 'sheet' || look === 'raised'
           ? rt.insets.bottom + theme.space.lg
           : theme.space.xl,
+  }),
+  header: (look: SheetLook) => ({
+    paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
+    paddingTop: look === 'raised' || look === 'bare' ? 0 : theme.space.xl,
+    paddingBottom: theme.space.sm,
   }),
   footer: (look: SheetLook) => ({
     paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,

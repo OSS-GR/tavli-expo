@@ -7,6 +7,8 @@
  * What shows, by `ChatView.status`:
  * - `open`: the messages (yours on the right), then the text field. The
  *   first time, the chat rules show first (`chatSeen.rulesSeen`).
+ *   Messages from one player form a group (`chatRows`): the last bubble
+ *   has the tail, and the time when no answer came at once.
  * - `muted`: a note and Unmute.
  * - `needs-account`, `needs-username`: what chat needs, and a button to
  *   the screen that fixes it (`onFix`).
@@ -19,8 +21,16 @@
  * - `banned`: a note.
  * - `unavailable` never opens the sheet: the chat button does not show.
  *
- * The header has Mute and Report or block. A report from here names the
- * game, so the server keeps the other player's last messages with it.
+ * The header (`ChatHead`, chat v2, #709) names the other player. Its "…"
+ * button opens a small menu in place: Mute, Report or block, and the chat
+ * rules. It is the sheet's `header`, so it stays in place over the
+ * messages; `useChatPanel` holds what it shares with the content.
+ * A report from here names the game, so the server keeps the other
+ * player's last messages with it.
+ *
+ * The text field has ready phrases over it while it is empty
+ * (`CHAT_PHRASES`): a tap sends one as a normal message, in this phone's
+ * language.
  *
  * The text of a message never goes to analytics, crash reports or logs.
  */
@@ -38,18 +48,39 @@ import {
 import type { PlayerId } from '@tavli/engine';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
+import { sideWood } from '@/components/avatar';
+import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/icons';
 import { FieldProblem } from '@/components/Problem';
 import { RoundButton } from '@/components/RoundButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { termsUrl } from '@/features/online/usernameStep';
 
+import { CHAT_PHRASES, chatRows, clockTime } from './chatLayout';
+import type { ChatPanel } from './useChat';
+
 /** The statuses that send the player to another screen to fix them. */
 export type ChatFix = Extract<ChatStatus, 'needs-account' | 'needs-username' | 'needs-terms'>;
+
+export interface ChatHeadProps {
+  chat: Chat;
+  view: ChatView;
+  /** This phone's side in the game. */
+  me: PlayerId;
+  /** The other player's name, as the game screen shows it. */
+  opponentName: string;
+  /** The player has read the chat rules (`chatSeen`). */
+  rulesSeen: boolean;
+  panel: ChatPanel;
+  /** Report or block the other player, from the chat. Without it the menu has no such row. */
+  onReportOrBlock?: () => void;
+  onClose: () => void;
+}
 
 export interface ChatSheetProps {
   chat: Chat;
@@ -61,15 +92,13 @@ export interface ChatSheetProps {
   /** The player has read the chat rules (`chatSeen`). */
   rulesSeen: boolean;
   onRulesSeen: () => void;
+  panel: ChatPanel;
   /** Opens the screen that fixes a `needs-*` status. */
   onFix: (status: ChatFix) => void;
   /** Accepts the new terms in place (`needs-terms`). Without it, `onFix` opens the username screen. */
   usernames?: Usernames;
   /** Opens Settings (the chat switch). */
   onSettings: () => void;
-  /** Report or block the other player, from the chat. Without it the header has no such button. */
-  onReportOrBlock?: () => void;
-  onClose: () => void;
 }
 
 /** The text for each status that has no messages. */
@@ -93,6 +122,107 @@ function isFix(status: ChatStatus): status is ChatFix {
   return status === 'needs-account' || status === 'needs-username' || status === 'needs-terms';
 }
 
+/** The chat's header: the other player, the "…" menu and Close. It stays over the messages. */
+export function ChatHead({
+  chat,
+  view,
+  me,
+  opponentName,
+  rulesSeen,
+  panel,
+  onReportOrBlock,
+  onClose,
+}: ChatHeadProps) {
+  const { t } = useTranslation();
+  const titleRef = useFocusOnShow();
+  const { theme } = useUnistyles();
+  const [busy, setBusy] = useState(false);
+  const { status } = view;
+  const mute = () => {
+    if (busy) return;
+    setBusy(true);
+    // The new view comes through the watch. A failed call leaves the chat as it is.
+    void chat
+      .setMuted(view.gameId, true)
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+  };
+
+  const canMute = status === 'open';
+  const canReport = onReportOrBlock !== undefined && (status === 'open' || status === 'muted');
+  const canReadRules = status === 'open' && rulesSeen;
+  const hasMenu = canMute || canReport || canReadRules;
+  const pick = (action: () => void) => () => {
+    panel.closeMenu();
+    action();
+  };
+  return (
+    <View style={styles.header}>
+      <View style={styles.head}>
+        <CheckerAvatar wood={sideWood(me === 'white' ? 'black' : 'white')} size={40} />
+        <View style={styles.titles}>
+          <Text
+            ref={titleRef}
+            testID="chat-title"
+            accessibilityRole="header"
+            accessibilityLabel={t('chat.openLabel', { name: opponentName })}
+            style={styles.title}>
+            {opponentName}
+          </Text>
+          <Text style={styles.subtitle}>{t('chat.title')}</Text>
+        </View>
+        {hasMenu ? (
+          <RoundButton
+            testID="chat-more"
+            icon="ellipsis"
+            size="small"
+            accessibilityLabel={t('chat.more')}
+            expanded={panel.menuOpen}
+            onPress={panel.toggleMenu}
+          />
+        ) : null}
+        <RoundButton
+          testID="chat-close"
+          icon="x"
+          size="small"
+          accessibilityLabel={t('chat.close')}
+          onPress={onClose}
+        />
+      </View>
+      {hasMenu && panel.menuOpen ? (
+        <View testID="chat-menu" style={styles.menu}>
+          {canMute ? (
+            <MenuRow
+              testID="chat-mute"
+              icon="bellOff"
+              label={t('chat.mute')}
+              hint={t('chat.muteHint')}
+              onPress={pick(mute)}
+            />
+          ) : null}
+          {canReport ? (
+            <MenuRow
+              testID="chat-report"
+              icon="flag"
+              label={t('safety.actionLabel', { name: opponentName })}
+              color={theme.colors.problem}
+              onPress={pick(onReportOrBlock)}
+            />
+          ) : null}
+          {canReadRules ? (
+            <MenuRow
+              testID="chat-rules-again"
+              icon="book"
+              label={t('chat.rulesAgain')}
+              onPress={panel.askRules}
+            />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function ChatSheet({
   chat,
   view,
@@ -100,23 +230,22 @@ export function ChatSheet({
   opponentName,
   rulesSeen,
   onRulesSeen,
+  panel,
   onFix,
   usernames,
   onSettings,
-  onReportOrBlock,
-  onClose,
 }: ChatSheetProps) {
   const { t, i18n } = useTranslation();
-  const titleRef = useFocusOnShow();
+  const { theme } = useUnistyles();
   const [busy, setBusy] = useState(false);
   const { status } = view;
 
-  const setMuted = (muted: boolean) => {
+  const unmute = () => {
     if (busy) return;
     setBusy(true);
     // The new view comes through the watch. A failed call leaves the chat as it is.
     void chat
-      .setMuted(view.gameId, muted)
+      .setMuted(view.gameId, false)
       .catch(() => undefined)
       .finally(() => setBusy(false));
   };
@@ -144,42 +273,8 @@ export function ChatSheet({
       );
   };
 
-  const head = (
-    <View style={styles.head}>
-      <View style={styles.titles}>
-        <Text ref={titleRef} testID="chat-title" accessibilityRole="header" style={styles.title}>
-          {t('chat.title')}
-        </Text>
-        <Text style={styles.subtitle}>{t('chat.with', { name: opponentName })}</Text>
-      </View>
-      {status === 'open' ? (
-        <HeadButton
-          testID="chat-mute"
-          label={t('chat.mute')}
-          hint={t('chat.muteHint')}
-          onPress={() => setMuted(true)}
-        />
-      ) : null}
-      {onReportOrBlock && (status === 'open' || status === 'muted') ? (
-        <HeadButton
-          testID="chat-report"
-          label={t('chat.report')}
-          hint={t('chat.reportHint', { name: opponentName })}
-          onPress={onReportOrBlock}
-        />
-      ) : null}
-      <RoundButton
-        testID="chat-close"
-        icon="x"
-        size="small"
-        accessibilityLabel={t('chat.close')}
-        onPress={onClose}
-      />
-    </View>
-  );
-
   let body = null;
-  if (status === 'open' && !rulesSeen) {
+  if (status === 'open' && (!rulesSeen || panel.rulesAsked)) {
     body = (
       <View testID="chat-rules" style={styles.note}>
         <Text style={styles.noteTitle}>{t('chat.rules.title')}</Text>
@@ -188,32 +283,46 @@ export function ChatSheet({
             {`• ${t(`chat.rules.${key}`)}`}
           </Text>
         ))}
-        <ActionButton testID="chat-rules-ok" label={t('chat.rules.ok')} onPress={onRulesSeen} />
+        <ActionButton
+          testID="chat-rules-ok"
+          label={t('chat.rules.ok')}
+          onPress={() => {
+            panel.rulesDone();
+            if (!rulesSeen) onRulesSeen();
+          }}
+        />
       </View>
     );
   } else if (status === 'open') {
     body =
       view.messages.length === 0 ? (
-        <Text testID="chat-empty" style={styles.empty}>
-          {t('chat.empty', { name: opponentName })}
-        </Text>
+        <View testID="chat-empty" style={styles.empty}>
+          <Icon name="messageCircle" size={32} color={theme.colors.textDim} />
+          <Text style={styles.emptyTitle}>{t('chat.emptyTitle')}</Text>
+          <Text style={styles.emptyLine}>{t('chat.emptyLine')}</Text>
+        </View>
       ) : (
         <View testID="chat-messages" style={styles.messages}>
-          {view.messages.map((message) => (
-            <Bubble key={message.id} message={message} mine={message.from === me} />
+          {chatRows(view.messages, me).map(({ message, mine, last, time }) => (
+            <View key={message.id} style={styles.messageRow(last)}>
+              <Bubble message={message} mine={mine} last={last} />
+              {time ? (
+                <Text style={styles.time(mine)}>{clockTime(message.sentAt, i18n.language)}</Text>
+              ) : null}
+            </View>
           ))}
         </View>
       );
   } else {
     body = (
-      <View testID={`chat-status-${status}`} style={styles.note}>
+      <View testID={`chat-status-${status}`} style={styles.card}>
         <Text style={styles.body}>{t(STATUS_TEXT[status])}</Text>
         {status === 'muted' ? (
           <ActionButton
             testID="chat-unmute"
             label={t('chat.unmute')}
             busy={busy}
-            onPress={() => setMuted(false)}
+            onPress={unmute}
           />
         ) : null}
         {status === 'needs-terms' && usernames ? (
@@ -256,42 +365,47 @@ export function ChatSheet({
 
   return (
     <View testID="chat-sheet" style={styles.sheet}>
-      {head}
       {body}
     </View>
   );
 }
 
-function HeadButton({
+function MenuRow({
   testID,
+  icon,
   label,
   hint,
+  color,
   onPress,
 }: {
   testID: string;
+  icon: IconName;
   label: string;
-  hint: string;
+  hint?: string;
+  /** The text color. Default: the theme's text. */
+  color?: string;
   onPress: () => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={hint}
-      hitSlop={8}
+      {...(hint === undefined ? {} : { accessibilityHint: hint })}
       onPress={onPress}
-      style={({ pressed }) => [styles.headButton, pressed && styles.pressed]}>
-      <Text style={styles.headButtonText}>{label}</Text>
+      style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}>
+      <Icon name={icon} size={20} color={theme.colors.textDim} />
+      <Text style={[styles.menuText, color === undefined ? null : { color }]}>{label}</Text>
     </Pressable>
   );
 }
 
-function Bubble({ message, mine }: { message: ChatMessage; mine: boolean }) {
+function Bubble({ message, mine, last }: { message: ChatMessage; mine: boolean; last: boolean }) {
   const { t } = useTranslation();
   return (
     <View
-      style={styles.bubble(mine)}
+      style={styles.bubble(mine, last)}
       accessible
       accessibilityLabel={t(mine ? 'chat.youSaid' : 'chat.theySaid', { text: message.text })}>
       <Text style={styles.bubbleText}>{message.text}</Text>
@@ -332,12 +446,13 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
   const left = CHAT_MAX_LENGTH - Array.from(text).length;
   const ready = text.trim() !== '' && left >= 0 && !sending;
 
-  const send = () => {
-    if (!ready) return;
+  // Sends the typed text, or a ready phrase (the typed text then stays).
+  const sendText = (sent: string, typed: boolean) => {
+    if (sending) return;
     setSending(true);
-    chat.send({ gameId, text }).then(
+    chat.send({ gameId, text: sent }).then(
       () => {
-        setText('');
+        if (typed) setText('');
         setProblem(null);
         setSending(false);
       },
@@ -351,35 +466,70 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
       },
     );
   };
+  const send = () => {
+    if (ready) sendText(text, true);
+  };
 
   return (
     <View style={styles.composer}>
-      <FieldProblem
-        testID="chat-problem"
-        text={problem === null ? null : t(problem.key)}
-        eventKey={`chat-problem:${gameId}:${problem?.n ?? 0}`}
-      />
+      {text === '' ? (
+        <ScrollView
+          testID="chat-phrases"
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.phrases}>
+          {CHAT_PHRASES.map((key) => {
+            const phrase = t(`chat.phrases.${key}`);
+            return (
+              <Pressable
+                key={key}
+                testID={`chat-phrase-${key}`}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.phraseLabel', { text: phrase })}
+                accessibilityState={{ disabled: sending }}
+                disabled={sending}
+                onPress={() => sendText(phrase, false)}
+                style={({ pressed }) => [styles.phrase, pressed && styles.pressed]}>
+                <Text style={styles.phraseText}>{phrase}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
       <View style={styles.row}>
-        <TextInput
-          testID="chat-input"
-          style={styles.input}
-          value={text}
-          onChangeText={(next) => {
-            setText(next);
-            if (problem !== null) setProblem(null);
-          }}
-          placeholder={t('chat.placeholder')}
-          placeholderTextColor={theme.colors.textDim}
-          accessibilityLabel={t('chat.inputLabel')}
-          multiline
-          // One row to start with; it grows with the text (up to `maxHeight`).
-          rows={1}
-          // A little over the limit may be typed, so the count can say so.
-          maxLength={CHAT_MAX_LENGTH + 50}
-          returnKeyType="send"
-          submitBehavior="submit"
-          onSubmitEditing={send}
-        />
+        <View style={styles.field(problem !== null, text !== '')}>
+          <TextInput
+            testID="chat-input"
+            style={styles.input}
+            value={text}
+            onChangeText={(next) => {
+              setText(next);
+              if (problem !== null) setProblem(null);
+            }}
+            placeholder={t('chat.placeholder')}
+            placeholderTextColor={theme.colors.textDim}
+            accessibilityLabel={t('chat.inputLabel')}
+            multiline
+            // One row to start with; it grows with the text (up to `maxHeight`).
+            rows={1}
+            // A little over the limit may be typed, so the count can say so.
+            maxLength={CHAT_MAX_LENGTH + 50}
+            returnKeyType="send"
+            submitBehavior="submit"
+            onSubmitEditing={send}
+          />
+          {left <= 40 ? (
+            <Text
+              testID="chat-left"
+              accessibilityLabel={
+                left >= 0 ? t('chat.left', { count: left }) : t('chat.over', { count: -left })
+              }
+              style={styles.left(left < 0)}>
+              {left}
+            </Text>
+          ) : null}
+        </View>
         <Pressable
           testID="chat-send"
           accessibilityRole="button"
@@ -395,11 +545,11 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
           />
         </Pressable>
       </View>
-      {left <= 40 ? (
-        <Text testID="chat-left" style={styles.left(left < 0)}>
-          {left >= 0 ? t('chat.left', { count: left }) : t('chat.over', { count: -left })}
-        </Text>
-      ) : null}
+      <FieldProblem
+        testID="chat-problem"
+        text={problem === null ? null : t(problem.key)}
+        eventKey={`chat-problem:${gameId}:${problem?.n ?? 0}`}
+      />
     </View>
   );
 }
@@ -408,10 +558,12 @@ const styles = StyleSheet.create((theme) => ({
   sheet: {
     gap: theme.space.md,
   },
+  header: {
+    gap: theme.space.sm,
+  },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: theme.space.sm,
   },
   titles: {
@@ -419,56 +571,91 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
   },
   title: {
-    ...theme.type.headline,
+    ...theme.type.title3,
     color: theme.colors.text,
   },
   subtitle: {
-    ...theme.type.caption,
+    ...theme.type.footnote,
     color: theme.colors.textDim,
   },
-  headButton: {
-    minHeight: 36,
-    justifyContent: 'center',
-    paddingHorizontal: theme.space.md,
-    borderRadius: theme.radii.pill,
+  menu: {
+    borderRadius: theme.radii.tray,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
+    overflow: 'hidden',
   },
-  headButtonText: {
-    ...theme.type.caption,
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    minHeight: theme.touch.minTarget,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+  },
+  menuText: {
+    ...theme.type.body,
+    flexShrink: 1,
     color: theme.colors.text,
   },
   pressed: {
     opacity: 0.7,
   },
   messages: {
-    gap: theme.space.xs,
+    gap: theme.space.xxs,
   },
-  bubble: (mine: boolean) => ({
+  messageRow: (last: boolean) => ({
+    gap: theme.space.xxs,
+    marginBottom: last ? theme.space.sm : 0,
+  }),
+  bubble: (mine: boolean, last: boolean) => ({
     alignSelf: mine ? 'flex-end' : 'flex-start',
     maxWidth: '82%',
     paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,
-    borderRadius: theme.radii.lg,
-    borderBottomRightRadius: mine ? theme.radii.sm : theme.radii.lg,
-    borderBottomLeftRadius: mine ? theme.radii.lg : theme.radii.sm,
+    borderRadius: theme.radii.xl,
+    // The tail: the last bubble of a group has a small corner on its side.
+    borderBottomRightRadius: mine && last ? theme.radii.sm : theme.radii.xl,
+    borderBottomLeftRadius: !mine && last ? theme.radii.sm : theme.radii.xl,
     borderWidth: 1,
-    borderColor: mine ? theme.colors.accentLine : theme.colors.border,
+    borderColor: mine ? theme.colors.accentWash : theme.colors.separator,
     backgroundColor: mine ? theme.colors.accentWash : theme.colors.surface,
   }),
   bubbleText: {
     ...theme.type.body,
     color: theme.colors.text,
   },
+  time: (mine: boolean) => ({
+    ...theme.type.footnote,
+    color: theme.colors.textDim,
+    alignSelf: mine ? 'flex-end' : 'flex-start',
+    paddingHorizontal: theme.space.xs,
+  }),
   empty: {
-    ...theme.type.body,
+    alignItems: 'center',
+    gap: theme.space.xs,
+    paddingVertical: theme.space.lg,
+  },
+  emptyTitle: {
+    ...theme.type.title3,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  emptyLine: {
+    ...theme.type.caption,
     color: theme.colors.textDim,
     textAlign: 'center',
-    paddingVertical: theme.space.lg,
   },
   note: {
     gap: theme.space.sm,
+  },
+  card: {
+    gap: theme.space.md,
+    padding: theme.space.lg,
+    borderRadius: theme.radii.tray,
+    borderWidth: 1,
+    borderColor: theme.colors.separator,
+    backgroundColor: theme.colors.surface,
   },
   noteTitle: {
     ...theme.type.bodyStrong,
@@ -479,25 +666,53 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.text,
   },
   composer: {
-    gap: theme.space.xs,
+    gap: theme.space.sm,
+  },
+  phrases: {
+    gap: theme.space.sm,
+  },
+  phrase: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: theme.space.md,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.accentLine,
+    backgroundColor: theme.colors.surface,
+  },
+  phraseText: {
+    ...theme.type.callout,
+    color: theme.colors.text,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: theme.space.sm,
   },
+  field: (problem: boolean, typed: boolean) => ({
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.space.sm,
+    minHeight: theme.touch.minTarget,
+    paddingHorizontal: theme.space.lg,
+    borderRadius: theme.touch.minTarget / 2,
+    borderWidth: 1,
+    borderColor: problem
+      ? theme.colors.problemLine
+      : typed
+        ? theme.colors.accentLine
+        : theme.colors.border,
+    backgroundColor: theme.colors.backgroundDeep,
+  }),
   input: {
     ...theme.type.body,
     flex: 1,
-    minHeight: theme.touch.minTarget,
     maxHeight: 120,
-    paddingHorizontal: theme.space.md,
     paddingVertical: theme.space.sm,
-    borderRadius: theme.radii.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.backgroundDeep,
     color: theme.colors.text,
+    // A browser draws its own focus ring inside the field: the field's border shows the focus.
+    outlineWidth: 0,
   },
   send: (ready: boolean) => ({
     width: theme.touch.minTarget,
@@ -510,8 +725,8 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: ready ? theme.colors.accentLine : theme.colors.border,
   }),
   left: (over: boolean) => ({
-    ...theme.type.caption,
+    ...theme.type.footnote,
     color: over ? theme.colors.problem : theme.colors.textDim,
-    textAlign: 'right',
+    paddingVertical: theme.space.md,
   }),
 }));
