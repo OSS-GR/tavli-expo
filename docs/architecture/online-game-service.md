@@ -870,7 +870,7 @@ An action, so it can read the tables with no cap in pages: the capped parts (acc
 
 ## Chat
 
-> ADR-0011 (proposed), epic #692. Built so far: the port, the pure rules and the in-memory server (#694), the Convex side (#695), how long the data lives (#697), and the report with the owner's tools (#698). The screens come in later steps.
+> ADR-0011, epic #692. The app side is "Chat" in [the app shell](app-shell.md#chat-692).
 
 The two players of an online game write short text messages to each other, in friend games and in Play ranked.
 
