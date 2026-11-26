@@ -21,8 +21,10 @@
  * - `banned`: a note.
  * - `unavailable` never opens the sheet: the chat button does not show.
  *
- * The header names the other player (chat v2, #709). Its "…" button
- * opens a small menu in place: Mute, Report or block, and the chat rules.
+ * The header (`ChatHead`, chat v2, #709) names the other player. Its "…"
+ * button opens a small menu in place: Mute, Report or block, and the chat
+ * rules. It is the sheet's `header`, so it stays in place over the
+ * messages; `useChatPanel` holds what it shares with the content.
  * A report from here names the game, so the server keeps the other
  * player's last messages with it.
  *
@@ -60,9 +62,25 @@ import { useFocusOnShow } from '@/features/accessibility/focus';
 import { termsUrl } from '@/features/online/usernameStep';
 
 import { CHAT_PHRASES, chatRows, clockTime } from './chatLayout';
+import type { ChatPanel } from './useChat';
 
 /** The statuses that send the player to another screen to fix them. */
 export type ChatFix = Extract<ChatStatus, 'needs-account' | 'needs-username' | 'needs-terms'>;
+
+export interface ChatHeadProps {
+  chat: Chat;
+  view: ChatView;
+  /** This phone's side in the game. */
+  me: PlayerId;
+  /** The other player's name, as the game screen shows it. */
+  opponentName: string;
+  /** The player has read the chat rules (`chatSeen`). */
+  rulesSeen: boolean;
+  panel: ChatPanel;
+  /** Report or block the other player, from the chat. Without it the menu has no such row. */
+  onReportOrBlock?: () => void;
+  onClose: () => void;
+}
 
 export interface ChatSheetProps {
   chat: Chat;
@@ -74,15 +92,13 @@ export interface ChatSheetProps {
   /** The player has read the chat rules (`chatSeen`). */
   rulesSeen: boolean;
   onRulesSeen: () => void;
+  panel: ChatPanel;
   /** Opens the screen that fixes a `needs-*` status. */
   onFix: (status: ChatFix) => void;
   /** Accepts the new terms in place (`needs-terms`). Without it, `onFix` opens the username screen. */
   usernames?: Usernames;
   /** Opens Settings (the chat switch). */
   onSettings: () => void;
-  /** Report or block the other player, from the chat. Without it the header has no such button. */
-  onReportOrBlock?: () => void;
-  onClose: () => void;
 }
 
 /** The text for each status that has no messages. */
@@ -106,6 +122,107 @@ function isFix(status: ChatStatus): status is ChatFix {
   return status === 'needs-account' || status === 'needs-username' || status === 'needs-terms';
 }
 
+/** The chat's header: the other player, the "…" menu and Close. It stays over the messages. */
+export function ChatHead({
+  chat,
+  view,
+  me,
+  opponentName,
+  rulesSeen,
+  panel,
+  onReportOrBlock,
+  onClose,
+}: ChatHeadProps) {
+  const { t } = useTranslation();
+  const titleRef = useFocusOnShow();
+  const { theme } = useUnistyles();
+  const [busy, setBusy] = useState(false);
+  const { status } = view;
+  const mute = () => {
+    if (busy) return;
+    setBusy(true);
+    // The new view comes through the watch. A failed call leaves the chat as it is.
+    void chat
+      .setMuted(view.gameId, true)
+      .catch(() => undefined)
+      .finally(() => setBusy(false));
+  };
+
+  const canMute = status === 'open';
+  const canReport = onReportOrBlock !== undefined && (status === 'open' || status === 'muted');
+  const canReadRules = status === 'open' && rulesSeen;
+  const hasMenu = canMute || canReport || canReadRules;
+  const pick = (action: () => void) => () => {
+    panel.closeMenu();
+    action();
+  };
+  return (
+    <View style={styles.header}>
+      <View style={styles.head}>
+        <CheckerAvatar wood={sideWood(me === 'white' ? 'black' : 'white')} size={40} />
+        <View style={styles.titles}>
+          <Text
+            ref={titleRef}
+            testID="chat-title"
+            accessibilityRole="header"
+            accessibilityLabel={t('chat.openLabel', { name: opponentName })}
+            style={styles.title}>
+            {opponentName}
+          </Text>
+          <Text style={styles.subtitle}>{t('chat.title')}</Text>
+        </View>
+        {hasMenu ? (
+          <RoundButton
+            testID="chat-more"
+            icon="ellipsis"
+            size="small"
+            accessibilityLabel={t('chat.more')}
+            expanded={panel.menuOpen}
+            onPress={panel.toggleMenu}
+          />
+        ) : null}
+        <RoundButton
+          testID="chat-close"
+          icon="x"
+          size="small"
+          accessibilityLabel={t('chat.close')}
+          onPress={onClose}
+        />
+      </View>
+      {hasMenu && panel.menuOpen ? (
+        <View testID="chat-menu" style={styles.menu}>
+          {canMute ? (
+            <MenuRow
+              testID="chat-mute"
+              icon="bellOff"
+              label={t('chat.mute')}
+              hint={t('chat.muteHint')}
+              onPress={pick(mute)}
+            />
+          ) : null}
+          {canReport ? (
+            <MenuRow
+              testID="chat-report"
+              icon="flag"
+              label={t('safety.actionLabel', { name: opponentName })}
+              color={theme.colors.problem}
+              onPress={pick(onReportOrBlock)}
+            />
+          ) : null}
+          {canReadRules ? (
+            <MenuRow
+              testID="chat-rules-again"
+              icon="book"
+              label={t('chat.rulesAgain')}
+              onPress={panel.askRules}
+            />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function ChatSheet({
   chat,
   view,
@@ -113,27 +230,22 @@ export function ChatSheet({
   opponentName,
   rulesSeen,
   onRulesSeen,
+  panel,
   onFix,
   usernames,
   onSettings,
-  onReportOrBlock,
-  onClose,
 }: ChatSheetProps) {
   const { t, i18n } = useTranslation();
-  const titleRef = useFocusOnShow();
   const { theme } = useUnistyles();
   const [busy, setBusy] = useState(false);
-  // The "…" menu, and the chat rules when the player asks for them again.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [rulesAsked, setRulesAsked] = useState(false);
   const { status } = view;
 
-  const setMuted = (muted: boolean) => {
+  const unmute = () => {
     if (busy) return;
     setBusy(true);
     // The new view comes through the watch. A failed call leaves the chat as it is.
     void chat
-      .setMuted(view.gameId, muted)
+      .setMuted(view.gameId, false)
       .catch(() => undefined)
       .finally(() => setBusy(false));
   };
@@ -161,81 +273,8 @@ export function ChatSheet({
       );
   };
 
-  const canMute = status === 'open';
-  const canReport = onReportOrBlock !== undefined && (status === 'open' || status === 'muted');
-  const canReadRules = status === 'open' && rulesSeen;
-  const hasMenu = canMute || canReport || canReadRules;
-  const pick = (action: () => void) => () => {
-    setMenuOpen(false);
-    action();
-  };
-  const head = (
-    <>
-      <View style={styles.head}>
-        <CheckerAvatar wood={sideWood(me === 'white' ? 'black' : 'white')} size={40} />
-        <View style={styles.titles}>
-          <Text
-            ref={titleRef}
-            testID="chat-title"
-            accessibilityRole="header"
-            accessibilityLabel={t('chat.openLabel', { name: opponentName })}
-            style={styles.title}>
-            {opponentName}
-          </Text>
-          <Text style={styles.subtitle}>{t('chat.title')}</Text>
-        </View>
-        {hasMenu ? (
-          <RoundButton
-            testID="chat-more"
-            icon="ellipsis"
-            size="small"
-            accessibilityLabel={t('chat.more')}
-            onPress={() => setMenuOpen((open) => !open)}
-          />
-        ) : null}
-        <RoundButton
-          testID="chat-close"
-          icon="x"
-          size="small"
-          accessibilityLabel={t('chat.close')}
-          onPress={onClose}
-        />
-      </View>
-      {hasMenu && menuOpen ? (
-        <View testID="chat-menu" style={styles.menu}>
-          {canMute ? (
-            <MenuRow
-              testID="chat-mute"
-              icon="bellOff"
-              label={t('chat.mute')}
-              hint={t('chat.muteHint')}
-              onPress={pick(() => setMuted(true))}
-            />
-          ) : null}
-          {canReport ? (
-            <MenuRow
-              testID="chat-report"
-              icon="flag"
-              label={t('safety.actionLabel', { name: opponentName })}
-              color={theme.colors.problem}
-              onPress={pick(onReportOrBlock)}
-            />
-          ) : null}
-          {canReadRules ? (
-            <MenuRow
-              testID="chat-rules-again"
-              icon="book"
-              label={t('chat.rulesAgain')}
-              onPress={pick(() => setRulesAsked(true))}
-            />
-          ) : null}
-        </View>
-      ) : null}
-    </>
-  );
-
   let body = null;
-  if (status === 'open' && (!rulesSeen || rulesAsked)) {
+  if (status === 'open' && (!rulesSeen || panel.rulesAsked)) {
     body = (
       <View testID="chat-rules" style={styles.note}>
         <Text style={styles.noteTitle}>{t('chat.rules.title')}</Text>
@@ -248,7 +287,7 @@ export function ChatSheet({
           testID="chat-rules-ok"
           label={t('chat.rules.ok')}
           onPress={() => {
-            setRulesAsked(false);
+            panel.rulesDone();
             if (!rulesSeen) onRulesSeen();
           }}
         />
@@ -259,7 +298,7 @@ export function ChatSheet({
       view.messages.length === 0 ? (
         <View testID="chat-empty" style={styles.empty}>
           <Icon name="messageCircle" size={32} color={theme.colors.textDim} />
-          <Text style={styles.emptyTitle}>{t('chat.emptyTitle', { name: opponentName })}</Text>
+          <Text style={styles.emptyTitle}>{t('chat.emptyTitle')}</Text>
           <Text style={styles.emptyLine}>{t('chat.emptyLine')}</Text>
         </View>
       ) : (
@@ -283,7 +322,7 @@ export function ChatSheet({
             testID="chat-unmute"
             label={t('chat.unmute')}
             busy={busy}
-            onPress={() => setMuted(false)}
+            onPress={unmute}
           />
         ) : null}
         {status === 'needs-terms' && usernames ? (
@@ -326,7 +365,6 @@ export function ChatSheet({
 
   return (
     <View testID="chat-sheet" style={styles.sheet}>
-      {head}
       {body}
     </View>
   );
@@ -519,6 +557,9 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
 const styles = StyleSheet.create((theme) => ({
   sheet: {
     gap: theme.space.md,
+  },
+  header: {
+    gap: theme.space.sm,
   },
   head: {
     flexDirection: 'row',

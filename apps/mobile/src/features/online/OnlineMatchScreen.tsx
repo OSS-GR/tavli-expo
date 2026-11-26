@@ -57,9 +57,9 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ChatComposer, ChatSheet, type ChatFix } from '@/features/chat/ChatSheet';
+import { ChatComposer, ChatHead, ChatSheet, type ChatFix } from '@/features/chat/ChatSheet';
 import { chatSeen, newestSentAt, unreadCount } from '@/features/chat/chatSeen';
-import { chatOffered, useChat } from '@/features/chat/useChat';
+import { chatOffered, useChat, useChatPanel } from '@/features/chat/useChat';
 import { Sheet } from '@/components/Sheet';
 import { useGameStore } from '@/features/game/gameStore';
 import { useAnnouncement } from '@/features/game/useAnnouncement';
@@ -264,6 +264,7 @@ function OnlineBoard({
   // when the text field goes away for a moment (Report or block, a close).
   const [draft, setDraft] = useState('');
   const chatOpen = overlay.kind === 'chat';
+  const chatPanel = useChatPanel(chatOpen, chatView?.status);
   const newest = chatView === null ? 0 : newestSentAt(chatView);
   // An open chat is a read chat. The phone keeps what was read.
   if (chatOpen && newest > seenAt) setSeenAt(newest);
@@ -461,6 +462,7 @@ function OnlineBoard({
       : undefined;
 
   let content = null;
+  let header = null;
   if (overlay.kind === 'menu') {
     content = (
       <GameMenu
@@ -556,26 +558,15 @@ function OnlineBoard({
       />
     );
   } else if (overlay.kind === 'chat' && chat && chatOffered(chatView)) {
-    content = (
-      <ChatSheet
+    // The header stays in place over the messages (#711).
+    header = (
+      <ChatHead
         chat={chat}
         view={chatView}
         me={side}
         opponentName={name(opponentSide)}
         rulesSeen={rulesSeen}
-        {...(usernames ? { usernames } : {})}
-        onRulesSeen={() => {
-          chatSeen.markRulesSeen();
-          setRulesSeen(true);
-        }}
-        onFix={(status) => {
-          close();
-          onChatFix?.(status);
-        }}
-        onSettings={() => {
-          close();
-          onSettings();
-        }}
+        panel={chatPanel}
         {...(safety && opponentId !== undefined
           ? {
               onReportOrBlock: () =>
@@ -589,10 +580,38 @@ function OnlineBoard({
         onClose={close}
       />
     );
+    content = (
+      <ChatSheet
+        chat={chat}
+        view={chatView}
+        me={side}
+        opponentName={name(opponentSide)}
+        rulesSeen={rulesSeen}
+        panel={chatPanel}
+        {...(usernames ? { usernames } : {})}
+        onRulesSeen={() => {
+          chatSeen.markRulesSeen();
+          setRulesSeen(true);
+        }}
+        onFix={(status) => {
+          close();
+          onChatFix?.(status);
+        }}
+        onSettings={() => {
+          close();
+          onSettings();
+        }}
+      />
+    );
   }
   // The text field stays in place under the messages.
   const composing =
-    overlay.kind === 'chat' && chat && chatView?.status === 'open' && rulesSeen && content !== null;
+    overlay.kind === 'chat' &&
+    chat &&
+    chatView?.status === 'open' &&
+    rulesSeen &&
+    !chatPanel.rulesAsked &&
+    content !== null;
   const unread = unreadCount(chatView, side, seenAt);
 
   return (
@@ -635,6 +654,7 @@ function OnlineBoard({
             ? 'raised'
             : 'dialog'
         }
+        {...(header !== null ? { header } : {})}
         {...(composing
           ? {
               footer: <ChatComposer chat={chat} gameId={gameId} text={draft} onText={setDraft} />,

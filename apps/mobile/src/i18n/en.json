@@ -2442,8 +2442,8 @@
     "openHint": "Opens the chat of this game",
     "more": "Chat options",
     "rulesAgain": "Chat rules",
-    "emptyTitle": "Say hello to {{name}}",
-    "emptyLine": "Only the two of you see this chat.",
+    "emptyTitle": "Say hello!",
+    "emptyLine": "Be kind. The \"…\" button mutes this chat or reports the player.",
     "phraseLabel": "Send: {{text}}",
     "phrases": {
       "goodLuck": "Good luck!",
@@ -2467,7 +2467,6 @@
     "muteHint": "Hides the chat of this game. The other player is not told.",
     "unmute": "Show the chat again",
     "report": "Report",
-    "reportHint": "Report or block {{name}}",
     "status": {
       "needsAccount": "Chat is for saved accounts. Save your account to chat with other players.",
       "needsUsername": "Pick a username to chat with other players.",

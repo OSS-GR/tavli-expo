@@ -236,9 +236,32 @@ describe('the chat of an online game', () => {
     await user.press(screen.getByTestId('chat-rules-again'));
     expect(screen.queryByTestId('chat-menu')).toBeNull();
     expect(screen.getByTestId('chat-rules')).toBeTruthy();
+    // The text field waits while the rules show.
+    expect(screen.queryByTestId('chat-input')).toBeNull();
     await user.press(screen.getByTestId('chat-rules-ok'));
     expect(screen.queryByTestId('chat-rules')).toBeNull();
     expect(screen.getByTestId('chat-empty')).toBeTruthy();
+    expect(screen.getByTestId('chat-input')).toBeTruthy();
+  });
+
+  it('says whether the menu is open, and forgets the asked rules after a mute', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    await user.press(await button());
+    const more = () => screen.getByTestId('chat-more');
+    expect(more().props.accessibilityState).toMatchObject({ expanded: false });
+    await user.press(more());
+    expect(more().props.accessibilityState).toMatchObject({ expanded: true });
+    await user.press(screen.getByTestId('chat-rules-again'));
+    await user.press(more());
+    await user.press(screen.getByTestId('chat-mute'));
+    await settle();
+    await user.press(await screen.findByTestId('chat-unmute'));
+    await settle();
+    // The messages again, not the rules.
+    expect(await screen.findByTestId('chat-empty')).toBeTruthy();
+    expect(screen.queryByTestId('chat-rules')).toBeNull();
   });
 
   it('mutes and shows the chat again', async () => {

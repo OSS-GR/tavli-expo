@@ -15,6 +15,8 @@ export interface RoundButtonProps {
   /** What screen readers say, for example "Back". */
   accessibilityLabel: string;
   accessibilityHint?: string;
+  /** The button opens and closes a part of the screen (a menu): screen readers say which. */
+  expanded?: boolean;
   onPress: () => void;
   /** `small`: 36 pt (a sheet's close button), still a 44 pt hit area. Default: 44 pt. */
   size?: 'regular' | 'small';
@@ -28,6 +30,7 @@ export function RoundButton({
   icon,
   accessibilityLabel,
   accessibilityHint,
+  expanded,
   onPress,
   size = 'regular',
   testID,
@@ -40,6 +43,7 @@ export function RoundButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
+      {...(expanded === undefined ? {} : { accessibilityState: { expanded } })}
       onPress={onPress}
       {...(small ? { hitSlop: SMALL_HIT_SLOP } : {})}
       style={({ pressed }) => [styles.button, small && styles.small, pressed && styles.pressed]}>
