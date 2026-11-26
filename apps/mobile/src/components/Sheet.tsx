@@ -163,7 +163,7 @@ export function Sheet({
       animationType="fade"
       onRequestClose={onClose}
       supportedOrientations={turns ? TURNS : UPRIGHT}>
-      <GestureHandlerRootView style={styles.gestures}>
+      <GestureHandlerRootView style={FILL}>
         <KeyboardAvoidingView
           style={styles.root(shown)}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -210,6 +210,13 @@ export function Sheet({
     </Modal>
   );
 }
+
+/**
+ * A plain style, not a Unistyles one: `GestureHandlerRootView` is not a
+ * React Native component, so in a browser a Unistyles style gives it no
+ * `flex`, the root has no height and the sheet sits at the top.
+ */
+const FILL = { flex: 1 } as const;
 
 /** How a dragged sheet goes back to its place. */
 const SPRING = { damping: 20, stiffness: 220 };
@@ -268,9 +275,6 @@ const styles = StyleSheet.create((theme, rt) => ({
             borderColor: theme.colors.border,
           }),
   }),
-  gestures: {
-    flex: 1,
-  },
   handleArea: {
     height: HANDLE_HEIGHT,
     alignSelf: 'stretch',
