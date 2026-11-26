@@ -130,6 +130,7 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
 import { Icon } from '@/components/Icon';
+import { ChatPeek } from '@/features/chat/ChatPeek';
 import { MoveList } from '@/features/accessibility/MoveList';
 import {
   useMoveListAsked,
@@ -380,10 +381,13 @@ export interface GameScreenProps {
   onOpenMenu?: () => void;
   /**
    * Shows the chat button beside the other seat (an online game with a
-   * chat, #692). `unread`: the dot for new messages.
+   * chat, #692). `unread`: the count of new messages on the button.
+   * `peek`: a new message to show for a moment over the screen (#709); a
+   * tap on it opens the chat.
    */
   chat?: {
     readonly unread: number;
+    readonly peek?: { readonly name: string; readonly text: string } | null;
     readonly label: string;
     readonly hint: string;
     readonly onOpen: () => void;
@@ -2244,7 +2248,11 @@ export function GameScreen({
       style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}>
       <Icon name="messageCircle" size={20} color={ui.colors.text} />
       {chat.unread > 0 ? (
-        <View testID="chat-unread" style={styles.chatDot} importantForAccessibility="no" />
+        <View testID="chat-unread" style={styles.chatBadge} importantForAccessibility="no">
+          <Text style={styles.chatBadgeText} allowFontScaling={false}>
+            {chat.unread > 9 ? '9+' : chat.unread}
+          </Text>
+        </View>
       ) : null}
     </Pressable>
   ) : null;
@@ -2613,6 +2621,11 @@ export function GameScreen({
           {trail}
         </View>
       </GestureDetector>
+      {chat?.peek && !hideScreen ? (
+        <View style={styles.chatPeek(landscape, rails.left)} pointerEvents="box-none">
+          <ChatPeek name={chat.peek.name} text={chat.peek.text} onPress={chat.onOpen} />
+        </View>
+      ) : null}
       {endSheet !== null ? (
         <SupportAskCover covered={ask.open} fill="absolute">
           {endSheet}
@@ -2785,18 +2798,37 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  // The dot for new chat messages (#692), on the button's top right.
-  chatDot: {
+  // The count of new chat messages (#692, #709), on the button's top right.
+  chatBadge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: theme.colors.accent,
     borderWidth: 1,
     borderColor: theme.colors.background,
   },
+  chatBadgeText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '700',
+    color: theme.colors.onAccent,
+  },
+  // A new chat message (#709): under the top row at the right in portrait,
+  // at the top beside the left rail on the side. Inside the screen, so
+  // Android does not clip it.
+  chatPeek: (landscape: boolean, rail: number) => ({
+    position: 'absolute',
+    top: landscape ? theme.space.sm : rt.insets.top + MENU_SIZE + theme.space.md,
+    ...(landscape
+      ? { left: rt.insets.left + rail + theme.space.sm }
+      : { right: rt.insets.right + theme.space.sm }),
+  }),
   menuIcon: {
     fontSize: 20,
     lineHeight: 24,
