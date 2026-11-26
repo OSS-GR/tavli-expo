@@ -82,6 +82,12 @@ export interface ChatMessage {
   readonly text: string;
   /** When the server took it, in epoch milliseconds (server clock). */
   readonly sentAt: number;
+  /**
+   * The number of the game of the match it was sent in, from 1 (#709):
+   * the app draws a line where a new game starts. A message from before
+   * the server kept this has 1.
+   */
+  readonly game: number;
 }
 
 /** The chat of one game, for the caller. */

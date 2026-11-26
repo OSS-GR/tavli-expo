@@ -2444,6 +2444,7 @@
     "rulesAgain": "Chat rules",
     "emptyTitle": "Say hello!",
     "emptyLine": "Be kind. The \"…\" button mutes this chat or reports the player.",
+    "gameLine": "Game {{number}}",
     "phraseLabel": "Send: {{text}}",
     "phrases": {
       "goodLuck": "Good luck!",

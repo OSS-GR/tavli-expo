@@ -139,7 +139,27 @@ describe('chat on the Convex server', () => {
     ).toEqual([{ game: gameId, senderId: BOB, text: 'good luck', sentAt: START, hidden: false }]);
     const view = await as(t, ALICE).query(api.chat.getChat, { gameId });
     expect(view.messages).toEqual([
-      { id: rows[0]?._id, from: rows[0]?.from, text: 'good luck', sentAt: START },
+      { id: rows[0]?._id, from: rows[0]?.from, text: 'good luck', sentAt: START, game: 1 },
+    ]);
+    expect(rows[0]?.game).toBe(1);
+  });
+
+  it('a row from before the game number was kept reads as game 1', async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    await t.run(async (ctx) => {
+      await ctx.db.insert('chatMessages', {
+        gameId,
+        senderId: BOB,
+        from: 'black',
+        text: 'old',
+        sentAt: START,
+        hidden: false,
+      });
+    });
+    const view = await as(t, ALICE).query(api.chat.getChat, { gameId });
+    expect(view.messages.map(({ text, game }) => ({ text, game }))).toEqual([
+      { text: 'old', game: 1 },
     ]);
   });
 

@@ -13,7 +13,7 @@ import { createConvexChat } from './chat';
 import type { ConvexChatClient } from './chat';
 import { CHAT_FUNCTION_NAMES } from './functions';
 
-const MESSAGE = { id: 'm1', from: 'white', text: 'hi', sentAt: 5 } as const;
+const MESSAGE = { id: 'm1', from: 'white', text: 'hi', sentAt: 5, game: 1 } as const;
 
 function fakeClient(answer: () => Promise<unknown> = () => Promise.resolve(null)) {
   const calls: { kind: string; name: string; args: unknown }[] = [];

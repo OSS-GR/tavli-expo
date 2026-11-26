@@ -303,8 +303,17 @@ export function ChatSheet({
         </View>
       ) : (
         <View testID="chat-messages" style={styles.messages}>
-          {chatRows(view.messages, me).map(({ message, mine, last, time }) => (
+          {chatRows(view.messages, me).map(({ message, mine, last, time, gameLine }) => (
             <View key={message.id} style={styles.messageRow(last)}>
+              {gameLine === null ? null : (
+                <View style={styles.gameLine}>
+                  <View style={styles.gameRule} />
+                  <Text testID={`chat-game-${gameLine}`} style={styles.gameText}>
+                    {t('chat.gameLine', { number: gameLine })}
+                  </Text>
+                  <View style={styles.gameRule} />
+                </View>
+              )}
               <Bubble message={message} mine={mine} last={last} />
               {time ? (
                 <Text style={styles.time(mine)}>{clockTime(message.sentAt, i18n.language)}</Text>
@@ -624,6 +633,21 @@ const styles = StyleSheet.create((theme) => ({
   bubbleText: {
     ...theme.type.body,
     color: theme.colors.text,
+  },
+  gameLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    paddingVertical: theme.space.sm,
+  },
+  gameRule: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.separator,
+  },
+  gameText: {
+    ...theme.type.footnote,
+    color: theme.colors.textDim,
   },
   time: (mine: boolean) => ({
     ...theme.type.footnote,

@@ -12,6 +12,7 @@ import {
   NO_CHAT_PLAYER,
   chatBanned,
   chatExpired,
+  chatGameNumber,
   chatSeenBy,
   chatStatus,
   cleanChatText,
@@ -212,15 +213,15 @@ describe('planChatMessage', () => {
 
 describe('chatSeenBy', () => {
   const stored: StoredChatMessage[] = [
-    { id: '2', from: 'black', text: 'you too', sentAt: 20, hidden: false },
-    { id: '1', from: 'white', text: 'good luck', sentAt: 10, hidden: false },
-    { id: '3', from: 'black', text: 'after the block', sentAt: 30, hidden: true },
+    { id: '2', from: 'black', text: 'you too', sentAt: 20, game: 1, hidden: false },
+    { id: '1', from: 'white', text: 'good luck', sentAt: 10, game: 1, hidden: false },
+    { id: '3', from: 'black', text: 'after the block', sentAt: 30, game: 1, hidden: true },
   ];
 
   it('shows the messages oldest first, with no hidden flag', () => {
     expect(chatSeenBy(stored, 'white', 'open')).toEqual([
-      { id: '1', from: 'white', text: 'good luck', sentAt: 10 },
-      { id: '2', from: 'black', text: 'you too', sentAt: 20 },
+      { id: '1', from: 'white', text: 'good luck', sentAt: 10, game: 1 },
+      { id: '2', from: 'black', text: 'you too', sentAt: 20, game: 1 },
     ]);
   });
 
@@ -234,6 +235,7 @@ describe('chatSeenBy', () => {
       from: 'white',
       text: `message ${i}`,
       sentAt: i,
+      game: 1,
       hidden: false,
     }));
     const seen = chatSeenBy(many, 'black', 'open');
@@ -246,5 +248,21 @@ describe('chatSeenBy', () => {
     for (const closed of ['muted', 'turned-off', 'unavailable', 'needs-terms'] as const) {
       expect(chatSeenBy(stored, 'white', closed)).toEqual([]);
     }
+  });
+});
+
+describe('chatGameNumber', () => {
+  const flow = (finished: number, phase: string) =>
+    ({ match: { games: Array.from({ length: finished }) }, game: { phase } }) as never;
+
+  it('is 1 in the first game of a match', () => {
+    expect(chatGameNumber(flow(0, 'opening-roll'))).toBe(1);
+    expect(chatGameNumber(flow(0, 'moving'))).toBe(1);
+  });
+
+  it('stays on a game that just ended, and goes up when the next one starts', () => {
+    expect(chatGameNumber(flow(1, 'game-over'))).toBe(1);
+    expect(chatGameNumber(flow(1, 'opening-roll'))).toBe(2);
+    expect(chatGameNumber(flow(2, 'moving'))).toBe(3);
   });
 });

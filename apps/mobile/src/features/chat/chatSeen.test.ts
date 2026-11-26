@@ -51,9 +51,9 @@ describe('chatSeen', () => {
 
 describe('unreadCount', () => {
   const messages = [
-    { id: '1', from: 'white', text: 'hi', sentAt: 10 },
-    { id: '2', from: 'black', text: 'hello', sentAt: 20 },
-    { id: '3', from: 'black', text: 'you there?', sentAt: 30 },
+    { id: '1', from: 'white', text: 'hi', sentAt: 10, game: 1 },
+    { id: '2', from: 'black', text: 'hello', sentAt: 20, game: 1 },
+    { id: '3', from: 'black', text: 'you there?', sentAt: 30, game: 1 },
   ] as const;
 
   it("counts the other player's messages newer than the read time", () => {

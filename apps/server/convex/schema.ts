@@ -263,6 +263,8 @@ export default defineSchema({
     text: v.string(),
     /** When the server took it, epoch ms (server clock). */
     sentAt: v.number(),
+    /** The number of the game of the match it was sent in, from 1 (#709). Rows from before have none. */
+    game: v.optional(v.number()),
     /** Sent by a player the other blocked then: only the sender sees it. */
     hidden: v.boolean(),
   })
