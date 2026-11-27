@@ -147,3 +147,41 @@ describe('<Sheet side /> (#716)', () => {
     expect(screen.getByTestId('sheet-handle', { includeHiddenElements: true })).toBeTruthy();
   });
 });
+
+describe('<Sheet /> for the chat (#720)', () => {
+  afterEach(resetWindow);
+
+  const chat = () =>
+    renderWithRoot(
+      <Sheet
+        visible
+        onClose={() => undefined}
+        closeLabel="Close"
+        look="raised"
+        side
+        sideHint="Tap here to go back"
+        maxHeight={0.55}
+        testID="the-sheet">
+        <Text>Inside</Text>
+      </Sheet>,
+    );
+  const maxHeight = () =>
+    (
+      StyleSheet.flatten(screen.getByTestId('the-sheet').props.style as never) as {
+        maxHeight?: number | string;
+      }
+    ).maxHeight;
+
+  it('takes at most its share of the height in a tall window, with no side line', async () => {
+    await chat();
+    expect(maxHeight()).toBe('55%');
+    expect(screen.queryByText('Tap here to go back', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('is as tall as the window as a side panel, with the line beside it', async () => {
+    await chat();
+    await setWindow(LANDSCAPE_SE);
+    expect(maxHeight()).toBe('100%');
+    expect(screen.getByText('Tap here to go back', { includeHiddenElements: true })).toBeTruthy();
+  });
+});

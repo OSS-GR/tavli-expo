@@ -58,7 +58,13 @@ import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { CHAT_PEEK_MS } from '@/features/chat/ChatPeek';
-import { ChatComposer, ChatHead, ChatSheet, type ChatFix } from '@/features/chat/ChatSheet';
+import {
+  ChatComposer,
+  ChatHead,
+  ChatRules,
+  ChatSheet,
+  type ChatFix,
+} from '@/features/chat/ChatSheet';
 import { chatSeen, newestSentAt, unreadCount } from '@/features/chat/chatSeen';
 import { chatOffered, useChat, useChatPanel } from '@/features/chat/useChat';
 import { SIDE_PANEL_WIDTH, Sheet } from '@/components/Sheet';
@@ -128,6 +134,9 @@ export interface OnlineMatchScreenProps {
   /** The phone clock. Default: `Date.now`. */
   now?: () => number;
 }
+
+/** The most of the window's height the chat sheet takes (#719). */
+export const CHAT_SHEET_HEIGHT = 0.55;
 
 export function OnlineMatchScreen(props: OnlineMatchScreenProps) {
   // A new game id is a new screen, with its own store.
@@ -585,6 +594,21 @@ function OnlineBoard({
         opponentName={name(opponentSide)}
         rulesSeen={rulesSeen}
         panel={chatPanel}
+        {...(online.clock === null
+          ? {}
+          : {
+              turn: {
+                mine: online.clock.player === side,
+                urgent: online.clock.urgent,
+                text:
+                  online.clock.player === side
+                    ? t('chat.turn.mine', { time: clockText(shown ?? 0, minutes, t) })
+                    : t('chat.turn.theirs', {
+                        name: name(opponentSide),
+                        time: clockText(shown ?? 0, minutes, t),
+                      }),
+              },
+            })}
         {...(safety && opponentId !== undefined
           ? {
               onReportOrBlock: () =>
@@ -604,13 +628,9 @@ function OnlineBoard({
         view={chatView}
         me={side}
         opponentName={name(opponentSide)}
-        rulesSeen={rulesSeen}
-        panel={chatPanel}
+        now={clockNow}
+        rulesShown={!rulesSeen || chatPanel.rulesAsked}
         {...(usernames ? { usernames } : {})}
-        onRulesSeen={() => {
-          chatSeen.markRulesSeen();
-          setRulesSeen(true);
-        }}
         onFix={(status) => {
           close();
           onChatFix?.(status);
@@ -622,14 +642,12 @@ function OnlineBoard({
       />
     );
   }
-  // The text field stays in place under the messages.
-  const composing =
-    overlay.kind === 'chat' &&
-    chat &&
-    chatView?.status === 'open' &&
-    rulesSeen &&
-    !chatPanel.rulesAsked &&
-    content !== null;
+  // Under the messages, in place: the text field, or the chat rules before
+  // the first send and when the player asks for them (#719).
+  const chatOpenNow =
+    overlay.kind === 'chat' && chat && chatView?.status === 'open' && content !== null;
+  const rulesShow = chatOpenNow && (!rulesSeen || chatPanel.rulesAsked);
+  const composing = chatOpenNow && !rulesShow;
   const unread = unreadCount(chatView, side, seenAt);
 
   return (
@@ -680,6 +698,25 @@ function OnlineBoard({
               footer: <ChatComposer chat={chat} gameId={gameId} text={draft} onText={setDraft} />,
               stickToEnd: true,
             }
+          : rulesShow
+            ? {
+                footer: (
+                  <ChatRules
+                    onOk={() => {
+                      chatPanel.rulesDone();
+                      if (!rulesSeen) {
+                        chatSeen.markRulesSeen();
+                        setRulesSeen(true);
+                      }
+                    }}
+                  />
+                ),
+                stickToEnd: true,
+              }
+            : {})}
+        // The chat leaves the top row and part of the board in view (#719).
+        {...(overlay.kind === 'chat'
+          ? { maxHeight: CHAT_SHEET_HEIGHT, sideHint: t('chat.sideHint') }
           : {})}
         // The game screen turns with the phone (#185); its menu and dialog too.
         turns

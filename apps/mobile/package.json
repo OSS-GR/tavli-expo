@@ -19,7 +19,7 @@
     "@better-auth/expo": "1.7.18",
     "@convex-dev/better-auth": "0.13.0",
     "@expo/metro-runtime": "~58.0.17",
-    "@sentry/react-native": "~8.28.0",
+    "@sentry/react-native": "~8.28.1",
     "@shopify/react-native-skia": "2.14.0",
     "@tavli/analytics-posthog": "workspace:*",
     "@tavli/apple-sign-in-expo": "workspace:*",
@@ -94,7 +94,11 @@
         "expo",
         "expo-dev-client",
         "expo-router",
-        "jest-expo"
+        "jest-expo",
+        "expo-network",
+        "expo-notifications",
+        "expo-splash-screen",
+        "expo-updates"
       ]
     }
   }
