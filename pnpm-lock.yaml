@@ -211,8 +211,8 @@ importers:
         specifier: ~58.0.17
         version: 58.0.17(@expo/log-box@58.0.15)(expo@58.0.25)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       '@sentry/react-native':
-        specifier: ~8.28.0
-        version: 8.28.0(8a1cec10a363dfa45c6c94dbeef3d481)
+        specifier: ~8.28.1
+        version: 8.28.1(8a1cec10a363dfa45c6c94dbeef3d481)
       '@shopify/react-native-skia':
         specifier: 2.14.0
         version: 2.14.0(0b3d6665e6f3af9da9ed2f512d3b53f4)
@@ -540,8 +540,8 @@ importers:
         version: link:../../contracts
     devDependencies:
       '@sentry/react-native':
-        specifier: ~8.28.0
-        version: 8.28.0(8a1cec10a363dfa45c6c94dbeef3d481)
+        specifier: ~8.28.1
+        version: 8.28.1(8a1cec10a363dfa45c6c94dbeef3d481)
 
   packages/adapters/haptics-expo:
     dependencies:
@@ -2503,8 +2503,8 @@ packages:
     resolution: {integrity: sha512-KXzNf2c430cJIOMv84+MKpkXgave1DBNMNNwn073olVD773NME5IhDv/9VQyiFM2wIU+6bm4FEBVEVSuzqgjJw==}
     engines: {node: '>=18'}
 
-  '@sentry/expo-upload-sourcemaps@8.28.0':
-    resolution: {integrity: sha512-aSM1z7iO8EVkLIUv9SOQS9NvCWRHkO/U21GXMOu2Xx+mAVekeAYU0rVOpDEMDaVgLu1FjAA+waKW1FLkdIFlvw==}
+  '@sentry/expo-upload-sourcemaps@8.28.1':
+    resolution: {integrity: sha512-A3m1jJ3SN2MXBIzBRPGDA7RhgeEFx9QFj9Xfn1RZq4revxrywhRHYaS+Xuj5KrKcuBXIAHydgEVjAcwhcG0efA==}
     engines: {node: '>=18'}
     hasBin: true
     peerDependencies:
@@ -2520,8 +2520,8 @@ packages:
     resolution: {integrity: sha512-/nrtMVSxOqBAigMWxIQS+Y8OqQ27ty+isMh6+X96kfAp/SaGrNZ425SZxKwq0mwHS0WnVkF+rE5dJnbbi56XSA==}
     engines: {node: '>=18'}
 
-  '@sentry/react-native@8.28.0':
-    resolution: {integrity: sha512-GNAIZlm3e+cgSP5IPtSEnOab6HFXh+D7qdm16Dy2/zJtkOwaTjjv5cHgXv0TIb0Cq6zh14wGwLeM+nk5IChTlQ==}
+  '@sentry/react-native@8.28.1':
+    resolution: {integrity: sha512-SD9Ws0n+0gBadf9Qpjq/AA4QaLKU+NPRz1A1sMwDFB4bE6ziKYOkC/I9bCT7xOz2RuXYgjoyQjxbgaqMyb7tdA==}
     hasBin: true
     peerDependencies:
       '@babel/core': '>=7.0.0'
@@ -8750,7 +8750,7 @@ snapshots:
     dependencies:
       '@sentry/conventions': 0.16.0
 
-  '@sentry/expo-upload-sourcemaps@8.28.0(@expo/env@2.6.0(supports-color@8.1.1))(dotenv@17.4.2)':
+  '@sentry/expo-upload-sourcemaps@8.28.1(@expo/env@2.6.0(supports-color@8.1.1))(dotenv@17.4.2)':
     dependencies:
       '@sentry/cli': 3.8.0
     optionalDependencies:
@@ -8761,13 +8761,13 @@ snapshots:
     dependencies:
       '@sentry/core': 10.75.2
 
-  '@sentry/react-native@8.28.0(8a1cec10a363dfa45c6c94dbeef3d481)':
+  '@sentry/react-native@8.28.1(8a1cec10a363dfa45c6c94dbeef3d481)':
     dependencies:
       '@sentry/browser': 10.75.2
       '@sentry/bundler-plugins': 10.75.2(supports-color@8.1.1)
       '@sentry/cli': 3.8.0
       '@sentry/core': 10.75.2
-      '@sentry/expo-upload-sourcemaps': 8.28.0(@expo/env@2.6.0(supports-color@8.1.1))(dotenv@17.4.2)
+      '@sentry/expo-upload-sourcemaps': 8.28.1(@expo/env@2.6.0(supports-color@8.1.1))(dotenv@17.4.2)
       '@sentry/react': 10.75.2(react@19.3.0)
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
