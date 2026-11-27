@@ -265,6 +265,8 @@ export default defineSchema({
     sentAt: v.number(),
     /** The number of the game of the match it was sent in, from 1 (#709). Rows from before have none. */
     game: v.optional(v.number()),
+    /** The message is this ready phrase (`CHAT_PHRASE_IDS`, #724): a phone shows it in its own language. */
+    phrase: v.optional(v.string()),
     /** Sent by a player the other blocked then: only the sender sees it. */
     hidden: v.boolean(),
   })

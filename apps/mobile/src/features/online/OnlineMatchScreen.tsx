@@ -65,6 +65,7 @@ import {
   ChatSheet,
   type ChatFix,
 } from '@/features/chat/ChatSheet';
+import { shownText } from '@/features/chat/chatLayout';
 import { chatSeen, newestSentAt, unreadCount } from '@/features/chat/chatSeen';
 import { chatOffered, useChat, useChatPanel } from '@/features/chat/useChat';
 import { SIDE_PANEL_WIDTH, Sheet } from '@/components/Sheet';
@@ -355,14 +356,14 @@ function OnlineBoard({
   useAnnouncement(
     heard === undefined
       ? null
-      : t('chat.newMessage', { name: name(opponentSide), text: heard.text }),
+      : t('chat.newMessage', { name: name(opponentSide), text: shownText(heard, t) }),
     heard === undefined ? undefined : `chat:${gameId}:${heard.id}`,
   );
   // The same message shows over the screen for a moment while the chat is
   // closed (#709). A read message, or one whose time is over, does not.
   const [peekOver, setPeekOver] = useState<string | null>(null);
   const heardId = heard?.id;
-  const heardMs = heard === undefined ? 0 : peekMs(heard.text);
+  const heardMs = heard === undefined ? 0 : peekMs(shownText(heard, t));
   // Many messages in a row show only the count on the button (#722).
   const [peeks, setPeeks] = useState<{
     readonly last: string | null;
@@ -386,7 +387,7 @@ function OnlineBoard({
     peeks.quiet !== heard.id
       ? {
           name: name(opponentSide),
-          text: heard.text,
+          text: shownText(heard, t),
           onDismiss: () => setPeekOver(heard.id),
         }
       : null;

@@ -305,7 +305,7 @@ export interface ChatFunctions {
   readonly sendChat: FunctionReference<
     'mutation',
     'public',
-    { gameId: string; text: string },
+    { gameId: string; text: string; phrase?: string },
     ChatMessage
   >;
   readonly setChatMuted: FunctionReference<

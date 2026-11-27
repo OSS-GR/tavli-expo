@@ -354,6 +354,25 @@ describe('the chat of an online game', () => {
     expect(screen.queryByTestId('chat-phrases')).toBeNull();
   });
 
+  it("shows the other player's ready phrase in this phone's language", async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    await act(async () => {
+      // A Greek phone sends the phrase with its Greek text.
+      await server.chatFor('bob').send({ gameId, text: 'Καλή τύχη!', phrase: 'goodLuck' });
+    });
+    await settle();
+    // The peek and the chat show it in English here.
+    expect(
+      screen.getByTestId('chat-peek-text', { includeHiddenElements: true }).props.children,
+    ).toBe('Good luck!');
+    await user.press(await button());
+    const messages = await screen.findByTestId('chat-messages');
+    expect(within(messages).getByText('Good luck!')).toBeTruthy();
+    expect(screen.queryByText('Καλή τύχη!')).toBeNull();
+  });
+
   it('groups messages and shows the time under the last one', async () => {
     storage.setString(CHAT_RULES_STORAGE_KEY, '1');
     const user = setupUser();

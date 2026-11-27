@@ -31,8 +31,9 @@
  * player's last messages with it.
  *
  * The text field has ready phrases over it while it is empty
- * (`CHAT_PHRASES`): a tap sends one as a normal message, in this phone's
- * language.
+ * (`CHAT_PHRASES`): a tap sends one as a normal message with its id and
+ * its text in this phone's language; each phone shows it in its own
+ * language (`shownText`, #724).
  *
  * The text of a message never goes to analytics, crash reports or logs.
  */
@@ -64,7 +65,14 @@ import { RoundButton } from '@/components/RoundButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { termsUrl } from '@/features/online/usernameStep';
 
-import { CHAT_PHRASES, chatRows, clockTime, dayLabel } from './chatLayout';
+import {
+  CHAT_PHRASES,
+  chatRows,
+  clockTime,
+  dayLabel,
+  shownText,
+  type ChatPhrase,
+} from './chatLayout';
 import type { ChatPanel } from './useChat';
 
 /** The statuses that send the player to another screen to fix them. */
@@ -512,12 +520,12 @@ function Bubble({
 }) {
   const { t } = useTranslation();
   const label = mine
-    ? t('chat.youSaid', { text: message.text })
-    : t('chat.theySaid', { name, text: message.text });
+    ? t('chat.youSaid', { text: shownText(message, t) })
+    : t('chat.theySaid', { name, text: shownText(message, t) });
   if (onLongPress === undefined) {
     return (
       <View style={styles.bubble(mine, last)} accessible accessibilityLabel={label}>
-        <Text style={styles.bubbleText}>{message.text}</Text>
+        <Text style={styles.bubbleText}>{shownText(message, t)}</Text>
       </View>
     );
   }
@@ -528,7 +536,7 @@ function Bubble({
       accessibilityLabel={label}
       accessibilityHint={t('chat.messageHint')}
       onLongPress={onLongPress}>
-      <Text style={styles.bubbleText}>{message.text}</Text>
+      <Text style={styles.bubbleText}>{shownText(message, t)}</Text>
     </Pressable>
   );
 }
@@ -567,10 +575,10 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
   const ready = text.trim() !== '' && left >= 0 && !sending;
 
   // Sends the typed text, or a ready phrase (the typed text then stays).
-  const sendText = (sent: string, typed: boolean) => {
+  const sendText = (sent: string, typed: boolean, phrase?: ChatPhrase) => {
     if (sending) return;
     setSending(true);
-    chat.send({ gameId, text: sent }).then(
+    chat.send({ gameId, text: sent, ...(phrase === undefined ? {} : { phrase }) }).then(
       () => {
         if (typed) setText('');
         setProblem(null);
@@ -609,7 +617,7 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
                 accessibilityLabel={t('chat.phraseLabel', { text: phrase })}
                 accessibilityState={{ disabled: sending }}
                 disabled={sending}
-                onPress={() => sendText(phrase, false)}
+                onPress={() => sendText(phrase, false, key)}
                 style={({ pressed }) => [styles.phrase, pressed && styles.pressed]}>
                 <Text style={styles.phraseText}>{phrase}</Text>
               </Pressable>

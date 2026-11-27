@@ -80,8 +80,16 @@ export function createConvexChat(options: ConvexChatOptions): Chat {
         stop();
       };
     },
-    send: ({ gameId, text }) =>
-      run(async () => copy(await client.mutation(CHAT_FUNCTIONS.sendChat, { gameId, text }))),
+    send: ({ gameId, text, phrase }) =>
+      run(async () =>
+        copy(
+          await client.mutation(CHAT_FUNCTIONS.sendChat, {
+            gameId,
+            text,
+            ...(phrase === undefined ? {} : { phrase }),
+          }),
+        ),
+      ),
     setMuted: async (gameId, muted) => {
       await run(() => client.mutation(CHAT_FUNCTIONS.setChatMuted, { gameId, muted }));
     },

@@ -922,6 +922,7 @@ The text of a message never goes to analytics, crash reports, pushes or logs.
 Tables: `chatMessages` (indexes `by_game`, `by_game_sender` for the rate limit, `by_sender` for the account delete) and `chatMutes` (`by_player`).
 
 - A message keeps the number of the game of the match it was sent in (`ChatMessage.game`, from 1; #715): both servers set it with `chatGameNumber(flow)`. The Convex field `game` is optional, and a row from before reads as game 1. The app draws a line where a new game starts.
+- A ready phrase keeps its id (`ChatMessage.phrase`, #724) next to its text in the sender's language. Both servers keep an id from `CHAT_PHRASE_IDS` and drop any other; the text is still checked and kept, so the filter, the limits, a report and Download my data work on it as on typed text. The Convex field `phrase` is optional.
 - A closed chat reads no `chatMessages` row.
 - `getChat` reads the game's rows newest first and stops at `CHAT_VIEW_MESSAGES`, so a long chat costs the same.
 - The rate limit reads only the caller's rows of the last `CHAT_RATE_WINDOW_MS`.
