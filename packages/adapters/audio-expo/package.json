@@ -18,10 +18,10 @@
   },
   "peerDependencies": {
     "expo-asset": "~58.0.21",
-    "expo-audio": "~58.0.11"
+    "expo-audio": "~58.0.12"
   },
   "devDependencies": {
     "expo-asset": "~58.0.21",
-    "expo-audio": "~58.0.11"
+    "expo-audio": "~58.0.12"
   }
 }
