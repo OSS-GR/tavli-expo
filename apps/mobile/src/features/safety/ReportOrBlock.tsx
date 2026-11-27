@@ -121,12 +121,31 @@ export interface ReportOrBlockProps {
    * game, so the server keeps the player's last messages with it.
    */
   chatGameId?: string;
+  /**
+   * Start at this step, with no check of the block list first (#722): a
+   * long press on a chat message picks Report or Block already, and the
+   * player must not wait on the turn clock.
+   */
+  start?: 'report' | 'block';
 }
 
 /** The steps of the dialog. Show it in a `Sheet` (`ReportOrBlockSheet`). */
-export function ReportOrBlock({ player, safety, onClose, onHold, chatGameId }: ReportOrBlockProps) {
+export function ReportOrBlock({
+  player,
+  safety,
+  onClose,
+  onHold,
+  chatGameId,
+  start,
+}: ReportOrBlockProps) {
   const { t } = useTranslation();
-  const [step, setStep] = useState<Step>({ kind: 'checking' });
+  const [step, setStep] = useState<Step>(
+    start === 'report'
+      ? { kind: 'report', blocked: false }
+      : start === 'block'
+        ? { kind: 'block' }
+        : { kind: 'checking' },
+  );
   const live = useRef(true);
   // One call at a time: a second tap before the render sees `sending` does nothing.
   const sending = useRef(false);
@@ -146,6 +165,8 @@ export function ReportOrBlock({ player, safety, onClose, onHold, chatGameId }: R
 
   // Checking: does the user block this player already? Only the first answer counts.
   useEffect(() => {
+    // A dialog that starts at a step asks nothing first.
+    if (start !== undefined) return undefined;
     let checking = true;
     const show = (next: Step) => {
       if (!checking) return;
@@ -167,7 +188,7 @@ export function ReportOrBlock({ player, safety, onClose, onHold, chatGameId }: R
       checking = false;
       clearTimeout(timer);
     };
-  }, [safety, player.id]);
+  }, [safety, player.id, start]);
 
   const name = safetyName(player.name, t);
 
