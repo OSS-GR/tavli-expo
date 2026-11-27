@@ -57,7 +57,7 @@ import { ActivityIndicator, Text, View, useWindowDimensions } from 'react-native
 import { StyleSheet } from 'react-native-unistyles';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { CHAT_PEEK_MS } from '@/features/chat/ChatPeek';
+import { nextPeek, peekMs } from '@/features/chat/ChatPeek';
 import {
   ChatComposer,
   ChatHead,
@@ -183,7 +183,13 @@ type Overlay =
   /** The other player's card (#651). */
   | { readonly kind: 'card' }
   /** Report or block (#435), with the player as the menu named them. `fromChat`: opened from the chat. */
-  | { readonly kind: 'safety'; readonly player: SafetyPlayer; readonly fromChat?: boolean }
+  | {
+      readonly kind: 'safety';
+      readonly player: SafetyPlayer;
+      readonly fromChat?: boolean;
+      /** From a long press on a chat message: the dialog starts at this step (#722). */
+      readonly start?: 'report' | 'block';
+    }
   /** The chat of the game (#692). */
   | { readonly kind: 'chat' };
 
@@ -356,14 +362,33 @@ function OnlineBoard({
   // closed (#709). A read message, or one whose time is over, does not.
   const [peekOver, setPeekOver] = useState<string | null>(null);
   const heardId = heard?.id;
+  const heardMs = heard === undefined ? 0 : peekMs(heard.text);
+  // Many messages in a row show only the count on the button (#722).
+  const [peeks, setPeeks] = useState<{
+    readonly last: string | null;
+    readonly times: readonly number[];
+    readonly quiet: string | null;
+  }>({ last: null, times: [], quiet: null });
+  if (heardId !== undefined && peeks.last !== heardId) {
+    const next = nextPeek(peeks.times, now());
+    setPeeks({ last: heardId, times: next.times, quiet: next.show ? null : heardId });
+  }
   useEffect(() => {
     if (heardId === undefined) return;
-    const timer = setTimeout(() => setPeekOver(heardId), CHAT_PEEK_MS);
+    const timer = setTimeout(() => setPeekOver(heardId), heardMs);
     return () => clearTimeout(timer);
-  }, [heardId]);
+  }, [heardId, heardMs]);
   const peek =
-    heard !== undefined && !chatOpen && heard.sentAt > seenAt && peekOver !== heard.id
-      ? { name: name(opponentSide), text: heard.text }
+    heard !== undefined &&
+    !chatOpen &&
+    heard.sentAt > seenAt &&
+    peekOver !== heard.id &&
+    peeks.quiet !== heard.id
+      ? {
+          name: name(opponentSide),
+          text: heard.text,
+          onDismiss: () => setPeekOver(heard.id),
+        }
       : null;
   if (view === null) return null;
 
@@ -582,6 +607,7 @@ function OnlineBoard({
         onClose={close}
         onHold={setHeld}
         {...(overlay.fromChat ? { chatGameId: gameId } : {})}
+        {...(overlay.start ? { start: overlay.start } : {})}
       />
     );
   } else if (overlay.kind === 'chat' && chat && chatOffered(chatView)) {
@@ -630,6 +656,17 @@ function OnlineBoard({
         opponentName={name(opponentSide)}
         now={clockNow}
         rulesShown={!rulesSeen || chatPanel.rulesAsked}
+        {...(safety && opponentId !== undefined
+          ? {
+              onReportOrBlock: (start: 'report' | 'block') =>
+                setOverlay({
+                  kind: 'safety',
+                  player: { id: opponentId, name: opponentName },
+                  fromChat: true,
+                  start,
+                }),
+            }
+          : {})}
         {...(usernames ? { usernames } : {})}
         onFix={(status) => {
           close();

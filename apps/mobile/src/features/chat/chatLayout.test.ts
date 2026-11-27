@@ -4,7 +4,15 @@ import { hasBadWord, hasLink } from '@tavli/online';
 import el from '@/i18n/el.json';
 import en from '@/i18n/en.json';
 
-import { CHAT_PEEK_LENGTH, peekText } from './ChatPeek';
+import {
+  CHAT_PEEK_LENGTH,
+  CHAT_PEEK_MAX_MS,
+  CHAT_PEEK_MS,
+  CHAT_PEEK_REPEAT_MS,
+  nextPeek,
+  peekMs,
+  peekText,
+} from './ChatPeek';
 import {
   CHAT_GROUP_GAP_MS,
   CHAT_PHRASES,
@@ -149,5 +157,26 @@ describe('day lines', () => {
     const older = dayLabel(at(12, 9), now, 'en');
     expect(older.kind).toBe('date');
     expect(older.kind === 'date' ? older.text : '').toMatch(/12/);
+  });
+});
+
+describe('peekMs', () => {
+  it('gives a short message the base time and a long one more, up to the cap', () => {
+    expect(peekMs('hi')).toBe(CHAT_PEEK_MS);
+    expect(peekMs('x'.repeat(60))).toBe(2500 + 50 * 60);
+    expect(peekMs('x'.repeat(200))).toBeLessThanOrEqual(CHAT_PEEK_MAX_MS);
+    expect(peekMs('x'.repeat(200))).toBe(2500 + 50 * CHAT_PEEK_LENGTH);
+  });
+});
+
+describe('nextPeek', () => {
+  it('shows two peeks in a row, then only the count, then peeks again later', () => {
+    const first = nextPeek([], 1000);
+    expect(first).toEqual({ times: [1000], show: true });
+    const second = nextPeek(first.times, 2000);
+    expect(second.show).toBe(true);
+    const third = nextPeek(second.times, 3000);
+    expect(third).toEqual({ times: [1000, 2000], show: false });
+    expect(nextPeek(third.times, 1000 + CHAT_PEEK_REPEAT_MS).show).toBe(true);
   });
 });

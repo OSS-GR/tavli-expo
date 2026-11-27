@@ -13,10 +13,11 @@ import { SIDE_PANEL_WIDTH } from '@/components/Sheet';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
 import { storage } from '@/services';
 
-import { CHAT_PEEK_MS } from './ChatPeek';
+import { CHAT_PEEK_MS, CHAT_PEEK_REPEATS, CHAT_PEEK_SWIPE } from './ChatPeek';
 import { CHAT_RULES_STORAGE_KEY, CHAT_SEEN_STORAGE_KEY } from './chatSeen';
 
 import { runOnFakeTimers, setupUser } from '../../../test/clock';
+import { touch } from '../../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../../test/render';
 import { LANDSCAPE_PRO_MAX, resetWindow, setWindow } from '../../../test/window';
 
@@ -176,6 +177,90 @@ describe('the chat of an online game', () => {
     await user.press(screen.getByTestId('chat-peek', { includeHiddenElements: true }));
     expect(await screen.findByTestId('chat-messages')).toBeTruthy();
     expect(screen.queryByTestId('chat-peek', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('a swipe sends the new message away, and the count stays', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const { server, gameId } = await openGame();
+    await button();
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'hello' });
+    });
+    await settle();
+    const peek = () => screen.queryByTestId('chat-peek', { includeHiddenElements: true });
+    expect(peek()).not.toBeNull();
+    // A short move is no swipe.
+    await touch('chat-peek-pan', [
+      { x: 100, y: 20 },
+      { x: 100 + CHAT_PEEK_SWIPE - 10, y: 20 },
+    ]);
+    expect(peek()).not.toBeNull();
+    await touch('chat-peek-pan', [
+      { x: 100, y: 20 },
+      { x: 100 + CHAT_PEEK_SWIPE + 5, y: 22 },
+    ]);
+    expect(peek()).toBeNull();
+    expect(dot()).not.toBeNull();
+  });
+
+  it('shows only the count for many messages in a row', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const { server, gameId } = await openGame();
+    await button();
+    const peek = () => screen.queryByTestId('chat-peek', { includeHiddenElements: true });
+    for (let n = 1; n <= CHAT_PEEK_REPEATS; n += 1) {
+      await act(async () => {
+        await server.chatFor('bob').send({ gameId, text: `message ${n}` });
+      });
+      await settle();
+      expect(peek()).not.toBeNull();
+    }
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'one more' });
+    });
+    await settle();
+    expect(peek()).toBeNull();
+    expect(within(dot()!).getByText('3', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('a long press on their message gives Mute, Report and Block at once', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    let theirs = '';
+    await act(async () => {
+      theirs = (await server.chatFor('bob').send({ gameId, text: 'rude words' })).id;
+      await server.chatFor('me').send({ gameId, text: 'mine' });
+    });
+    await user.press(await button());
+    await screen.findByText('rude words');
+    // Your own message has no actions.
+    expect(screen.queryByTestId('chat-actions')).toBeNull();
+    await user.longPress(screen.getByTestId(`chat-message-${theirs}`));
+    expect(screen.getByTestId('chat-actions')).toBeTruthy();
+    // Report goes straight to the reasons: no choose step, no wait.
+    await user.press(screen.getByTestId('chat-action-report'));
+    expect(await screen.findByTestId('safety-reasons')).toBeTruthy();
+    await user.press(screen.getByTestId('safety-reason-chat'));
+    await settle();
+    expect(server.reportsOf()).toMatchObject([
+      { reporterId: 'me', reportedId: 'bob', reason: 'chat', chat: [{ text: 'rude words' }] },
+    ]);
+  });
+
+  it('a long press mutes the chat in one more tap', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    let theirs = '';
+    await act(async () => {
+      theirs = (await server.chatFor('bob').send({ gameId, text: 'hello' })).id;
+    });
+    await user.press(await button());
+    await user.longPress(await screen.findByTestId(`chat-message-${theirs}`));
+    await user.press(screen.getByTestId('chat-action-mute'));
+    await settle();
+    expect(await screen.findByTestId('chat-status-muted')).toBeTruthy();
   });
 
   it('shows no new message over the screen for a muted chat', async () => {

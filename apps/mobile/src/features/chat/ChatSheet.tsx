@@ -100,6 +100,11 @@ export interface ChatSheetProps {
   opponentName: string;
   /** The phone time: which messages are from today. */
   now: number;
+  /**
+   * Report or block the other player from one of their messages (a long
+   * press, #722), at that step. Without it the long press offers only Mute.
+   */
+  onReportOrBlock?: (start: 'report' | 'block') => void;
   /** The chat rules show under the content: an empty chat then shows no "Say hello" (the rules need the room). */
   rulesShown?: boolean;
   /** Opens the screen that fixes a `needs-*` status. */
@@ -244,6 +249,7 @@ export function ChatSheet({
   opponentName,
   now,
   rulesShown = false,
+  onReportOrBlock,
   onFix,
   usernames,
   onSettings,
@@ -251,16 +257,23 @@ export function ChatSheet({
   const { t, i18n } = useTranslation();
   const { theme } = useUnistyles();
   const [busy, setBusy] = useState(false);
+  // The message of the other player that shows its actions (a long press).
+  const [acted, setActed] = useState<string | null>(null);
   const { status } = view;
 
-  const unmute = () => {
+  const setMuted = (muted: boolean) => {
     if (busy) return;
     setBusy(true);
     // The new view comes through the watch. A failed call leaves the chat as it is.
     void chat
-      .setMuted(view.gameId, false)
+      .setMuted(view.gameId, muted)
       .catch(() => undefined)
       .finally(() => setBusy(false));
+  };
+  const unmute = () => setMuted(false);
+  const act = (action: () => void) => () => {
+    setActed(null);
+    action();
   };
 
   // Accept the new terms: the same username again, with the terms. The
@@ -316,7 +329,47 @@ export function ChatSheet({
                     <View style={styles.gameRule} />
                   </View>
                 )}
-                <Bubble message={message} mine={mine} last={last} name={opponentName} />
+                <Bubble
+                  message={message}
+                  mine={mine}
+                  last={last}
+                  name={opponentName}
+                  {...(mine
+                    ? {}
+                    : {
+                        onLongPress: () =>
+                          setActed((now) => (now === message.id ? null : message.id)),
+                      })}
+                />
+                {acted === message.id ? (
+                  <View testID="chat-actions" style={styles.menu}>
+                    <MenuRow
+                      testID="chat-action-mute"
+                      icon="bellOff"
+                      label={t('chat.muteThis')}
+                      hint={t('chat.muteHint')}
+                      onPress={act(() => setMuted(true))}
+                    />
+                    {onReportOrBlock ? (
+                      <>
+                        <MenuRow
+                          testID="chat-action-report"
+                          icon="flag"
+                          label={t('chat.reportThis')}
+                          color={theme.colors.problem}
+                          onPress={act(() => onReportOrBlock('report'))}
+                        />
+                        <MenuRow
+                          testID="chat-action-block"
+                          icon="userX"
+                          label={t('safety.blockLabel', { name: opponentName })}
+                          color={theme.colors.problem}
+                          onPress={act(() => onReportOrBlock('block'))}
+                        />
+                      </>
+                    ) : null}
+                  </View>
+                ) : null}
                 {time ? (
                   <Text style={styles.time(mine)}>{clockTime(message.sentAt, i18n.language)}</Text>
                 ) : null}
@@ -447,25 +500,36 @@ function Bubble({
   mine,
   last,
   name,
+  onLongPress,
 }: {
   message: ChatMessage;
   mine: boolean;
   last: boolean;
   /** The other player's name, for screen readers. */
   name: string;
+  /** The other player's message: a long press shows Mute, Report and Block. */
+  onLongPress?: () => void;
 }) {
   const { t } = useTranslation();
+  const label = mine
+    ? t('chat.youSaid', { text: message.text })
+    : t('chat.theySaid', { name, text: message.text });
+  if (onLongPress === undefined) {
+    return (
+      <View style={styles.bubble(mine, last)} accessible accessibilityLabel={label}>
+        <Text style={styles.bubbleText}>{message.text}</Text>
+      </View>
+    );
+  }
   return (
-    <View
+    <Pressable
+      testID={`chat-message-${message.id}`}
       style={styles.bubble(mine, last)}
-      accessible
-      accessibilityLabel={
-        mine
-          ? t('chat.youSaid', { text: message.text })
-          : t('chat.theySaid', { name, text: message.text })
-      }>
+      accessibilityLabel={label}
+      accessibilityHint={t('chat.messageHint')}
+      onLongPress={onLongPress}>
       <Text style={styles.bubbleText}>{message.text}</Text>
-    </View>
+    </Pressable>
   );
 }
 

@@ -387,7 +387,11 @@ export interface GameScreenProps {
    */
   chat?: {
     readonly unread: number;
-    readonly peek?: { readonly name: string; readonly text: string } | null;
+    readonly peek?: {
+      readonly name: string;
+      readonly text: string;
+      readonly onDismiss: () => void;
+    } | null;
     readonly label: string;
     readonly hint: string;
     readonly onOpen: () => void;
@@ -2632,7 +2636,12 @@ export function GameScreen({
       </GestureDetector>
       {chat?.peek && !hideScreen ? (
         <View style={styles.chatPeek(landscape, rails.left)} pointerEvents="box-none">
-          <ChatPeek name={chat.peek.name} text={chat.peek.text} onPress={chat.onOpen} />
+          <ChatPeek
+            name={chat.peek.name}
+            text={chat.peek.text}
+            onPress={chat.onOpen}
+            onDismiss={chat.peek.onDismiss}
+          />
         </View>
       ) : null}
       {endSheet !== null ? (
@@ -2834,15 +2843,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     fontWeight: '700',
     color: theme.colors.onAccent,
   },
-  // A new chat message (#709): under the top row at the right in portrait,
-  // at the top beside the left rail on the side. Inside the screen, so
-  // Android does not clip it.
+  // A new chat message (#709, #722): in the top row, left of the chat
+  // button, so it never covers the board (a tap meant for a checker must
+  // not open the chat). On its side the top row is the left rail: there it
+  // sits at the top beside the rail. Inside the screen, so Android does
+  // not clip it.
   chatPeek: (landscape: boolean, rail: number) => ({
     position: 'absolute',
-    top: landscape ? theme.space.sm : rt.insets.top + MENU_SIZE + theme.space.md,
+    top: landscape ? theme.space.xs : rt.insets.top + theme.space.xs,
     ...(landscape
       ? { left: rt.insets.left + rail + theme.space.sm }
-      : { right: rt.insets.right + theme.space.sm }),
+      : { right: rt.insets.right + MENU_SIZE + theme.space.lg }),
   }),
   menuIcon: {
     fontSize: 20,
