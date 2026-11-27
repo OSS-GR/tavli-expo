@@ -107,7 +107,7 @@ describe('the chat of an online game', () => {
     await user.press(screen.getByTestId('chat-send'));
     await settle();
     expect((await screen.findByTestId('chat-problem')).props.children).toBe(
-      'Messages cannot hold links or email addresses.',
+      'Messages cannot contain links or email addresses.',
     );
     expect(screen.getByTestId('chat-input').props.value).toBe('see www.example.com');
     expect(screen.queryByTestId('chat-messages')).toBeNull();
@@ -319,6 +319,34 @@ describe('the chat of an online game', () => {
     } finally {
       await resetWindow();
     }
+  });
+
+  it('shows the messages at once the first time, with the rules in the place of the text field', async () => {
+    const user = setupUser();
+    const { server, gameId } = await openGame();
+    await act(async () => {
+      await server.chatFor('bob').send({ gameId, text: 'hello there' });
+    });
+    await user.press(await button());
+    // The message is readable before OK; only writing waits for the rules.
+    expect(await screen.findByText('hello there')).toBeTruthy();
+    expect(screen.getByTestId('chat-rules')).toBeTruthy();
+    expect(screen.queryByTestId('chat-input')).toBeNull();
+    await user.press(screen.getByTestId('chat-rules-ok'));
+    expect(screen.queryByTestId('chat-rules')).toBeNull();
+    expect(screen.getByTestId('chat-input')).toBeTruthy();
+    expect(screen.getByText('hello there')).toBeTruthy();
+  });
+
+  it('says whose turn it is and the time left in the header', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    await user.press(await button());
+    const line = String((await screen.findByTestId('chat-turn')).props.children);
+    // The game has a clock: the line names the turn, not just "Chat".
+    expect(line).not.toBe('Chat');
+    expect(line).toMatch(/Your turn · |U_bob plays · /);
   });
 
   it('shows the chat rules again from the menu', async () => {

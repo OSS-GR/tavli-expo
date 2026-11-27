@@ -20,11 +20,13 @@
  * Android needs its own `GestureHandlerRootView` in a `Modal`.
  *
  * `side` (the chat, #716): in a window that is wider than tall, the sheet
- * is a panel at the right edge, as tall as the window, with no dimming:
- * the screen under it leaves that room free (`SIDE_PANEL_WIDTH`), so the
- * board beside it stays whole. It has no grab
+ * is a panel at the right edge, as tall as the window. The screen under
+ * it leaves that room free (`SIDE_PANEL_WIDTH`), so the board beside it
+ * stays whole. It has no grab
  * handle there (a drag down does not fit a side panel); the dimmed part,
- * the back button and the content's own button close it.
+ * the back button and the content's own button close it. The part beside
+ * the panel is dimmed, so the board there does not look playable, and
+ * `sideHint` says that a tap goes back to it (#719).
  *
  * A text field in it (the email code, the username) stays above the
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
@@ -37,6 +39,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Text,
   View,
   useWindowDimensions,
   type ModalProps,
@@ -100,6 +103,14 @@ export interface SheetProps {
    * edge (`sheet`, `raised`).
    */
   side?: boolean;
+  /** With `side`, as a panel: a short line in the dimmed part ("Tap here to go back to the board"). */
+  sideHint?: string;
+  /**
+   * The most of the window's height the sheet takes, from 0 to 1 (the
+   * chat: the top row and part of the board stay in view, #719). Not for
+   * a side panel. Default: the whole height.
+   */
+  maxHeight?: number;
   /**
    * A part over the scrolling content that stays in place (the chat's
    * header and its menu, #711): the content scrolls under it.
@@ -127,6 +138,8 @@ export function Sheet({
   look = 'sheet',
   turns = false,
   side = false,
+  sideHint,
+  maxHeight,
   header,
   footer,
   stickToEnd = false,
@@ -203,9 +216,25 @@ export function Sheet({
             accessibilityElementsHidden={ownCloseButton}
             importantForAccessibility={ownCloseButton ? 'no-hide-descendants' : 'auto'}
           />
+          {docked && sideHint !== undefined ? (
+            <View
+              style={styles.sideHint}
+              pointerEvents="none"
+              // The dimmed part is a button with its own label: screen readers skip this line.
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              <Text style={styles.sideHintText}>{sideHint}</Text>
+            </View>
+          ) : null}
           <Animated.View
             testID={testID}
-            style={[styles.sheet(shown, docked), dragged]}
+            style={[
+              styles.sheet(shown, docked),
+              maxHeight === undefined || docked
+                ? null
+                : { maxHeight: `${Math.round(maxHeight * 100)}%` },
+              dragged,
+            ]}
             accessibilityViewIsModal>
             {shown === 'raised' && !docked ? (
               <GestureDetector gesture={pan}>
@@ -267,11 +296,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingLeft: rt.insets.left + (atBottom(look) ? 0 : theme.space.lg),
     paddingRight: docked ? 0 : rt.insets.right + (atBottom(look) ? 0 : theme.space.lg),
   }),
-  // A side panel has the board beside it, not under it: no dimming.
+  // A side panel has the board beside it: dimmed, so it does not look playable (#719).
   scrim: (docked: boolean) => ({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.backgroundDeep,
-    opacity: docked ? 0 : 0.7,
+    opacity: docked ? 0.55 : 0.7,
   }),
   sheet: (look: SheetLook, docked: boolean) => ({
     // Never taller than the screen: the content scrolls instead.
@@ -325,6 +354,19 @@ const styles = StyleSheet.create((theme, rt) => ({
         }
       : {}),
   }),
+  // The line in the dimmed part beside a side panel, at the bottom.
+  sideHint: {
+    position: 'absolute',
+    left: rt.insets.left,
+    right: SIDE_PANEL_WIDTH + rt.insets.right,
+    bottom: rt.insets.bottom + theme.space.md,
+    alignItems: 'center',
+  },
+  sideHintText: {
+    ...theme.type.footnote,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
   handleArea: {
     height: HANDLE_HEIGHT,
     alignSelf: 'stretch',

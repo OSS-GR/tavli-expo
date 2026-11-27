@@ -2445,6 +2445,15 @@
     "emptyTitle": "Say hello!",
     "emptyLine": "Be kind. The \"…\" button mutes this chat or reports the player.",
     "gameLine": "Game {{number}}",
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "turn": {
+      "mine": "Your turn · {{time}}",
+      "theirs": "{{name}} plays · {{time}}"
+    },
+    "sideHint": "Tap here to go back to the board",
     "phraseLabel": "Send: {{text}}",
     "phrases": {
       "goodLuck": "Good luck!",
@@ -2462,7 +2471,7 @@
     "over_one": "{{count}} character too long",
     "over_other": "{{count}} characters too long",
     "youSaid": "You: {{text}}",
-    "theySaid": "They: {{text}}",
+    "theySaid": "{{name}}: {{text}}",
     "newMessage": "{{name}} wrote: {{text}}",
     "mute": "Mute",
     "muteHint": "Hides the chat of this game. The other player is not told.",
@@ -2499,8 +2508,8 @@
     "problem": {
       "empty": "Write something first.",
       "tooLong": "This message is too long.",
-      "link": "Messages cannot hold links or email addresses.",
-      "badWords": "This message breaks the chat rules. Change it and send again.",
+      "link": "Messages cannot contain links or email addresses.",
+      "badWords": "This message has a word we do not allow. Change it and send again.",
       "tooFast": "Too many messages. Wait a moment.",
       "closed": "The chat is closed.",
       "signedOut": "You are signed out. Sign in to chat.",

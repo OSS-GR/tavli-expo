@@ -6,7 +6,9 @@
  *
  * What shows, by `ChatView.status`:
  * - `open`: the messages (yours on the right), then the text field. The
- *   first time, the chat rules show first (`chatSeen.rulesSeen`).
+ *   first time, the chat rules (`ChatRules`) stand in the text field's
+ *   place until OK (`chatSeen.rulesSeen`): the player reads the messages
+ *   at once and meets the rules before the first send (#719).
  *   Messages from one player form a group (`chatRows`): the last bubble
  *   has the tail, and the time when no answer came at once.
  * - `muted`: a note and Unmute.
@@ -47,6 +49,7 @@ import {
 } from '@tavli/contracts';
 import type { PlayerId } from '@tavli/engine';
 import { useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
@@ -61,7 +64,7 @@ import { RoundButton } from '@/components/RoundButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { termsUrl } from '@/features/online/usernameStep';
 
-import { CHAT_PHRASES, chatRows, clockTime } from './chatLayout';
+import { CHAT_PHRASES, chatRows, clockTime, dayLabel } from './chatLayout';
 import type { ChatPanel } from './useChat';
 
 /** The statuses that send the player to another screen to fix them. */
@@ -77,6 +80,12 @@ export interface ChatHeadProps {
   /** The player has read the chat rules (`chatSeen`). */
   rulesSeen: boolean;
   panel: ChatPanel;
+  /**
+   * Whose turn it is and the time left, as a line under the name (#719):
+   * the sheet may cover the clock. `mine`: this phone's turn. `urgent`:
+   * the time is short. Without it the line says "Chat".
+   */
+  turn?: { readonly text: string; readonly mine: boolean; readonly urgent: boolean };
   /** Report or block the other player, from the chat. Without it the menu has no such row. */
   onReportOrBlock?: () => void;
   onClose: () => void;
@@ -89,10 +98,10 @@ export interface ChatSheetProps {
   me: PlayerId;
   /** The other player's name, as the game screen shows it. */
   opponentName: string;
-  /** The player has read the chat rules (`chatSeen`). */
-  rulesSeen: boolean;
-  onRulesSeen: () => void;
-  panel: ChatPanel;
+  /** The phone time: which messages are from today. */
+  now: number;
+  /** The chat rules show under the content: an empty chat then shows no "Say hello" (the rules need the room). */
+  rulesShown?: boolean;
   /** Opens the screen that fixes a `needs-*` status. */
   onFix: (status: ChatFix) => void;
   /** Accepts the new terms in place (`needs-terms`). Without it, `onFix` opens the username screen. */
@@ -130,6 +139,7 @@ export function ChatHead({
   opponentName,
   rulesSeen,
   panel,
+  turn,
   onReportOrBlock,
   onClose,
 }: ChatHeadProps) {
@@ -169,7 +179,11 @@ export function ChatHead({
             style={styles.title}>
             {opponentName}
           </Text>
-          <Text style={styles.subtitle}>{t('chat.title')}</Text>
+          <Text
+            testID="chat-turn"
+            style={styles.subtitle(turn?.mine ?? false, turn?.urgent ?? false)}>
+            {turn?.text ?? t('chat.title')}
+          </Text>
         </View>
         {hasMenu ? (
           <RoundButton
@@ -228,9 +242,8 @@ export function ChatSheet({
   view,
   me,
   opponentName,
-  rulesSeen,
-  onRulesSeen,
-  panel,
+  now,
+  rulesShown = false,
   onFix,
   usernames,
   onSettings,
@@ -274,52 +287,42 @@ export function ChatSheet({
   };
 
   let body = null;
-  if (status === 'open' && (!rulesSeen || panel.rulesAsked)) {
-    body = (
-      <View testID="chat-rules" style={styles.note}>
-        <Text style={styles.noteTitle}>{t('chat.rules.title')}</Text>
-        {(['kind', 'noLinks', 'tools', 'kept'] as const).map((key) => (
-          <Text key={key} style={styles.body}>
-            {`• ${t(`chat.rules.${key}`)}`}
-          </Text>
-        ))}
-        <ActionButton
-          testID="chat-rules-ok"
-          label={t('chat.rules.ok')}
-          onPress={() => {
-            panel.rulesDone();
-            if (!rulesSeen) onRulesSeen();
-          }}
-        />
-      </View>
-    );
-  } else if (status === 'open') {
+  if (status === 'open') {
     body =
       view.messages.length === 0 ? (
-        <View testID="chat-empty" style={styles.empty}>
-          <Icon name="messageCircle" size={32} color={theme.colors.textDim} />
-          <Text style={styles.emptyTitle}>{t('chat.emptyTitle')}</Text>
-          <Text style={styles.emptyLine}>{t('chat.emptyLine')}</Text>
-        </View>
+        rulesShown ? null : (
+          <View testID="chat-empty" style={styles.empty}>
+            <Icon name="messageCircle" size={32} color={theme.colors.textDim} />
+            <Text style={styles.emptyTitle}>{t('chat.emptyTitle')}</Text>
+            <Text style={styles.emptyLine}>{t('chat.emptyLine')}</Text>
+          </View>
+        )
       ) : (
         <View testID="chat-messages" style={styles.messages}>
-          {chatRows(view.messages, me).map(({ message, mine, last, time, gameLine }) => (
-            <View key={message.id} style={styles.messageRow(last)}>
-              {gameLine === null ? null : (
-                <View style={styles.gameLine}>
-                  <View style={styles.gameRule} />
-                  <Text testID={`chat-game-${gameLine}`} style={styles.gameText}>
-                    {t('chat.gameLine', { number: gameLine })}
-                  </Text>
-                  <View style={styles.gameRule} />
-                </View>
-              )}
-              <Bubble message={message} mine={mine} last={last} />
-              {time ? (
-                <Text style={styles.time(mine)}>{clockTime(message.sentAt, i18n.language)}</Text>
-              ) : null}
-            </View>
-          ))}
+          {chatRows(view.messages, me, now).map(
+            ({ message, mine, last, time, gameLine, dayLine }) => (
+              <View key={message.id} style={styles.messageRow(last)}>
+                {gameLine === null && !dayLine ? null : (
+                  <View style={styles.gameLine}>
+                    <View style={styles.gameRule} />
+                    <Text testID={`chat-line-${message.id}`} style={styles.gameText}>
+                      {[
+                        dayLine ? dayText(message.sentAt, now, i18n.language, t) : null,
+                        gameLine === null ? null : t('chat.gameLine', { number: gameLine }),
+                      ]
+                        .filter((part) => part !== null)
+                        .join(' · ')}
+                    </Text>
+                    <View style={styles.gameRule} />
+                  </View>
+                )}
+                <Bubble message={message} mine={mine} last={last} name={opponentName} />
+                {time ? (
+                  <Text style={styles.time(mine)}>{clockTime(message.sentAt, i18n.language)}</Text>
+                ) : null}
+              </View>
+            ),
+          )}
         </View>
       );
   } else {
@@ -410,13 +413,57 @@ function MenuRow({
   );
 }
 
-function Bubble({ message, mine, last }: { message: ChatMessage; mine: boolean; last: boolean }) {
+/** The day of a message as its line says it: "Today", "Yesterday" or "12 Nov". */
+function dayText(sentAt: number, now: number, locale: string, t: TFunction): string {
+  const day = dayLabel(sentAt, now, locale);
+  return day.kind === 'date' ? day.text : t(`chat.day.${day.kind}`);
+}
+
+export interface ChatRulesProps {
+  onOk: () => void;
+}
+
+/**
+ * The chat rules, in the text field's place: before the first send, and
+ * again when the player asks for them from the menu.
+ */
+export function ChatRules({ onOk }: ChatRulesProps) {
+  const { t } = useTranslation();
+  return (
+    <View testID="chat-rules" style={styles.card}>
+      <Text style={styles.noteTitle}>{t('chat.rules.title')}</Text>
+      {(['kind', 'noLinks', 'tools', 'kept'] as const).map((key) => (
+        <Text key={key} style={styles.rule}>
+          {`• ${t(`chat.rules.${key}`)}`}
+        </Text>
+      ))}
+      <ActionButton testID="chat-rules-ok" label={t('chat.rules.ok')} onPress={onOk} />
+    </View>
+  );
+}
+
+function Bubble({
+  message,
+  mine,
+  last,
+  name,
+}: {
+  message: ChatMessage;
+  mine: boolean;
+  last: boolean;
+  /** The other player's name, for screen readers. */
+  name: string;
+}) {
   const { t } = useTranslation();
   return (
     <View
       style={styles.bubble(mine, last)}
       accessible
-      accessibilityLabel={t(mine ? 'chat.youSaid' : 'chat.theySaid', { text: message.text })}>
+      accessibilityLabel={
+        mine
+          ? t('chat.youSaid', { text: message.text })
+          : t('chat.theySaid', { name, text: message.text })
+      }>
       <Text style={styles.bubbleText}>{message.text}</Text>
     </View>
   );
@@ -583,8 +630,14 @@ const styles = StyleSheet.create((theme) => ({
     ...theme.type.title3,
     color: theme.colors.text,
   },
-  subtitle: {
+  // The turn line: your own turn stands out, a short time is the problem color.
+  subtitle: (mine: boolean, urgent: boolean) => ({
     ...theme.type.footnote,
+    fontWeight: mine ? '600' : '400',
+    color: urgent ? theme.colors.problem : mine ? theme.colors.turnText : theme.colors.textDim,
+  }),
+  rule: {
+    ...theme.type.caption,
     color: theme.colors.textDim,
   },
   menu: {
@@ -696,7 +749,8 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.space.sm,
   },
   phrase: {
-    minHeight: 36,
+    // A full touch target: a chip sends at once.
+    minHeight: theme.touch.minTarget,
     justifyContent: 'center',
     paddingHorizontal: theme.space.md,
     borderRadius: theme.radii.pill,
