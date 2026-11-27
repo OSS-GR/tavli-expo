@@ -301,13 +301,16 @@ export {
   CHAT_KEEP_DAYS,
   CHAT_MAX_LENGTH,
   CHAT_MESSAGES_PER_MINUTE,
+  CHAT_PHRASE_IDS,
   CHAT_RATE_WINDOW_MS,
   CHAT_STATUSES,
   CHAT_VIEW_MESSAGES,
   isChatErrorData,
+  isChatPhraseId,
 } from './chat';
 export type {
   Chat,
+  ChatPhraseId,
   ChatErrorCode,
   ChatErrorData,
   ChatMessage,

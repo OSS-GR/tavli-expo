@@ -46,6 +46,19 @@ export const CHAT_VIEW_MESSAGES = 200;
 /** Messages are deleted this many days after the match ends. The chat is closed from then on. */
 export const CHAT_KEEP_DAYS = 30;
 
+/**
+ * The ready phrases (#724): a phone sends one with its id and its text in
+ * the sender's language. Each phone shows a phrase it knows in its own
+ * language, and the text for an id it does not know (an older build).
+ */
+export const CHAT_PHRASE_IDS = ['goodLuck', 'niceRoll', 'oneMore', 'goodGame', 'thanks'] as const;
+
+export type ChatPhraseId = (typeof CHAT_PHRASE_IDS)[number];
+
+export function isChatPhraseId(value: unknown): value is ChatPhraseId {
+  return typeof value === 'string' && (CHAT_PHRASE_IDS as readonly string[]).includes(value);
+}
+
 /** Why the caller sees a chat or not. Only `open` has messages and takes a send. */
 export const CHAT_STATUSES = [
   /** Both players may chat, and the caller did not hide it. */
@@ -88,6 +101,12 @@ export interface ChatMessage {
    * the server kept this has 1.
    */
   readonly game: number;
+  /**
+   * The message is this ready phrase: a phone shows it in its own
+   * language. `text` still holds it in the sender's language. Absent for
+   * a typed message.
+   */
+  readonly phrase?: ChatPhraseId;
 }
 
 /** The chat of one game, for the caller. */
@@ -108,6 +127,8 @@ export interface SendChatRequest {
   readonly gameId: string;
   /** The text as typed. The server trims it and joins its lines. */
   readonly text: string;
+  /** The text is this ready phrase, in the sender's language. The server checks the text like a typed one. */
+  readonly phrase?: ChatPhraseId;
 }
 
 export const CHAT_ERROR_CODES = [

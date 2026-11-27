@@ -153,16 +153,35 @@ export function chatContract(): ChatContractCheck[] {
         });
         same(first.text, 'good luck', 'the kept text');
         same(first.game, 1, 'a message of the first game of the match has game 1');
+        same(first.phrase, undefined, 'a typed message is no ready phrase');
         await subject.advance(1000);
         const second = await subject
           .chatFor('bob')
           .send({ gameId: subject.gameId, text: 'you too' });
         await subject.settle();
         check(first.id !== second.id, 'two messages have two ids');
+        same(second.phrase, undefined, 'a typed answer is no ready phrase');
         check(first.from !== second.from, 'the two players write from two sides');
         check(second.sentAt > first.sentAt, 'the later message has the later time');
         for (const watching of [alice, bob]) {
           same(watching.last().messages, [first, second], 'the messages, oldest first');
+          watching.stop();
+        }
+      },
+    },
+    {
+      name: 'a ready phrase keeps its id and its text for both players',
+      run: async (subject) => {
+        const alice = await watch(subject, 'alice', subject.gameId);
+        const bob = await watch(subject, 'bob', subject.gameId);
+        const sent = await subject
+          .chatFor('alice')
+          .send({ gameId: subject.gameId, text: 'Καλή τύχη!', phrase: 'goodLuck' });
+        await subject.settle();
+        same(sent.phrase, 'goodLuck', 'the phrase id');
+        same(sent.text, 'Καλή τύχη!', "the text in the sender's language");
+        for (const watching of [alice, bob]) {
+          same(watching.last().messages, [sent], 'the phrase as both players get it');
           watching.stop();
         }
       },

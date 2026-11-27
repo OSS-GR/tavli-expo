@@ -70,6 +70,7 @@ import {
   RANKED_GAMES,
   RANKED_TARGET_POINTS,
   RANKED_TURN_TIME_MINUTES,
+  isChatPhraseId,
   normalizeFriendToken,
   normalizeInviteCode,
 } from '@tavli/contracts';
@@ -1666,6 +1667,8 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             text: plan.text,
             sentAt: at,
             game: chatGameNumber(loadFlow(game.flow)),
+            // A ready phrase keeps its id; an id this server does not know is dropped.
+            ...(isChatPhraseId(request.phrase) ? { phrase: request.phrase } : {}),
             // The other player blocks the sender: only the sender sees it.
             hidden: blocksPlayer(otherId, id),
             senderId: id,
@@ -1678,6 +1681,7 @@ export function createMemoryGameServer(options: MemoryGameServerOptions): Memory
             text: plan.text,
             sentAt: at,
             game: message.game,
+            ...(message.phrase === undefined ? {} : { phrase: message.phrase }),
           };
           return sent;
         }),

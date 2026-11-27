@@ -35,7 +35,7 @@
 
 import { ConvexError, v } from 'convex/values';
 
-import { CHAT_RATE_WINDOW_MS, CHAT_VIEW_MESSAGES } from '@tavli/contracts';
+import { CHAT_RATE_WINDOW_MS, CHAT_VIEW_MESSAGES, isChatPhraseId } from '@tavli/contracts';
 import type {
   ChatErrorCode,
   ChatMessage,
@@ -148,6 +148,7 @@ function stored(row: Doc<'chatMessages'>): StoredChatMessage {
     sentAt: row.sentAt,
     // A row from before the server kept the game number counts as game 1.
     game: row.game ?? 1,
+    ...(isChatPhraseId(row.phrase) ? { phrase: row.phrase } : {}),
     hidden: row.hidden,
   };
 }
@@ -177,8 +178,8 @@ export const getChat = query({
 });
 
 export const sendChat = mutation({
-  args: { gameId: v.id('games'), text: v.string() },
-  handler: async (ctx, { gameId, text }): Promise<ChatMessage> => {
+  args: { gameId: v.id('games'), text: v.string(), phrase: v.optional(v.string()) },
+  handler: async (ctx, { gameId, text, phrase: sentPhrase }): Promise<ChatMessage> => {
     const callerId = await existingPlayer(ctx);
     const seat = await seatOf(ctx, callerId, gameId);
     const now = Date.now();
@@ -200,6 +201,8 @@ export const sendChat = mutation({
     });
     if (!plan.ok) fail(plan.code, plan.message);
     const game = chatGameNumber(loadStored(seat.game.flow).flow);
+    // A ready phrase keeps its id; an id this server does not know is dropped.
+    const phrase = isChatPhraseId(sentPhrase) ? { phrase: sentPhrase } : {};
     const id = await ctx.db.insert('chatMessages', {
       gameId,
       senderId: callerId,
@@ -207,10 +210,11 @@ export const sendChat = mutation({
       text: plan.text,
       sentAt: now,
       game,
+      ...phrase,
       // The other player blocks the sender: only the sender sees it.
       hidden: await blocks(ctx, seat.otherId, callerId),
     });
-    return { id, from: seat.side, text: plan.text, sentAt: now, game };
+    return { id, from: seat.side, text: plan.text, sentAt: now, game, ...phrase };
   },
 });
 

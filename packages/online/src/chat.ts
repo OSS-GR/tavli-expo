@@ -276,7 +276,14 @@ export function chatSeenBy(
   if (status !== 'open') return [];
   return messages
     .filter((message) => !message.hidden || message.from === viewer)
-    .map(({ id, from, text, sentAt, game }) => ({ id, from, text, sentAt, game }))
+    .map(({ id, from, text, sentAt, game, phrase }) => ({
+      id,
+      from,
+      text,
+      sentAt,
+      game,
+      ...(phrase === undefined ? {} : { phrase }),
+    }))
     .sort((a, b) => a.sentAt - b.sentAt)
     .slice(-CHAT_VIEW_MESSAGES);
 }

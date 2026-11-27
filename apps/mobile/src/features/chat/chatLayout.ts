@@ -3,7 +3,8 @@
  * player that follow each other closely form a group. The last bubble of
  * a group has the tail, and the time when no answer came at once.
  */
-import type { ChatMessage } from '@tavli/contracts';
+import { CHAT_PHRASE_IDS, type ChatMessage, type ChatPhraseId } from '@tavli/contracts';
+import type { TFunction } from 'i18next';
 import type { PlayerId } from '@tavli/engine';
 
 /** A message this long after the one before starts a new group. */
@@ -89,5 +90,13 @@ export function dayLabel(
 }
 
 /** The ready phrases, in the order the chips show. The text is in `chat.phrases`. */
-export const CHAT_PHRASES = ['goodLuck', 'niceRoll', 'oneMore', 'goodGame', 'thanks'] as const;
-export type ChatPhrase = (typeof CHAT_PHRASES)[number];
+export const CHAT_PHRASES = CHAT_PHRASE_IDS;
+export type ChatPhrase = ChatPhraseId;
+
+/**
+ * The text of a message as this phone shows it (#724): a ready phrase in
+ * the phone's language, a typed message as it is.
+ */
+export function shownText(message: Pick<ChatMessage, 'text' | 'phrase'>, t: TFunction): string {
+  return message.phrase === undefined ? message.text : t(`chat.phrases.${message.phrase}`);
+}

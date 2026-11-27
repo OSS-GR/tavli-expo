@@ -144,6 +144,29 @@ describe('chat on the Convex server', () => {
     expect(rows[0]?.game).toBe(1);
   });
 
+  it('keeps the id of a ready phrase, and drops an id it does not know', async () => {
+    const t = await setup();
+    const gameId = await play(t, ALICE, BOB);
+    const known = await as(t, BOB).mutation(api.chat.sendChat, {
+      gameId,
+      text: 'Good luck!',
+      phrase: 'goodLuck',
+    });
+    expect(known.phrase).toBe('goodLuck');
+    vi.advanceTimersByTime(1000);
+    const unknown = await as(t, BOB).mutation(api.chat.sendChat, {
+      gameId,
+      text: 'Hello',
+      phrase: 'not-a-phrase',
+    });
+    expect(unknown.phrase).toBeUndefined();
+    const view = await as(t, ALICE).query(api.chat.getChat, { gameId });
+    expect(view.messages.map(({ text, phrase }) => ({ text, phrase }))).toEqual([
+      { text: 'Good luck!', phrase: 'goodLuck' },
+      { text: 'Hello', phrase: undefined },
+    ]);
+  });
+
   it('a row from before the game number was kept reads as game 1', async () => {
     const t = await setup();
     const gameId = await play(t, ALICE, BOB);
