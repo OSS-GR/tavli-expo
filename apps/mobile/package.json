@@ -85,7 +85,7 @@
     "babel-preset-expo": "~58.0.24",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.14",
-    "playwright": "1.63.0",
+    "playwright": "1.65.1",
     "typescript": "~6.0.3"
   },
   "expo": {
