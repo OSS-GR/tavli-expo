@@ -10,7 +10,8 @@ import { useEffect, useState } from 'react';
 import { Keyboard } from 'react-native';
 
 export function useKeyboardShown(): boolean {
-  const [shown, setShown] = useState(false);
+  // A sheet that opens over a keyboard that is up already starts right.
+  const [shown, setShown] = useState(() => Keyboard.isVisible());
   useEffect(() => {
     const subscriptions = [
       Keyboard.addListener('keyboardWillShow', () => setShown(true)),
