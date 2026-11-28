@@ -54,7 +54,8 @@ export type WhatsNewEntryId =
   | 'friendPage'
   | 'opponentCard'
   | 'chat'
-  | 'blockedTurns';
+  | 'blockedTurns'
+  | 'pickFriend';
 
 export interface WhatsNewEntry {
   readonly id: WhatsNewEntryId;
@@ -72,7 +73,10 @@ export interface WhatsNewRelease {
 export const RELEASES: readonly WhatsNewRelease[] = [
   {
     date: '2026-11-28',
-    entries: [{ id: 'blockedTurns', icon: 'lock' }],
+    entries: [
+      { id: 'blockedTurns', icon: 'lock' },
+      { id: 'pickFriend', icon: 'users' },
+    ],
   },
   {
     date: '2026-11-25',

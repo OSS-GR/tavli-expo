@@ -726,9 +726,10 @@
     "account": "An online game needs a free account. When you make the invite, you pick how you sign in: you can play as a guest, with no name and no email.",
     "make": "Make an invite link",
     "making": "Making the invite…",
+    "sending": "Sending the invite…",
     "makeFailed": "The invite was not made. Check the connection and try again.",
     "accountFailed": "Your free account was not made. Check the connection and try again.",
-    "tooMany": "You have {{max}} open invites. Wait until a friend answers one, or until one expires, then make a new one.",
+    "tooMany": "You have {{max}} open invites. Cancel one on Home, under Your invites, or wait until one closes.",
     "wait": {
       "title": "Send the invite",
       "body": "{{game}} · first to {{count}}. The game starts when your friend accepts.",
@@ -776,11 +777,14 @@
     "sendTo": "Send the invite to {{name}}",
     "invited": "Invite sent",
     "invitedTo": "Invite sent to {{name}}",
+    "sentNote": "Invite sent to {{name}}. They get a notification.",
+    "sendCancelled": "The invite to {{name}} is cancelled.",
+    "done": "Done",
     "allFriends": "All friends",
     "summary": "{{length}} · {{time}}.",
     "who": "Who",
-    "anyone": "Anyone",
-    "anyoneLabel": "Anyone: make an invite link",
+    "anyone": "Invite link",
+    "anyoneLabel": "Invite link: anyone with the link can join",
     "add": "Add"
   },
   "friends": {
@@ -1323,6 +1327,11 @@
         "title": "No roll when you cannot move",
         "body": "When no roll can move any of your checkers, for example on the bar against six doors, you do not roll. The other player rolls again until a move opens for you.",
         "where": "In every game, also online"
+      },
+      "pickFriend": {
+        "title": "Pick a friend, then send",
+        "body": "On Play a friend, a tap on a name only picks who gets the invite. Nothing goes out until you press the button. You can cancel an invite you sent.",
+        "where": "Home › Play a friend"
       }
     }
   },

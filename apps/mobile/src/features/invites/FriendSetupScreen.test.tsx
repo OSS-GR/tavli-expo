@@ -296,7 +296,7 @@ describe('FriendSetupScreen', () => {
     await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     expect(
       screen.getByText(
-        'You have 10 open invites. Wait until a friend answers one, or until one expires, then make a new one.',
+        'You have 10 open invites. Cancel one on Home, under Your invites, or wait until one closes.',
       ),
     ).toBeOnTheScreen();
     expect(onCreated).not.toHaveBeenCalled();
@@ -307,7 +307,7 @@ describe('FriendSetupScreen', () => {
     });
     expect(
       screen.getByText(
-        'Έχεις ήδη 10 ανοιχτές προσκλήσεις. Περίμενε να απαντήσει κάποιος φίλος ή να λήξει μία και μετά φτιάξε νέα.',
+        'Έχεις ήδη 10 ανοιχτές προσκλήσεις. Ακύρωσε μία από την Αρχική, στο «Οι προσκλήσεις σου», ή περίμενε να κλείσει κάποια.',
       ),
     ).toBeOnTheScreen();
     await act(async () => {
@@ -662,41 +662,45 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeOnTheScreen();
   });
 
-  it('a tap on a friend sends a friend invite with the picks at once, saves them and stays (#507)', async () => {
+  it('a tap on a friend only picks them; the main button sends the invite (#732)', async () => {
     const user = setupUser();
     const parts = savedMe();
     await befriend(parts.server, 'ann');
     const props = await show(parts);
+    const ann = nameOf(parts.server, 'ann');
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    // The tap sends nothing: it picks Ann, and the main button names her.
+    await user.press(screen.getByRole('radio', { name: ann }));
+    await flush();
+    expect(screen.getByRole('radio', { name: ann })).toBeChecked();
+    expect(props.onFriendInvited).not.toHaveBeenCalled();
+    expect(await parts.server.friendsFor('ann').listFriendInvites()).toEqual([]);
+    // The game is picked after the friend: the invite still holds it.
     await user.press(screen.getByRole('radio', { name: /^Fevga/ }));
     await user.press(screen.getByRole('radio', { name: '3' }));
     await user.press(screen.getByRole('radio', { name: '5 min' }));
-    await user.press(
-      screen.getByRole('button', { name: `Send the invite to ${nameOf(parts.server, 'ann')}` }),
-    );
+    await user.press(screen.getByRole('button', { name: `Send the invite to ${ann}` }));
     await flush();
     const game = { choice: 'fevga', targetPoints: 3, turnTimeMinutes: 5 };
     // The friend gets a push: no waiting screen, the screen says so.
     expect(props.onCreated).not.toHaveBeenCalled();
     expect(props.onFriendInvited).toHaveBeenCalledTimes(1);
     const code = props.onFriendInvited.mock.calls[0]![0];
-    expect(screen.getByTestId('friend-sent')).toHaveTextContent(
-      `Invite sent to ${nameOf(parts.server, 'ann')}`,
-    );
-    expect(announce).toHaveBeenCalledWith(`Invite sent to ${nameOf(parts.server, 'ann')}`);
+    const sent = `Invite sent to ${ann}. They get a notification.`;
+    expect(screen.getByTestId('friend-sent')).toHaveTextContent(sent);
+    expect(announce).toHaveBeenCalledWith(sent);
     announce.mockRestore();
-    // The buttons work again, but Ann's row is off: a second tap sends no second invite.
-    expect(screen.getByRole('button', { name: 'Make an invite link' })).toBeEnabled();
-    const row = screen.getByRole('button', {
-      name: `Invite sent to ${nameOf(parts.server, 'ann')}`,
-    });
-    expect(row).toBeDisabled();
-    await user.press(row);
-    await flush();
-    expect(props.onFriendInvited).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('radio', { name: `Invite sent to ${ann}` })).toBeChecked();
     expect(await parts.server.friendsFor('ann').listFriendInvites()).toEqual([
       expect.objectContaining({ code, from: ME, ...game }),
     ]);
+    // The main button is Done now: it goes back and sends no second invite.
+    expect(screen.queryByRole('button', { name: `Send the invite to ${ann}` })).toBeNull();
+    await user.press(screen.getByRole('button', { name: 'Done' }));
+    await flush();
+    expect(props.onBack).toHaveBeenCalledTimes(1);
+    expect(props.onFriendInvited).toHaveBeenCalledTimes(1);
+    expect(await parts.server.friendsFor('ann').listFriendInvites()).toHaveLength(1);
     // No code invite on the side, and no sign-in sheet.
     expect(screen.queryByTestId('sign-in-sheet')).toBeNull();
     expect(loadFriendInviteSetup()).toEqual(game);
@@ -707,6 +711,71 @@ describe('FriendSetupScreen: your friends (#488)', () => {
         props: { game: 'fevga', matchLength: 3, turnTimeMinutes: 5 },
       },
     ]);
+  });
+
+  it('Cancel takes a sent invite back, and the friend can be picked again (#732)', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    await show(parts);
+    const ann = nameOf(parts.server, 'ann');
+    await user.press(screen.getByRole('radio', { name: ann }));
+    await user.press(screen.getByRole('button', { name: `Send the invite to ${ann}` }));
+    await flush();
+    await user.press(screen.getByTestId('friend-cancel-sent'));
+    await flush();
+    expect(await parts.server.friendsFor('ann').listFriendInvites()).toEqual([]);
+    expect(screen.getByTestId('friend-cancelled')).toHaveTextContent(
+      `The invite to ${ann} is cancelled.`,
+    );
+    expect(screen.queryByTestId('friend-sent')).toBeNull();
+    expect(screen.queryByTestId('friend-cancel-sent')).toBeNull();
+    // Ann is still picked, and the main button sends again.
+    await user.press(screen.getByRole('button', { name: `Send the invite to ${ann}` }));
+    await flush();
+    expect(await parts.server.friendsFor('ann').listFriendInvites()).toHaveLength(1);
+  });
+
+  it('a second friend gets a second invite; the first stays sent (#732)', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    await befriend(parts.server, 'bob');
+    await show(parts);
+    const ann = nameOf(parts.server, 'ann');
+    const bob = nameOf(parts.server, 'bob');
+    await user.press(screen.getByRole('radio', { name: ann }));
+    await user.press(screen.getByRole('button', { name: `Send the invite to ${ann}` }));
+    await flush();
+    await user.press(screen.getByRole('radio', { name: bob }));
+    expect(screen.queryByTestId('friend-sent')).toBeNull();
+    await user.press(screen.getByRole('button', { name: `Send the invite to ${bob}` }));
+    await flush();
+    expect(await parts.server.friendsFor('ann').listFriendInvites()).toHaveLength(1);
+    expect(await parts.server.friendsFor('bob').listFriendInvites()).toHaveLength(1);
+    expect(screen.getByRole('radio', { name: `Invite sent to ${ann}` })).not.toBeChecked();
+    // Back on Ann: her invite is still sent, so the button is Done.
+    await user.press(screen.getByRole('radio', { name: `Invite sent to ${ann}` }));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeOnTheScreen();
+  });
+
+  it('shows the send button in Greek (#732)', async () => {
+    const user = setupUser();
+    const parts = savedMe();
+    await befriend(parts.server, 'ann');
+    await show(parts);
+    const ann = nameOf(parts.server, 'ann');
+    await user.press(screen.getByRole('radio', { name: ann }));
+    await act(async () => {
+      await i18n.changeLanguage('el');
+    });
+    expect(
+      screen.getByRole('button', { name: i18n.t('friend.sendTo', { name: ann }) }),
+    ).toBeOnTheScreen();
+    expect(i18n.t('friend.sendTo', { name: ann })).not.toMatch(/Send/);
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
   });
 
   it('a code invite (Make an invite) saves no friend setup', async () => {
@@ -742,18 +811,26 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     expect(screen.queryByTestId('friend-add')).toBeNull();
   });
 
-  it('Anyone makes an open invite link, like Make an invite link (#516)', async () => {
+  it('the Invite link tile is picked first; with it, the main button makes a link (#516, #732)', async () => {
     const user = setupUser();
     const parts = savedMe();
     await befriend(parts.server, 'ann');
     const props = await show(parts);
-    await user.press(screen.getByRole('button', { name: 'Anyone: make an invite link' }));
+    const link = () =>
+      screen.getByRole('radio', { name: 'Invite link: anyone with the link can join' });
+    expect(link()).toBeChecked();
+    // A tap on a friend, then back on the link: nothing is sent.
+    await user.press(screen.getByRole('radio', { name: nameOf(parts.server, 'ann') }));
+    expect(link()).not.toBeChecked();
+    await user.press(link());
+    await flush();
+    expect(props.onCreated).not.toHaveBeenCalled();
+    await user.press(screen.getByRole('button', { name: 'Make an invite link' }));
     await flush();
     expect(props.onCreated).toHaveBeenCalledTimes(1);
     expect(props.onFriendInvited).not.toHaveBeenCalled();
     expect(loadFriendInviteSetup()).toBeNull();
   });
-
   it('a phone that signed in before gets no account sentence (#516)', async () => {
     const parts = savedMe();
     await show(parts);
@@ -811,6 +888,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     const props = await show(parts);
     // Ann ends the friendship on her phone.
     await parts.server.friendsFor('ann').removeFriend(ME);
+    await user.press(screen.getByRole('radio', { name: nameOf(parts.server, 'ann') }));
     await user.press(
       screen.getByRole('button', { name: `Send the invite to ${nameOf(parts.server, 'ann')}` }),
     );
@@ -827,6 +905,7 @@ describe('FriendSetupScreen: your friends (#488)', () => {
     await befriend(parts.server, 'ann');
     const props = await show(parts);
     parts.authStore.session = null;
+    await user.press(screen.getByRole('radio', { name: nameOf(parts.server, 'ann') }));
     await user.press(
       screen.getByRole('button', { name: `Send the invite to ${nameOf(parts.server, 'ann')}` }),
     );
