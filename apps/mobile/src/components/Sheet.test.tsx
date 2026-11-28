@@ -2,8 +2,8 @@
  * The grab handle of the raised sheet (#652): a drag down past
  * `DRAG_CLOSE_DISTANCE` closes the sheet, a shorter one springs it back.
  */
-import { screen } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { act, screen } from '@testing-library/react-native';
+import { DeviceEventEmitter, StyleSheet, Text } from 'react-native';
 
 import { touch } from '../../test/gestureHandlerMock';
 import { renderWithRoot } from '../../test/render';
@@ -183,5 +183,62 @@ describe('<Sheet /> for the chat (#720)', () => {
     await setWindow(LANDSCAPE_SE);
     expect(maxHeight()).toBe('100%');
     expect(screen.getByText('Tap here to go back', { includeHiddenElements: true })).toBeTruthy();
+  });
+});
+
+describe('<Sheet /> while the keyboard shows (#729)', () => {
+  afterEach(async () => {
+    await act(async () => {
+      DeviceEventEmitter.emit('keyboardDidHide', {});
+    });
+    await resetWindow();
+  });
+
+  const keyboard = (shown: boolean) =>
+    act(async () => {
+      DeviceEventEmitter.emit(shown ? 'keyboardDidShow' : 'keyboardDidHide', {});
+    });
+  const chat = () =>
+    renderWithRoot(
+      <Sheet
+        visible
+        onClose={() => undefined}
+        closeLabel="Close"
+        look="raised"
+        side
+        maxHeight={0.55}
+        header={<Text>Head</Text>}
+        footer={<Text>Foot</Text>}
+        testID="the-sheet">
+        <Text>Inside</Text>
+      </Sheet>,
+    );
+  const maxHeight = () =>
+    (
+      StyleSheet.flatten(screen.getByTestId('the-sheet').props.style as never) as {
+        maxHeight?: number | string;
+      }
+    ).maxHeight;
+
+  it('takes all the room over the keyboard in a tall window, and its limit again after', async () => {
+    await chat();
+    expect(maxHeight()).toBe('55%');
+    await keyboard(true);
+    expect(maxHeight()).toBe('100%');
+    // The header stays in a tall window.
+    expect(screen.getByText('Head')).toBeTruthy();
+    await keyboard(false);
+    expect(maxHeight()).toBe('55%');
+  });
+
+  it('hides the header of a side panel while the keyboard shows', async () => {
+    await chat();
+    await setWindow(LANDSCAPE_SE);
+    expect(screen.getByText('Head')).toBeTruthy();
+    await keyboard(true);
+    expect(screen.queryByText('Head')).toBeNull();
+    expect(screen.getByText('Foot')).toBeTruthy();
+    await keyboard(false);
+    expect(screen.getByText('Head')).toBeTruthy();
   });
 });

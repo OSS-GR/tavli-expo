@@ -52,7 +52,15 @@ import type { PlayerId } from '@tavli/engine';
 import { useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
 import { ActionButton } from '@/components/ActionButton';
@@ -61,6 +69,7 @@ import { CheckerAvatar } from '@/components/CheckerAvatar';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/icons';
 import { FieldProblem } from '@/components/Problem';
+import { useKeyboardShown } from '@/components/keyboard';
 import { RoundButton } from '@/components/RoundButton';
 import { useFocusOnShow } from '@/features/accessibility/focus';
 import { termsUrl } from '@/features/online/usernameStep';
@@ -571,6 +580,11 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
   const [sending, setSending] = useState(false);
   // The text key of the last refusal, and a count so the same problem is read again.
   const [problem, setProblem] = useState<{ key: SendProblemKey; n: number } | null>(null);
+  // A phone on its side has little room over the keyboard: the ready
+  // phrases make way for the messages (#729).
+  const keyboardUp = useKeyboardShown();
+  const window = useWindowDimensions();
+  const tight = keyboardUp && window.width > window.height;
   const left = CHAT_MAX_LENGTH - Array.from(text).length;
   const ready = text.trim() !== '' && left >= 0 && !sending;
 
@@ -600,7 +614,7 @@ export function ChatComposer({ chat, gameId, text, onText: setText }: ChatCompos
 
   return (
     <View style={styles.composer}>
-      {text === '' ? (
+      {text === '' && !tight ? (
         <ScrollView
           testID="chat-phrases"
           horizontal
