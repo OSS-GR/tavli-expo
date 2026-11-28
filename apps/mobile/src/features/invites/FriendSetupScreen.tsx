@@ -45,14 +45,20 @@
  * - Your friends (#488, `friends`): a phone with a note of an online
  *   account (`hasOnlineAccount`) loads the saved account's friends when
  *   the screen opens. With friends, the Who row (`WhoRow`, #516) sits at
- *   the top: "Anyone" (it makes the open link, like the button), up to
+ *   the top: "Invite link" (anyone with the link), up to
  *   `FRIENDS_SHOWN` friends as checkers (`pickFriends`), and Add
- *   (`onAddFriend`); "All friends" opens Friends. A tap on a friend sends a friend invite at once
- *   with the picks on the screen (the owner's call: the picks are right
- *   above). The friend gets a push and needs no link, so the screen stays
- *   and says "Invite sent to NAME" (#507, `onFriendInvited`); no waiting
- *   screen opens. That friend's tile turns off for the visit, so a second
- *   tap sends no second invite. A guest, nobody signed in, no
+ *   (`onAddFriend`); "All friends" opens Friends. A tap on a tile only
+ *   picks the receiver (#732, owner, 2026-11-28: a tap on a name must
+ *   never send): the tiles are radio buttons, the invite link is picked
+ *   first, and the one main button says what it does, "Make an invite
+ *   link" or "Send the invite to NAME", with the picks on the screen. The
+ *   friend gets a push and needs no link, so the screen stays and says
+ *   "Invite sent to NAME. They get a notification." (#507,
+ *   `onFriendInvited`); no waiting screen opens. For that friend the main
+ *   button is then **Done** (it goes back), so a second press sends no
+ *   second invite, and **Cancel the invite** takes it back
+ *   (`Invites.cancelInvite` with the code of the send). Another pick
+ *   brings the action back, so the player can invite one more friend. A guest, nobody signed in, no
  *   friends or a failed load: no list, and the screen is as before. The
  *   list never makes an account and never opens the sign-in sheet. A tap
  *   that finds the account gone drops the list and says so; a friend who
@@ -152,7 +158,7 @@ type NotSaved = 'guest' | 'signedOut';
 
 /** Why "Make an invite" (or a tap on a friend) did not work. */
 type Problem =
-  | { readonly kind: 'account' | 'make' | 'tooMany' }
+  | { readonly kind: 'account' | 'make' | 'tooMany' | 'cancel' }
   | { readonly kind: 'friends'; readonly problem: FriendsProblem };
 
 /** The friends Play a friend shows (#488): up to `FRIENDS_SHOWN`. */
@@ -192,9 +198,15 @@ export function FriendSetupScreen({
   // The friend from the list who just got an invite (#507). A new object
   // for each send, so a second send is read again.
   const [sent, setSent] = useState<{ readonly name: string } | null>(null);
-  // Friends from the list who got an invite on this visit: their rows turn
-  // off, so a second tap sends no second invite.
-  const [invited, setInvited] = useState<ReadonlySet<string>>(() => new Set());
+  // The invite a friend took back (#732): read once, like `sent`.
+  const [cancelled, setCancelled] = useState<{ readonly name: string } | null>(null);
+  // Friends from the list who got an invite on this visit, with the
+  // invite's code: the button turns to Done for them, so a second press
+  // sends no second invite, and Cancel takes that invite back.
+  const [invited, setInvited] = useState<ReadonlyMap<string, string>>(() => new Map());
+  // Who gets the invite (#732): a friend's player id from the list, or
+  // `null` for the invite link. A tap on a tile only sets this.
+  const [selected, setSelected] = useState<string | null>(null);
   // No saved session: the sign-in sheet is open.
   const [signingIn, setSigningIn] = useState(false);
   const titleRef = useFocusOnShow();
@@ -270,6 +282,7 @@ export function FriendSetupScreen({
     setBusy(true);
     setProblem(null);
     setSent(null);
+    setCancelled(null);
     const game: NewInvite = { choice, targetPoints, turnTimeMinutes };
     const target =
       to !== undefined && listFrom !== undefined
@@ -363,12 +376,50 @@ export function FriendSetupScreen({
       making.current = false;
       setBusy(false);
       setSent({ name: playerNameText(to.name, t) ?? t('friends.unnamed') });
-      setInvited((old) => new Set(old).add(to.playerId));
+      setInvited((old) => new Map(old).set(to.playerId, code));
       onFriendInvited?.(code);
       return;
     }
     // The buttons stay off while the route opens the waiting screen.
     onCreated(code);
+  };
+
+  // The picked friend, while the list still has them; else the invite link.
+  const pickedFriend =
+    selected === null ? undefined : friendList?.find((f) => f.playerId === selected);
+  const pickedName =
+    pickedFriend === undefined
+      ? null
+      : (playerNameText(pickedFriend.name, t) ?? t('friends.unnamed'));
+  const pickedCode = pickedFriend === undefined ? undefined : invited.get(pickedFriend.playerId);
+  /** Takes back the invite the picked friend got on this visit (#732). */
+  const cancelSent = () => {
+    if (making.current || pickedFriend === undefined || pickedCode === undefined) return;
+    making.current = true;
+    setBusy(true);
+    setProblem(null);
+    const { playerId } = pickedFriend;
+    const name = pickedName ?? t('friends.unnamed');
+    invites.cancelInvite(pickedCode).then(
+      () => {
+        making.current = false;
+        if (!mounted.current) return;
+        setBusy(false);
+        setSent(null);
+        setCancelled({ name });
+        setInvited((old) => {
+          const next = new Map(old);
+          next.delete(playerId);
+          return next;
+        });
+      },
+      () => {
+        making.current = false;
+        if (!mounted.current) return;
+        setBusy(false);
+        setProblem({ kind: 'cancel' });
+      },
+    );
   };
 
   const lengthOptions: SegmentOption<`${MatchLength}`>[] = MATCH_LENGTHS.map((n) => ({
@@ -390,9 +441,11 @@ export function FriendSetupScreen({
         ? t('friend.tooMany', { max: MAX_OPEN_INVITES })
         : problem?.kind === 'make'
           ? t('friend.makeFailed')
-          : problem?.kind === 'friends'
-            ? t(`friends.problem.${problem.problem}`)
-            : null;
+          : problem?.kind === 'cancel'
+            ? t('friend.wait.cancelFailed')
+            : problem?.kind === 'friends'
+              ? t(`friends.problem.${problem.problem}`)
+              : null;
   const notSavedText =
     notSaved === 'guest'
       ? t('friends.guest')
@@ -406,10 +459,15 @@ export function FriendSetupScreen({
   useEffect(() => {
     if (problemText !== null) AccessibilityInfo.announceForAccessibility(problemText);
   }, [problem, problemText]);
-  const sentText = sent === null ? null : t('friends.sent', { name: sent.name });
+  const sentText = sent === null ? null : t('friend.sentNote', { name: sent.name });
   useEffect(() => {
     if (sentText !== null) AccessibilityInfo.announceForAccessibility(sentText);
   }, [sent, sentText]);
+  const cancelledText =
+    cancelled === null ? null : t('friend.sendCancelled', { name: cancelled.name });
+  useEffect(() => {
+    if (cancelledText !== null) AccessibilityInfo.announceForAccessibility(cancelledText);
+  }, [cancelled, cancelledText]);
 
   // The account sentence is for a phone that never signed in: the sign-in
   // sheet comes on Make an invite. A friend invite needs a saved account
@@ -451,10 +509,16 @@ export function FriendSetupScreen({
             <WhoRow
               testID="friend-friends"
               friends={whoFriends}
-              invited={invited}
+              selected={pickedFriend?.playerId ?? null}
+              invited={new Set(invited.keys())}
               busy={busy}
-              onAnyone={() => void make()}
-              onFriend={(f) => void make({ to: f })}
+              onSelect={(playerId) => {
+                setSelected(playerId);
+                // The notes of the last action belong to the last pick.
+                setSent(null);
+                setCancelled(null);
+                setProblem(null);
+              }}
               {...(onAddFriend === undefined ? {} : { onAdd: onAddFriend })}
             />
           </View>
@@ -506,7 +570,18 @@ export function FriendSetupScreen({
             {problemText}
           </Text>
         ) : null}
-        {busy ? <Text style={styles.hint}>{t('friend.making')}</Text> : null}
+        {busy ? (
+          <Text style={styles.hint}>
+            {pickedFriend !== undefined || friend !== undefined
+              ? t('friend.sending')
+              : t('friend.making')}
+          </Text>
+        ) : null}
+        {cancelledText !== null ? (
+          <Text testID="friend-cancelled" style={styles.hint}>
+            {cancelledText}
+          </Text>
+        ) : null}
         {sentText !== null ? (
           <View testID="friend-sent" style={styles.sent}>
             <Icon name="check" size={18} color={theme.colors.accent} />
@@ -527,13 +602,39 @@ export function FriendSetupScreen({
             ) : null}
           </>
         ) : (
-          <ActionButton
-            testID="friend-make"
-            icon={friend === undefined ? 'link' : 'send'}
-            label={friend === undefined ? t('friend.make') : t('friends.invite.send')}
-            disabled={busy}
-            onPress={() => void make()}
-          />
+          <>
+            {pickedCode !== undefined ? (
+              <ActionButton
+                testID="friend-cancel-sent"
+                kind="secondary"
+                label={t('friend.wait.cancel')}
+                disabled={busy}
+                onPress={cancelSent}
+              />
+            ) : null}
+            {/* The one action (#732): the label says what it does for the pick. */}
+            <ActionButton
+              testID="friend-make"
+              {...(pickedCode !== undefined
+                ? {}
+                : { icon: friend !== undefined || pickedFriend !== undefined ? 'send' : 'link' })}
+              label={
+                friend !== undefined
+                  ? t('friends.invite.send')
+                  : pickedFriend === undefined
+                    ? t('friend.make')
+                    : pickedCode !== undefined
+                      ? t('friend.done')
+                      : t('friend.sendTo', { name: pickedName })
+              }
+              disabled={busy}
+              onPress={() => {
+                if (pickedFriend === undefined) void make();
+                else if (pickedCode !== undefined) onBack();
+                else void make({ to: pickedFriend });
+              }}
+            />
+          </>
         )}
       </View>
       {signingIn ? (

@@ -1,6 +1,6 @@
 /**
  * Parts of Play a friend in the Figma pass (#516, node `17:17`): the Who
- * row (Anyone, your friends, Add), the game list with round radio marks,
+ * row (the invite link, your friends, Add; a tap only picks, #732), the game list with round radio marks,
  * and a one-line setting row (a label, then its control).
  *
  * Text may wrap with a large font: no line limit, and no fixed width on a
@@ -31,60 +31,66 @@ const TILE_WIDTH = 64;
 
 export interface WhoRowProps {
   friends: readonly Friend[];
-  /** Friends who got an invite on this visit: their tiles are off. */
+  /** The picked receiver: a friend's player id, or `null` for the invite link. */
+  selected: string | null;
+  /** Friends who got an invite on this visit: their tiles show a check. */
   invited: ReadonlySet<string>;
   /** An invite is being made: every tile is off. */
   busy: boolean;
-  /** Anyone: an open invite link. */
-  onAnyone: () => void;
-  /** A friend: a friend invite, at once (#488). */
-  onFriend: (friend: Friend) => void;
+  /** A tap on a tile: it only picks the receiver (#732). `null` is the invite link. */
+  onSelect: (playerId: string | null) => void;
   /** Add a friend. Without it there is no Add tile. */
   onAdd?: () => void;
   testID?: string;
 }
 
 /**
- * Who to play (#516): "Anyone" (the open link, always the picked tile, so
- * it wears the brass ring), then each friend as a checker with initials,
- * then Add. A tap on a friend sends the invite at once, with the picks
- * below (#488); the screen stays and says so (#507).
+ * Who gets the invite (#516, #732): "Invite link" (anyone with the link),
+ * then each friend as a checker with initials, then Add. The tiles are
+ * radio buttons: a tap only picks the receiver, and the picked tile wears
+ * the brass ring and a bold name. The screen's one main button then makes
+ * the link or sends the invite. A friend who got an invite on this visit
+ * keeps a check badge.
  */
-export function WhoRow({ friends, invited, busy, onAnyone, onFriend, onAdd, testID }: WhoRowProps) {
+export function WhoRow({ friends, selected, invited, busy, onSelect, onAdd, testID }: WhoRowProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
+  const linkPicked = selected === null;
   return (
-    <View testID={testID} style={styles.whoTray}>
+    <View
+      testID={testID}
+      style={styles.whoTray}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={t('friend.who')}>
       <Pressable
         testID="friend-anyone"
-        accessibilityRole="button"
+        accessibilityRole="radio"
         accessibilityLabel={t('friend.anyoneLabel')}
-        accessibilityState={{ disabled: busy }}
+        accessibilityState={{ checked: linkPicked, disabled: busy }}
         disabled={busy}
-        onPress={onAnyone}
+        onPress={() => onSelect(null)}
         style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
-        <View style={styles.ring}>
+        <View style={linkPicked ? styles.ring : styles.box}>
           <CheckerAvatar wood="ebony" icon="link" size={CHECKER} />
         </View>
-        <Text style={styles.anyone}>{t('friend.anyone')}</Text>
+        <Text style={linkPicked ? styles.picked : styles.name}>{t('friend.anyone')}</Text>
       </Pressable>
       {friends.map((friend) => {
         const name = playerNameText(friend.name, t) ?? t('friends.unnamed');
         const done = invited.has(friend.playerId);
+        const picked = selected === friend.playerId;
         return (
           <Pressable
             key={friend.playerId}
             testID={`friend-pick-${friend.playerId}`}
-            accessibilityRole="button"
-            accessibilityLabel={
-              done ? t('friend.invitedTo', { name }) : t('friend.sendTo', { name })
-            }
+            accessibilityRole="radio"
+            accessibilityLabel={done ? t('friend.invitedTo', { name }) : name}
             accessibilityHint={done ? undefined : (recordText(friend.record, t) ?? undefined)}
-            accessibilityState={{ disabled: busy || done }}
-            disabled={busy || done}
-            onPress={() => onFriend(friend)}
-            style={({ pressed }) => [styles.tile, done && styles.done, pressed && styles.pressed]}>
-            <View style={styles.box}>
+            accessibilityState={{ checked: picked, disabled: busy }}
+            disabled={busy}
+            onPress={() => onSelect(friend.playerId)}
+            style={({ pressed }) => [styles.tile, pressed && styles.pressed]}>
+            <View style={picked ? styles.ring : styles.box}>
               <CheckerAvatar playerKey={friend.playerId} name={name} size={CHECKER} />
               {done ? (
                 <View style={styles.sentBadge}>
@@ -92,7 +98,7 @@ export function WhoRow({ friends, invited, busy, onAnyone, onFriend, onAdd, test
                 </View>
               ) : null}
             </View>
-            <Text style={styles.name}>{name}</Text>
+            <Text style={picked ? styles.picked : styles.name}>{name}</Text>
           </Pressable>
         );
       })}
@@ -201,10 +207,7 @@ const styles = StyleSheet.create((theme) => ({
   pressed: {
     opacity: 0.7,
   },
-  done: {
-    opacity: 0.55,
-  },
-  // Anyone is always the picked tile: a brass ring around its checker.
+  // The picked tile: a brass ring around its checker, and a bold name.
   ring: {
     padding: RING_PAD,
     borderRadius: TILE_BOX / 2,
@@ -238,7 +241,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  anyone: {
+  picked: {
     ...theme.type.footnote,
     fontWeight: '600',
     textAlign: 'center',
