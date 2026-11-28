@@ -665,3 +665,35 @@ describe('<GameScreen /> game and match end', () => {
     expect(onMatchOver).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a player who cannot move with any roll (#728)', () => {
+  it('says why the same player rolls again', async () => {
+    const store = newStore();
+    // White on the bar against Black's six doors, Black to roll.
+    const board = createBoard(
+      {
+        white: { points: { 6: 14 }, bar: 1 },
+        black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+      },
+      'contrary',
+    );
+    setPosition(store, board, 'black');
+    await show(store);
+    const line = 'Ann cannot move with any roll. Bob rolls again.';
+    expect(screen.queryByText(line)).toBeNull();
+    await act(async () => {
+      const { dispatch } = store.getState();
+      dispatch({ type: 'roll', player: 'black', dice: [6, 5] });
+      dispatch({ type: 'move', player: 'black', move: { from: 13, to: 7, die: 6 } });
+      dispatch({ type: 'move', player: 'black', move: { from: 13, to: 8, die: 5 } });
+      dispatch({ type: 'confirm', player: 'black' });
+    });
+    expect(store.getState().flow.game.state.toMove).toBe('black');
+    expect(await screen.findByText(line)).toBeTruthy();
+    // Black's next roll ends the line.
+    await act(async () => {
+      store.getState().dispatch({ type: 'roll', player: 'black', dice: [2, 1] });
+    });
+    expect(screen.queryByText(line)).toBeNull();
+  });
+});

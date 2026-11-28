@@ -1,4 +1,11 @@
-import { createSeededRng, rollDie, type GameFlow } from '@tavli/engine';
+import {
+  createBoard,
+  createGameFlow,
+  createSeededRng,
+  portes,
+  rollDie,
+  type GameFlow,
+} from '@tavli/engine';
 
 import { createGameStore, diceView, turnView } from './gameStore';
 import { nextOpeningRoller, openingDice, openingStatus } from './opening';
@@ -240,5 +247,62 @@ describe('opening status', () => {
     store.getState().dispatch({ type: 'move', player: 'white', move: { from: 8, to: 7, die: 1 } });
     store.getState().dispatch({ type: 'confirm', player: 'white' });
     expect(openingStatus(store.getState().flow.game)).toBeNull();
+  });
+});
+
+describe('a player who cannot move with any roll (#728)', () => {
+  /** Portes: White on the bar against Black's six doors, Black to roll. */
+  function sixDoors() {
+    const store = newStore();
+    const board = createBoard(
+      {
+        white: { points: { 6: 14 }, bar: 1 },
+        black: { points: { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 13: 3 } },
+      },
+      'contrary',
+    );
+    const state = { ...portes.initialState({ startingPlayer: 'black' }), board };
+    const { flow } = store.getState();
+    store.setState({ flow: { ...flow, game: createGameFlow({ state, starter: 'black' }) } });
+    return store;
+  }
+
+  it('skips their turn after the other player moves: the same player rolls again', () => {
+    const store = sixDoors();
+    const { dispatch } = store.getState();
+    expect(dispatch({ type: 'roll', player: 'black', dice: [6, 5] })).toBe(true);
+    expect(dispatch({ type: 'move', player: 'black', move: { from: 13, to: 7, die: 6 } })).toBe(
+      true,
+    );
+    expect(dispatch({ type: 'move', player: 'black', move: { from: 13, to: 8, die: 5 } })).toBe(
+      true,
+    );
+    expect(dispatch({ type: 'confirm', player: 'black' })).toBe(true);
+    const { flow } = store.getState();
+    // The doors stay closed: White does not roll.
+    expect(flow.game.phase).toBe('awaiting-roll');
+    expect(flow.game.state.toMove).toBe('black');
+    expect(flow.game.skipped).toBe('white');
+    expect(flow.log.at(-1)).toEqual({ type: 'skipTurn', player: 'white' });
+    // Black rolls again at once.
+    expect(dispatch({ type: 'roll', player: 'black', dice: [2, 1] })).toBe(true);
+    expect(store.getState().flow.game.skipped ?? null).toBeNull();
+  });
+
+  it('does not skip when a door opens', () => {
+    const store = sixDoors();
+    const { dispatch } = store.getState();
+    dispatch({ type: 'roll', player: 'black', dice: [2, 1] });
+    // Black's 6 point keeps one checker: White can hit it to enter.
+    expect(dispatch({ type: 'move', player: 'black', move: { from: 6, to: 4, die: 2 } })).toBe(
+      true,
+    );
+    expect(dispatch({ type: 'move', player: 'black', move: { from: 13, to: 12, die: 1 } })).toBe(
+      true,
+    );
+    dispatch({ type: 'confirm', player: 'black' });
+    const { flow } = store.getState();
+    expect(flow.game.state.toMove).toBe('white');
+    expect(flow.game.skipped ?? null).toBeNull();
   });
 });

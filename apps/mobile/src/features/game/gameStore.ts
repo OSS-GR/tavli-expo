@@ -8,6 +8,7 @@
 import {
   EngineError,
   applyMatchAction,
+  maySkipTurn,
   canConfirm,
   canUndo,
   createMatchFlow,
@@ -107,6 +108,17 @@ const nextMatchKey = () => {
   return `m${matchCount}`;
 };
 
+/**
+ * A player who cannot move with any roll does not roll (#728,
+ * `tavli-match.md` "A player who cannot move with any roll"): their turn
+ * is skipped, and the other player rolls again. The engine never skips by
+ * itself, so the store does it after each action (online, the server).
+ */
+function skipBlocked(flow: MatchFlow, ctx: { rng: GameStoreOptions['rng'] }): MatchFlow {
+  if (flow.match.status === 'finished' || !maySkipTurn(flow.game)) return flow;
+  return applyMatchAction(flow, { type: 'skipTurn', player: flow.game.state.toMove }, ctx);
+}
+
 export function createGameStore({
   players,
   targetPoints,
@@ -136,7 +148,7 @@ export function createGameStore({
       const previous = get().flow;
       let next: MatchFlow;
       try {
-        next = applyMatchAction(previous, action, ctx);
+        next = skipBlocked(applyMatchAction(previous, action, ctx), ctx);
       } catch (error) {
         if (!(error instanceof EngineError)) throw error;
         set({ lastError: error.message });

@@ -8,6 +8,7 @@ export {
   currentBoard,
   currentPrompt,
   legalNextMoves,
+  maySkipTurn,
   lostDice,
   lostDiceWithReason,
   remainingDice,

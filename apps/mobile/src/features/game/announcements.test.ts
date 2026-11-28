@@ -14,7 +14,12 @@ import { gameRuleSet, type OpeningRollRule } from '@/features/match/setup';
 import { viewFlow } from '@/features/online/onlineStore';
 import i18n from '@/i18n';
 
-import { onlineTurnAnnouncement, turnAnnouncement, type AnnouncementNames } from './announcements';
+import {
+  onlineTurnAnnouncement,
+  turnAnnouncement,
+  type AnnouncementNames,
+  skippedLine,
+} from './announcements';
 import { createGameStore } from './gameStore';
 import { diceWereRolled } from './rolledDice';
 
@@ -332,5 +337,28 @@ describe('online announcements (#255)', () => {
     const rolled = viewFlow(view());
     expect(rolled.game.phase).toBe('moving');
     expect(onlineTurnAnnouncement(rolled, i18n.t, online)).toMatch(/^Opponent rolled /);
+  });
+});
+
+describe('skippedLine (#728)', () => {
+  const game = (skipped: PlayerId | null, phase: 'awaiting-roll' | 'moving' = 'awaiting-roll') =>
+    ({ phase, ...(skipped === null ? {} : { skipped }) }) as never;
+
+  it('says who cannot move and who rolls again', () => {
+    // vs the bot, you are White.
+    expect(skippedLine(game('white'), i18n.t, vsBot)).toBe(
+      'You cannot move with any roll. Bot rolls again.',
+    );
+    expect(skippedLine(game('black'), i18n.t, vsBot)).toBe(
+      'Bot cannot move with any roll. You roll again.',
+    );
+    expect(skippedLine(game('white'), i18n.t, passAndPlay)).toBe(
+      'Ann cannot move with any roll. Bot rolls again.',
+    );
+  });
+
+  it('says nothing with no skipped turn, or once the dice are rolled', () => {
+    expect(skippedLine(game(null), i18n.t, vsBot)).toBeNull();
+    expect(skippedLine(game('white', 'moving'), i18n.t, vsBot)).toBeNull();
   });
 });

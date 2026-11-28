@@ -181,6 +181,7 @@ import { useSupportAsk } from '@/features/support/supportAsk';
 
 import {
   onlinePassLine,
+  skippedLine,
   onlineTurnAnnouncement,
   stateHasChosenDouble,
   turnAnnouncement,
@@ -1404,15 +1405,23 @@ export function GameScreen({
     const timer = setTimeout(() => setOnlineLineSeen(onlineLineKey), OPENING_RESULT_MS);
     return () => clearTimeout(timer);
   }, [onlineLineKey]);
+  // A skipped turn (#728): the line says why the same player rolls again,
+  // local and online, until that player rolls. Screen readers hear it once.
+  const skippedText =
+    view.matchPhase === 'playing' ? skippedLine(game, t, { nameOf, isYou }) : null;
+  useAnnouncement(
+    skippedText,
+    skippedText === null ? undefined : `${matchKey}:skip:${gameKey}:${game.state.turnNumber}`,
+  );
   // The pass inlay says it already, and its dice show first (#355).
   const onlineLine =
-    onlineLineText !== null &&
-    onlineLineSeen !== onlineLineKey &&
-    online?.ended === null &&
-    !showPass &&
-    !passWaits
-      ? onlineLineText
-      : null;
+    showPass || passWaits
+      ? null
+      : skippedText !== null
+        ? skippedText
+        : onlineLineText !== null && onlineLineSeen !== onlineLineKey && online?.ended === null
+          ? onlineLineText
+          : null;
   useAnnouncement(
     fastForwarding ? t('game.fastForward.started') : null,
     fastForwarding ? `${raceKey}:fastForward` : undefined,

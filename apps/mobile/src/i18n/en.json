@@ -1318,6 +1318,11 @@
         "title": "Your opponent's profile",
         "body": "In an online match, tap the other player's name to see their rating, their place on the global board and your record. Add them as a friend from there.",
         "where": "An online match › the other player's name"
+      },
+      "blockedTurns": {
+        "title": "No roll when you cannot move",
+        "body": "When no roll can move any of your checkers, for example on the bar against six doors, you do not roll. The other player rolls again until a move opens for you.",
+        "where": "In every game, also online"
       }
     }
   },
@@ -1545,6 +1550,9 @@
       "next_you": "Your turn.",
       "passed": "{{name}} rolled {{dice}}. No checker can move.",
       "passed_you": "You rolled {{dice}}. No checker can move.",
+      "skipped": "{{name}} cannot move with any roll. {{other}} rolls again.",
+      "skipped_you": "You cannot move with any roll. {{name}} rolls again.",
+      "skipped_youRoll": "{{name}} cannot move with any roll. You roll again.",
       "rolled": "{{name}} rolled {{dice}}.",
       "rolled_you": "You rolled {{dice}}.",
       "rolledDouble": "{{name}} rolled {{double}}: four moves of {{value}}.",

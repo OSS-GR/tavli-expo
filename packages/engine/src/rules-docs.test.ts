@@ -22,6 +22,8 @@ import portesTests from './variants/portes/portes.test.ts?raw';
 import raceTests from './race.test.ts?raw';
 // Play ranked cases (#529) are tested in @tavli/online, where the rule lives.
 import rankedTests from '../../online/src/ranked.test.ts?raw';
+// The server's skip of a blocked player (#728) is tested there too.
+import skipTests from '../../online/src/skip.test.ts?raw';
 import { PRESET_IDS, RULE_GROUPS, RULE_SCHEMA } from './rules';
 import type { PresetId, RuleSet } from './rules';
 import { section, tableRows } from './testing/markdown';
@@ -212,7 +214,15 @@ const EDGE_CASE_TESTS: readonly {
   {
     name: 'tavli-match.md',
     doc: matchDoc,
-    tests: [matchTests, matchFlowTests, gameFlowTests, portesTests, raceTests, rankedTests],
+    tests: [
+      matchTests,
+      matchFlowTests,
+      gameFlowTests,
+      portesTests,
+      raceTests,
+      rankedTests,
+      skipTests,
+    ],
   },
   { name: 'fevga.md', doc: fevgaDoc, tests: [fevgaTests] },
   { name: 'asodio.md', doc: asodioDoc, tests: [asodioTests], extra: ['### Presets'] },

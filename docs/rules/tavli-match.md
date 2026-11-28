@@ -276,6 +276,33 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
   in races" (Settings, Game); the button still shows.
 - You can stop it at any time and play on yourself.
 
+## A player who cannot move with any roll (app rule)
+
+Sometimes a player has no legal move with **any** of the 21 rolls. The
+common case is Portes: a checker on the bar, and the opponent holds all
+six points where it could enter (six doors). The same can happen in
+Plakoto, Fevga and Asodio when every checker is blocked for every roll.
+
+Then that player does not roll (owner, 2026-11-28, #728):
+
+- Their turn is **skipped with no dice**, and the opponent rolls again.
+- This repeats until the opponent's play leaves them a move for at least
+  one roll (for example, one door opens). Then they roll as usual. A roll
+  that happens to have no move still passes (edge case 13).
+- A player who has a move with **some** roll is never skipped: they roll,
+  and a roll with no move passes.
+- When **neither** player can move with any roll, nothing is skipped:
+  both keep rolling and passing, as before.
+- The check is the engine's `maySkipTurn`
+  (`packages/engine/src/flow/game-flow.ts`), and the step is the action
+  `skipTurn`. The flow never skips by itself: the app (a local game) and
+  the server (an online game, in `advance`) send the action. A roll by a
+  player who could be skipped stays legal, so a game from before this
+  rule replays the same.
+- Online, the server skips at once, in the same save as the opponent's
+  turn. The turn clock starts again for the opponent.
+- The app says why the same player rolls again: "<name> cannot move".
+
 ## Edge cases
 
 1. Opening roll tie (e.g. both roll 4): roll again until different.
@@ -367,6 +394,21 @@ The engine check is `isRace` (`packages/engine/src/race.ts`).
     that ends the game loses no dice (the app shows no slash and no note).
     The same holds for 6-5 with the last checker on point 1: the 6 bears it
     off, and the 5 is not lost.
+40. Portes: White has a checker on the bar and Black holds all six entry
+    points → White's turn can be skipped (`maySkipTurn`). `skipTurn` gives
+    the turn to Black with no dice: the turn number goes up, `lastTurn`
+    stays, and the flow notes who was skipped until the next roll.
+41. Black opens one entry point → White has a move with some roll, so
+    White's turn is not skipped: `skipTurn` is refused and White rolls.
+42. Five doors, not six: White can enter with one number → never skipped,
+    also when the roll that comes has no move (it passes, edge case 13).
+43. Neither player can move with any roll → nothing is skipped.
+44. A roll by a player who could be skipped is still legal and passes, so
+    an older game replays the same.
+45. Online: after a turn that leaves the other player with no move for any
+    roll, the server skips that player in the same save, and the same
+    player rolls again. It skips again after each such turn, and stops
+    when a door opens.
 
 ## House-rule variants (flags)
 
