@@ -30,7 +30,10 @@
  *
  * A text field in it (the email code, the username) stays above the
  * keyboard: on iOS the sheet moves up with it (`KeyboardAvoidingView`);
- * Android resizes the window.
+ * Android resizes the window. While the keyboard shows, the content gets
+ * all the room that is left (#729): `maxHeight` does not apply, the
+ * footer keeps no room for the home bar, and a side panel hides its
+ * header (a phone on its side has about 180 pt over the keyboard).
  */
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import {
@@ -57,6 +60,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StyleSheet } from 'react-native-unistyles';
 import { scheduleOnRN } from 'react-native-worklets';
+
+import { useKeyboardShown } from './keyboard';
 
 /** A drag of the handle this far down closes the sheet (points). */
 export const DRAG_CLOSE_DISTANCE = 90;
@@ -156,6 +161,7 @@ export function Sheet({
   // A side panel while the window is wider than tall.
   const window = useWindowDimensions();
   const docked = side && atBottom(shown) && window.width > window.height;
+  const keyboardUp = useKeyboardShown();
 
   // The drag of the handle (#652). A sheet that opens again starts in place.
   const dragY = useSharedValue(0);
@@ -230,7 +236,7 @@ export function Sheet({
             testID={testID}
             style={[
               styles.sheet(shown, docked),
-              maxHeight === undefined || docked
+              maxHeight === undefined || docked || keyboardUp
                 ? null
                 : { maxHeight: `${Math.round(maxHeight * 100)}%` },
               dragged,
@@ -247,7 +253,9 @@ export function Sheet({
                 </View>
               </GestureDetector>
             ) : null}
-            {header != null ? <View style={styles.header(shown)}>{header}</View> : null}
+            {header != null && !(docked && keyboardUp) ? (
+              <View style={styles.header(shown)}>{header}</View>
+            ) : null}
             <ScrollView
               testID="sheet-scroll"
               ref={scroll}
@@ -261,7 +269,7 @@ export function Sheet({
                 : {})}>
               {children}
             </ScrollView>
-            {footer != null ? <View style={styles.footer(shown)}>{footer}</View> : null}
+            {footer != null ? <View style={styles.footer(shown, keyboardUp)}>{footer}</View> : null}
           </Animated.View>
         </KeyboardAvoidingView>
       </GestureHandlerRootView>
@@ -405,10 +413,14 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: look === 'raised' || look === 'bare' ? 0 : theme.space.xl,
     paddingBottom: theme.space.sm,
   }),
-  footer: (look: SheetLook) => ({
+  footer: (look: SheetLook, keyboardUp: boolean) => ({
     paddingHorizontal: look === 'bare' ? 0 : look === 'raised' ? theme.space.lg : theme.space.xl,
     paddingTop: theme.space.sm,
-    paddingBottom:
-      look === 'sheet' || look === 'raised' ? rt.insets.bottom + theme.space.lg : theme.space.xl,
+    // Over the keyboard there is no home bar to keep clear of.
+    paddingBottom: keyboardUp
+      ? theme.space.sm
+      : look === 'sheet' || look === 'raised'
+        ? rt.insets.bottom + theme.space.lg
+        : theme.space.xl,
   }),
 }));

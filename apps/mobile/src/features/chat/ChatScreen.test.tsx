@@ -7,7 +7,7 @@ import { createSeededRng } from '@tavli/engine';
 import { createMemoryGameServer, type MemoryGameServer } from '@tavli/online';
 import { markNamed } from '@tavli/online/testing';
 import { act, screen, within } from '@testing-library/react-native';
-import { AccessibilityInfo, StyleSheet } from 'react-native';
+import { AccessibilityInfo, DeviceEventEmitter, StyleSheet } from 'react-native';
 
 import { SIDE_PANEL_WIDTH } from '@/components/Sheet';
 import { OnlineMatchScreen } from '@/features/online/OnlineMatchScreen';
@@ -451,6 +451,31 @@ describe('the chat of an online game', () => {
     // The game has a clock: the line names the turn, not just "Chat".
     expect(line).not.toBe('Chat');
     expect(line).toMatch(/Your turn · |U_bob plays · /);
+  });
+
+  it('hides the ready phrases over the keyboard on a phone on its side', async () => {
+    storage.setString(CHAT_RULES_STORAGE_KEY, '1');
+    const user = setupUser();
+    await openGame();
+    try {
+      await setWindow(LANDSCAPE_PRO_MAX);
+      await user.press(await button());
+      expect(await screen.findByTestId('chat-phrases')).toBeTruthy();
+      await act(async () => {
+        DeviceEventEmitter.emit('keyboardDidShow', {});
+      });
+      expect(screen.queryByTestId('chat-phrases')).toBeNull();
+      expect(screen.getByTestId('chat-input')).toBeTruthy();
+      await act(async () => {
+        DeviceEventEmitter.emit('keyboardDidHide', {});
+      });
+      expect(screen.getByTestId('chat-phrases')).toBeTruthy();
+    } finally {
+      await act(async () => {
+        DeviceEventEmitter.emit('keyboardDidHide', {});
+      });
+      await resetWindow();
+    }
   });
 
   it('shows the chat rules again from the menu', async () => {
