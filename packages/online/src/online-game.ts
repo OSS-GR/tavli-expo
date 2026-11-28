@@ -47,6 +47,7 @@ import {
   applyMatchAction,
   createMatchFlow,
   currentPrompt,
+  maySkipTurn,
   matchPhase,
   resolveRules,
 } from '@tavli/engine';
@@ -254,6 +255,10 @@ function apply(flow: MatchFlow, action: MatchAction, rng: Rng): MatchFlow {
  * (#379): each one rolls their own die. Only `rollOpenings: true` (the
  * time out when nobody rolled) makes the server roll it. The result keeps
  * the game it replaced with the next one (`endedGame`).
+ *
+ * It also skips the turn of a player who cannot move with any roll
+ * (`maySkipTurn`, #728): the same player then rolls again, and the next
+ * step may skip once more.
  */
 export function advance(
   flow: MatchFlow,
@@ -283,6 +288,12 @@ export function advance(
         next = apply(next, { type: 'rollOpening', player }, rng);
         break;
       }
+      case 'awaiting-roll':
+        // The player to roll cannot move with any roll: no dice, the other
+        // player rolls again (`tavli-match.md`, #728).
+        if (!maySkipTurn(game)) return done();
+        next = apply(next, { type: 'skipTurn', player: game.state.toMove }, rng);
+        break;
       default:
         return done();
     }

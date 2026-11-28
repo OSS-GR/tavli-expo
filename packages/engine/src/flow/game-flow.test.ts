@@ -21,6 +21,7 @@ import {
   currentBoard,
   currentPrompt,
   legalNextMoves,
+  maySkipTurn,
   lostDice,
   lostDiceWithReason,
   remainingDice,
@@ -229,6 +230,63 @@ describe('turn phases', () => {
     expect(flow.phase).toBe('awaiting-roll');
     expect(flow.state).toMatchObject({ toMove: 'black', turnNumber: 2, dice: null });
     expect(flow.lastTurn).toEqual({ player: 'white', dice: [4, 2], moves: [] });
+  });
+
+  describe('a player who cannot move with any roll (#728)', () => {
+    const SIX_DOORS = 'w: bar 13x14 ; b: 6x2 5x2 4x2 3x2 2x2 1x2 24x3';
+    const skip = (player: PlayerId): GameAction => ({ type: 'skipTurn', player });
+
+    it('tavli-match.md #40: on the bar against six doors, the turn is skipped with no dice', () => {
+      const flow = at(SIX_DOORS);
+      expect(maySkipTurn(flow)).toBe(true);
+      const skipped = applyGameAction(flow, skip('white'));
+      expect(skipped.phase).toBe('awaiting-roll');
+      expect(skipped.state).toMatchObject({ toMove: 'black', turnNumber: 2, dice: null });
+      expect(skipped.state.board).toEqual(flow.state.board);
+      // No turn was played: the last turn stays, and the flow notes the skip.
+      expect(skipped.lastTurn).toBeNull();
+      expect(skipped.skipped).toBe('white');
+      // Black's roll ends the note.
+      const rolled = applyGameAction(skipped, roll('black', [6, 5]));
+      expect('skipped' in rolled).toBe(false);
+      // Only the player to roll can be skipped.
+      expect(() => applyGameAction(flow, skip('black'))).toThrow(illegalAction);
+    });
+
+    it('tavli-match.md #41: one open door → the turn is not skipped', () => {
+      // Black left point 4: a 4 enters.
+      const flow = at('w: bar 13x14 ; b: 6x2 5x2 3x2 2x2 1x2 24x5');
+      expect(maySkipTurn(flow)).toBe(false);
+      expect(() => applyGameAction(flow, skip('white'))).toThrow(illegalAction);
+      expect(applyGameAction(flow, roll('white', [4, 2])).phase).toBe('moving');
+    });
+
+    it('tavli-match.md #42: five doors → never skipped, and a roll with no move passes', () => {
+      const flow = at('w: bar 13x14 ; b: 6x2 5x2 3x2 2x2 1x2 24x5');
+      expect(maySkipTurn(flow)).toBe(false);
+      const passed = applyGameAction(flow, roll('white', [6, 5]));
+      expect(passed.lastTurn).toEqual({ player: 'white', dice: [6, 5], moves: [] });
+      expect(passed.state.toMove).toBe('black');
+    });
+
+    it('tavli-match.md #43: neither player can move → nothing is skipped', () => {
+      // Each side has its one checker on the bar against six doors.
+      const flow = at('w: bar 6x2 5x2 4x2 3x2 2x2 1x2 7x2 ; b: bar 6x2 5x2 4x2 3x2 2x2 1x2 7x2');
+      expect(maySkipTurn(flow)).toBe(false);
+      expect(() => applyGameAction(flow, skip('white'))).toThrow(illegalAction);
+    });
+
+    it('tavli-match.md #44: a roll by a player who could be skipped is still legal', () => {
+      const flow = at(SIX_DOORS);
+      const passed = applyGameAction(flow, roll('white', [4, 2]));
+      expect(passed.lastTurn).toEqual({ player: 'white', dice: [4, 2], moves: [] });
+      expect(passed.state).toMatchObject({ toMove: 'black', turnNumber: 2 });
+    });
+
+    it('is false outside the wait for a roll', () => {
+      expect(maySkipTurn(applyGameAction(at(START), roll('white', [3, 1])))).toBe(false);
+      expect(maySkipTurn(at(START))).toBe(false);
+    });
   });
 
   it('tavli-match.md #9: when only one die can be played, the turn is complete after it', () => {

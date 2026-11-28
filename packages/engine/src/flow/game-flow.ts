@@ -29,6 +29,13 @@
  * and goes to the other player. `lastTurn` keeps the dice of the pass, so
  * the UI can show them (`tavli-match.md` #13).
  *
+ * A player who cannot move with any roll does not roll (`tavli-match.md`,
+ * "A player who cannot move with any roll", #728): `skipTurn` gives the
+ * turn to the other player with no dice. The flow never plays it by
+ * itself: the caller (the app, the server) sends it when `maySkipTurn`
+ * says so. A `roll` by that player stays legal, so a game from before
+ * this rule replays the same.
+ *
  * `GameFlow` is plain JSON. It never stores what it can compute: the board
  * in the middle of a turn, the legal next moves and the dice left come from
  * the helpers at the end of this file.
@@ -36,7 +43,7 @@
 
 import { applyMoveToBoard } from '../board';
 import type { BoardState } from '../board';
-import { diceMoves, isDieValue, rollDice, rollDie } from '../dice';
+import { DISTINCT_ROLLS, diceMoves, isDieValue, rollDice, rollDie } from '../dice';
 import type { Dice, DieValue } from '../dice';
 import { EngineError } from '../errors';
 import { resignGame } from '../match';
@@ -83,8 +90,14 @@ export interface GameFlow {
   readonly opening: OpeningRoll | null;
   /** The moves played so far this turn. Not final until `confirm`. */
   readonly played: readonly Move[];
-  /** The last finished turn, a pass too. `null` before the first one. */
+  /** The last finished turn, a pass too. `null` before the first one. A skipped turn does not change it. */
   readonly lastTurn: Turn | null;
+  /**
+   * The player whose turn was skipped since the last roll (`skipTurn`),
+   * so the UI can say why the same player rolls again. Absent or `null`
+   * when no turn was skipped. The next roll takes it away.
+   */
+  readonly skipped?: PlayerId | null;
   /** The result once the phase is `game-over`, else `null`. */
   readonly result: GameResult | null;
 }
@@ -109,6 +122,12 @@ export type GameAction =
   | { readonly type: 'rollOpening'; readonly player: PlayerId; readonly die?: DieValue }
   | { readonly type: 'chooseStarter'; readonly player: PlayerId }
   | { readonly type: 'roll'; readonly player: PlayerId; readonly dice?: Dice }
+  /**
+   * `player` cannot move with any roll: their turn is skipped with no
+   * dice, and the other player rolls again. Legal only when `maySkipTurn`
+   * is true for the flow.
+   */
+  | { readonly type: 'skipTurn'; readonly player: PlayerId }
   | {
       readonly type: 'move';
       readonly player: PlayerId;
@@ -203,10 +222,41 @@ function finishTurn(flow: GameFlow, moves: readonly Move[], variant: Variant): G
   return settle({ ...flow, lastTurn: turn }, next, variant);
 }
 
+/** True when `dice` gives the player to move of `state` no legal move. */
+function passes(state: GameState, dice: Dice, variant: Variant): boolean {
+  const turns = variant.legalTurns({ ...state, dice }, dice);
+  return turns.length === 1 && turns[0]?.moves.length === 0;
+}
+
+/** True when the player to move of `state` has no legal move with any roll. */
+function shutOut(state: GameState, variant: Variant): boolean {
+  // Plain rolls first: they are the cheapest to check, and most positions stop at the first one.
+  return [...DISTINCT_ROLLS]
+    .sort((a, b) => Number(a.dice[0] === a.dice[1]) - Number(b.dice[0] === b.dice[1]))
+    .every(({ dice }) => passes(state, dice, variant));
+}
+
+/**
+ * True when the turn of the player to roll can be skipped with `skipTurn`
+ * (`tavli-match.md`, "A player who cannot move with any roll"): the game
+ * waits for a roll, that player has no legal move with any of the 21
+ * rolls, and the other player has a move with some roll. When neither
+ * player can move, nothing is skipped: both keep rolling, as before.
+ */
+export function maySkipTurn(flow: GameFlow, ctx: FlowContext = {}): boolean {
+  if (flow.phase !== 'awaiting-roll' || flow.state.dice !== null) return false;
+  const variant = variantOf(flow, ctx);
+  if (!shutOut(flow.state, variant)) return false;
+  const other = { ...flow.state, toMove: opponent(flow.state.toMove) };
+  return !shutOut(other, variant);
+}
+
 /** The player to move has `dice`. A roll with no legal move passes at once. */
 function beginTurn(flow: GameFlow, dice: Dice, variant: Variant): GameFlow {
   const state = { ...flow.state, dice };
-  const rolled = { ...flow, state, played: [] };
+  // A roll ends the note of a skipped turn.
+  const rolled: GameFlow & { skipped?: PlayerId | null } = { ...flow, state, played: [] };
+  delete rolled.skipped;
   const turns = variant.legalTurns(state, dice);
   if (turns.length === 1 && turns[0]?.moves.length === 0) return finishTurn(rolled, [], variant);
   return { ...rolled, phase: 'moving' };
@@ -345,6 +395,21 @@ export function stepGame(
       onTurn(flow, player, ['awaiting-roll']);
       const dice = action.dice === undefined ? rollDice(needRng(ctx)) : checkDice(action.dice);
       return [beginTurn(flow, dice, variant), { type: 'roll', player, dice }];
+    }
+
+    case 'skipTurn': {
+      onTurn(flow, player, ['awaiting-roll']);
+      if (!maySkipTurn(flow, ctx)) illegal(`${player} can move with some roll, or nobody can`);
+      // The same step as a pass, with no dice: the other player, and the next turn number.
+      const state: GameState = {
+        ...flow.state,
+        toMove: opponent(player),
+        turnNumber: flow.state.turnNumber + 1,
+      };
+      return [
+        { ...flow, state, played: [], skipped: player },
+        { type: 'skipTurn', player },
+      ];
     }
 
     case 'move': {

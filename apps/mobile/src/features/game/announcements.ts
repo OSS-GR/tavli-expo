@@ -22,7 +22,14 @@
  * card (who starts), the pass inlay (the roll and why nothing moved), the
  * mother question, the game-end sheet and the match-end screen.
  */
-import { isDouble, matchPhase, type GameFlow, type MatchFlow, type PlayerId } from '@tavli/engine';
+import {
+  isDouble,
+  matchPhase,
+  opponent,
+  type GameFlow,
+  type MatchFlow,
+  type PlayerId,
+} from '@tavli/engine';
 import type { TFunction } from 'i18next';
 
 import { moveLabel } from '@/features/accessibility/moveChoices';
@@ -142,6 +149,25 @@ export function onlinePassLine(
   return isYou(last.player)
     ? t('game.announce.passed_you', { dice })
     : t('game.announce.passed', { name: nameOf(last.player), dice });
+}
+
+/**
+ * A player who cannot move with any roll was skipped (#728): why the same
+ * player rolls again, "Dev_bot cannot move with any roll. You roll
+ * again." `null` once that player has rolled.
+ */
+export function skippedLine(
+  game: GameFlow,
+  t: TFunction,
+  { nameOf, isYou }: AnnouncementNames,
+): string | null {
+  const skipped = game.skipped ?? null;
+  if (skipped === null || game.phase !== 'awaiting-roll') return null;
+  const roller = opponent(skipped);
+  if (isYou(skipped)) return t('game.announce.skipped_you', { name: nameOf(roller) });
+  return isYou(roller)
+    ? t('game.announce.skipped_youRoll', { name: nameOf(skipped) })
+    : t('game.announce.skipped', { name: nameOf(skipped), other: nameOf(roller) });
 }
 
 /**
